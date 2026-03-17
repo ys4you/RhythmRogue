@@ -54,6 +54,22 @@ namespace RhythmRogue.Battle
         // -----------------------------------------------------------------
         // SETUP — called by NoteHighway after getting from pool
         // -----------------------------------------------------------------
+        // LANE ROTATION — sprite points UP by default
+        //   Lane 0 (Left):  90° Z
+        //   Lane 1 (Down):  180° Z
+        //   Lane 2 (Up):    0° Z
+        //   Lane 3 (Right): -90° Z (270°)
+        // -----------------------------------------------------------------
+
+        private static readonly Quaternion[] LaneRotations =
+        {
+            Quaternion.Euler(0f, 0f, 90f),   // Left
+            Quaternion.Euler(0f, 0f, 180f),  // Down
+            Quaternion.identity,              // Up
+            Quaternion.Euler(0f, 0f, -90f)   // Right
+        };
+
+        // -----------------------------------------------------------------
 
         /// <summary>
         /// Initialize the note with chart data and lane color.
@@ -63,14 +79,23 @@ namespace RhythmRogue.Battle
         /// <param name="noteIndex">Index in the chart's note list.</param>
         /// <param name="laneColor">Color for this lane.</param>
         /// <param name="beatHeight">World units per beat (for hold body scaling).</param>
-        public void Setup(NoteData data, int noteIndex, Color laneColor, float beatHeight)
+        /// <param name="downscroll">
+        /// True = notes scroll top-to-bottom (tail above head, rotated 180°).
+        /// False = notes scroll bottom-to-top (tail below head, no rotation).
+        /// </param>
+        public void Setup(NoteData data, int noteIndex, Color laneColor, float beatHeight, bool downscroll = true)
         {
             Data = data;
             NoteIndex = noteIndex;
 
-            // Head color
+            // Rotate head to match lane direction
+            int lane = Mathf.Clamp(data.Lane, 0, LaneRotations.Length - 1);
+
             if (_headRenderer != null)
+            {
                 _headRenderer.color = laneColor;
+                _headRenderer.transform.localRotation = LaneRotations[lane];
+            }
 
             // Hold note body and tail
             bool isHold = data.Type == NoteType.Hold;
@@ -91,7 +116,16 @@ namespace RhythmRogue.Battle
                 _tailRenderer.gameObject.SetActive(isHold);
 
                 if (isHold)
+                {
                     _tailRenderer.color = laneColor;
+
+                    // Flip tail based on scroll direction:
+                    // Downscroll: tail is above head, cap should point away (rotate 180°)
+                    // Upscroll: tail is below head, cap points down naturally (no rotation)
+                    _tailRenderer.transform.localRotation = downscroll
+                        ? Quaternion.Euler(0f, 0f, 180f)
+                        : Quaternion.identity;
+                }
             }
         }
 
@@ -138,6 +172,13 @@ namespace RhythmRogue.Battle
             IsHit = false;
             IsMissed = false;
             IsBeingHeld = false;
+
+            // Reset rotations (set fresh per-lane in Setup)
+            if (_headRenderer != null)
+                _headRenderer.transform.localRotation = Quaternion.identity;
+
+            if (_tailRenderer != null)
+                _tailRenderer.transform.localRotation = Quaternion.identity;
         }
 
         /// <summary>

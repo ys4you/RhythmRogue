@@ -36,7 +36,7 @@
                     "name": "Lane3",
                     "type": "Button",
                     "id": "a1b2c3d4-0002-0004-0001-000000000001",
-                    "expectedControlType": "Button",
+                    "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
@@ -144,11 +144,33 @@
                 },
                 {
                     "name": "",
+                    "id": "d95d01f4-cf31-46f0-bd5a-c7ff391aa83a",
+                    "path": "<Keyboard>/q",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard",
+                    "action": "Lane0",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "b3000002-0000-0000-0000-000000000001",
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
+                    "action": "Lane1",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "02c5b170-ea16-4ef8-a82c-ab006bd0cd04",
+                    "path": "<Keyboard>/w",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard",
                     "action": "Lane1",
                     "isComposite": false,
                     "isPartOfComposite": false
@@ -166,11 +188,33 @@
                 },
                 {
                     "name": "",
+                    "id": "030becf8-5629-4e8c-9591-0a44a5c9bc7d",
+                    "path": "<Keyboard>/p",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard",
+                    "action": "Lane2",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "b3000004-0000-0000-0000-000000000001",
                     "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
                     "groups": "Gamepad",
+                    "action": "Lane3",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "20d3c0bc-2716-4758-9dcf-7c0aca5979aa",
+                    "path": "<Keyboard>/leftBracket",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": ";Keyboard",
                     "action": "Lane3",
                     "isComposite": false,
                     "isPartOfComposite": false

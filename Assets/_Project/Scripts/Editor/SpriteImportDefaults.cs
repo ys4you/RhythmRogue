@@ -15,7 +15,7 @@ namespace RhythmRogue.Editor
     public class SpriteImportDefaults : AssetPostprocessor
     {
         private const string PixelArtRoot = "Assets/_Project/";
-        private const int DefaultPixelsPerUnit = 16;
+        private const int DefaultPixelsPerUnit = 32;
 
         private void OnPreprocessTexture()
         {

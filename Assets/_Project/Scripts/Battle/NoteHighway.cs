@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Core;
@@ -20,8 +21,6 @@ namespace RhythmRogue.Battle
     /// Notes at the current beat sit exactly on the hit line.
     /// Notes in the future are above it (positive Y).
     /// Notes in the past are below it (negative Y).
-    /// 
-    /// Uses FloatExtensions.Remap where useful for position mapping.
     /// 
     /// SOLID breakdown:
     /// - S: Only manages note visuals and lifecycle. No input, no scoring.
@@ -53,6 +52,10 @@ namespace RhythmRogue.Battle
         [Tooltip("How many beats past the hit line before despawning (should exceed miss window).")]
         [SerializeField] private float _beatsDespawnBehind = 2f;
 
+        [Tooltip("True = notes scroll top-to-bottom (hit line at bottom). " +
+                 "False = notes scroll bottom-to-top (hit line at top).")]
+        [SerializeField] private bool _downscroll = true;
+
         [Header("Lane Colors")]
         [SerializeField] private Color[] _laneColors =
         {
@@ -65,12 +68,15 @@ namespace RhythmRogue.Battle
         [Header("References")]
         [SerializeField] private NotePool _notePool;
 
-        [Tooltip("Receptor sprites (one per lane). Assign in order: Left, Down, Up, Right.")]
-        [SerializeField] private SpriteRenderer[] _receptors;
+        [Header("Receptor Sprites")]
+        [Tooltip("Single idle sprite — code rotates and colors it per lane.")]
+        [SerializeField] private Sprite _receptorIdleSprite;
 
-        [Header("Receptor Visuals")]
-        [SerializeField] private Color _receptorIdleColor = new Color(0.3f, 0.3f, 0.3f);
-        [SerializeField] private Color _receptorPressedColor = Color.white;
+        [Tooltip("Single pressed sprite — swapped in on key press.")]
+        [SerializeField] private Sprite _receptorPressedSprite;
+
+        /// <summary>Auto-generated receptor renderers, one per lane.</summary>
+        private SpriteRenderer[] _receptors;
 
         // =================================================================
         // RUNTIME STATE
@@ -90,6 +96,17 @@ namespace RhythmRogue.Battle
 
         /// <summary>Cached Conductor reference.</summary>
         private Conductor _conductor;
+
+        // =================================================================
+        // EVENTS
+        // =================================================================
+
+        /// <summary>
+        /// Fired when a note is auto-missed by passing the despawn window.
+        /// JudgmentSystem subscribes to this to process auto-misses
+        /// through the same pipeline as player-triggered judgments.
+        /// </summary>
+        public event Action<NoteView> OnNoteMissedEvent;
 
         // =================================================================
         // PUBLIC — for hit detection and other consumers
@@ -114,12 +131,54 @@ namespace RhythmRogue.Battle
         public float BeatHeight => _beatHeight;
 
         // =================================================================
+        // LANE ROTATION — matches NoteView.LaneRotations
+        // =================================================================
+
+        private static readonly Quaternion[] LaneRotations =
+        {
+            Quaternion.Euler(0f, 0f, 90f),   // Left
+            Quaternion.Euler(0f, 0f, 180f),  // Down
+            Quaternion.identity,              // Up
+            Quaternion.Euler(0f, 0f, -90f)   // Right
+        };
+
+        // =================================================================
         // LIFECYCLE
         // =================================================================
 
         private void Awake()
         {
             _conductor = Conductor.Instance;
+            CreateReceptors();
+        }
+
+        /// <summary>
+        /// Auto-generate 4 receptor GameObjects at the hit line.
+        /// Each gets the idle sprite, rotated and colored per lane.
+        /// No manual setup needed — just assign the 2 sprites in the Inspector.
+        /// </summary>
+        private void CreateReceptors()
+        {
+            if (_receptorIdleSprite == null) return;
+
+            _receptors = new SpriteRenderer[4];
+
+            for (int i = 0; i < 4; i++)
+            {
+                var go = new GameObject($"Receptor_L{i}");
+                go.transform.SetParent(transform);
+                
+                float x = (i < _lanePositions.Length) ? _lanePositions[i] : i;
+                go.transform.position = new Vector3(x, _hitLineY, 0f);
+                go.transform.localRotation = LaneRotations[i];
+
+                var sr = go.AddComponent<SpriteRenderer>();
+                sr.sprite = _receptorIdleSprite;
+                sr.color = (i < _laneColors.Length) ? _laneColors[i] : Color.white;
+                sr.sortingOrder = 1;
+
+                _receptors[i] = sr;
+            }
         }
 
         private void Update()
@@ -150,7 +209,6 @@ namespace RhythmRogue.Battle
                 return;
             }
 
-            // Clear any existing notes
             ClearAllNotes();
 
             _chart = chart;
@@ -181,7 +239,7 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Flash a receptor to show the player pressed that lane.
-        /// Call from the input system on key down.
+        /// Swaps between idle and pressed sprites, keeping the lane color.
         /// </summary>
         /// <param name="lane">Lane index (0-3).</param>
         /// <param name="pressed">True on press, false on release.</param>
@@ -192,7 +250,7 @@ namespace RhythmRogue.Battle
 
             if (_receptors[lane] != null)
             {
-                _receptors[lane].color = pressed ? _receptorPressedColor : _receptorIdleColor;
+                _receptors[lane].sprite = pressed ? _receptorPressedSprite : _receptorIdleSprite;
             }
         }
 
@@ -212,7 +270,6 @@ namespace RhythmRogue.Battle
             {
                 NoteData noteData = _chart.Notes[_nextSpawnIndex];
 
-                // Stop if the next note is beyond the visible window
                 if (noteData.BeatPosition > spawnThreshold)
                     break;
 
@@ -228,11 +285,10 @@ namespace RhythmRogue.Battle
         {
             NoteView note = _notePool.Get();
 
-            // Lane color (clamped for safety)
             int lane = Mathf.Clamp(noteData.Lane, 0, _laneColors.Length - 1);
             Color color = _laneColors[lane];
 
-            note.Setup(noteData, noteIndex, color, _beatHeight);
+            note.Setup(noteData, noteIndex, color, _beatHeight, _downscroll);
             PositionNote(note, currentBeat);
 
             _activeNotes.Add(note);
@@ -252,10 +308,8 @@ namespace RhythmRogue.Battle
             {
                 PositionNote(note, currentBeat);
 
-                // Update hold note body while being held
                 if (note.Data.Type == NoteType.Hold && note.IsBeingHeld)
                 {
-                    // Shrink the body as the hold progresses
                     float remaining = note.Data.EndBeatPosition - currentBeat;
                     remaining = Mathf.Max(0f, remaining);
                     note.UpdateHoldBody(remaining, _beatHeight);
@@ -266,10 +320,6 @@ namespace RhythmRogue.Battle
         /// <summary>
         /// Position a note in world space based on its beat distance
         /// from the current beat.
-        /// 
-        /// Notes at currentBeat sit exactly on the hit line.
-        /// Notes in the future are above (positive Y offset).
-        /// Notes in the past are below (negative Y offset).
         /// </summary>
         private void PositionNote(NoteView note, float currentBeat)
         {
@@ -298,14 +348,12 @@ namespace RhythmRogue.Battle
 
             foreach (NoteView note in _activeNotes)
             {
-                // For hold notes, use the end beat position
                 float relevantBeat = note.Data.Type == NoteType.Hold
                     ? note.Data.EndBeatPosition
                     : note.Data.BeatPosition;
 
                 if (relevantBeat < despawnBeat)
                 {
-                    // Auto-miss if not yet processed
                     if (!note.IsProcessed)
                     {
                         note.IsMissed = true;
@@ -325,13 +373,21 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Called when a note is auto-missed by passing the despawn window.
-        /// Override point for the hit detection system to hook into.
-        /// 
-        /// TODO (PROTO-007): Fire NoteJudgedEvent with Miss judgment.
+        /// Fires OnNoteMissedEvent for JudgmentSystem to process through
+        /// the same pipeline as player-triggered judgments.
         /// </summary>
         private void OnNoteMissed(NoteView note)
         {
-            Debug.Log($"[NoteHighway] Missed: {note.Data}");
+            OnNoteMissedEvent?.Invoke(note);
+        }
+
+        // =================================================================
+        // CLEANUP
+        // =================================================================
+
+        private void OnDestroy()
+        {
+            OnNoteMissedEvent = null;
         }
 
         // =================================================================
@@ -341,14 +397,12 @@ namespace RhythmRogue.Battle
 #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
-            // Draw hit line
             Gizmos.color = Color.red;
             float lineHalfWidth = 3f;
             Gizmos.DrawLine(
                 new Vector3(-lineHalfWidth, _hitLineY, 0f),
                 new Vector3(lineHalfWidth, _hitLineY, 0f));
 
-            // Draw lane positions
             Gizmos.color = new Color(1f, 1f, 1f, 0.2f);
 
             if (_lanePositions != null)

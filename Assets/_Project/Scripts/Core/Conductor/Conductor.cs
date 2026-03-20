@@ -142,10 +142,21 @@ namespace RhythmRogue.Core
             _audioSource.playOnAwake = false;
         }
 
+        /// <summary>Fired when the song finishes playing naturally.</summary>
+        public event Action OnSongFinished;
+
         private void Update()
         {
             if (!_isPlaying || _isPaused)
                 return;
+
+            // Detect natural end of song (AudioSource stopped on its own)
+            if (!_audioSource.isPlaying && SongPositionInSeconds > 0.5f)
+            {
+                _isPlaying = false;
+                OnSongFinished?.Invoke();
+                return;
+            }
 
             UpdateTiming();
             CheckBeatEvents();
@@ -324,6 +335,7 @@ namespace RhythmRogue.Core
             OnBeat = null;
             OnHalfBeat = null;
             OnBpmChanged = null;
+            OnSongFinished = null;
             base.OnDestroy();
         }
     }

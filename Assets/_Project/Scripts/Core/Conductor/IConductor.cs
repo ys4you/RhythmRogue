@@ -86,6 +86,12 @@ namespace RhythmRogue.Core
         /// </summary>
         event Action<float, float> OnBpmChanged;
 
+        /// <summary>
+        /// Fired when the song finishes playing naturally (AudioSource ends).
+        /// Subscribe from: BattleManager to detect end-of-song condition.
+        /// </summary>
+        event Action OnSongFinished;
+
         // =================================================================
         // PLAYBACK CONTROL
         // =================================================================

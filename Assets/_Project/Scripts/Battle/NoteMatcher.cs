@@ -116,9 +116,6 @@ namespace RhythmRogue.Battle
             // Mark as hit to prevent double-matching
             closest.IsHit = true;
 
-            // Receptor feedback (visual)
-            _highway.SetReceptorPressed(lane, true);
-
             // Fire result for judgment system
             var result = new NoteMatchResult(closest, deltaMs, lane);
             OnNoteHit?.Invoke(result);

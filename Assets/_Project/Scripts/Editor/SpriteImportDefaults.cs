@@ -7,7 +7,7 @@ namespace RhythmRogue.Editor
     /// Automatically configures imported textures for pixel art:
     ///   - Filter Mode → Point (no filter)
     ///   - Compression → None
-    ///   - Sprite Pixels Per Unit → 16 (common pixel art tile size)
+    ///   - Sprite Pixels Per Unit → 32 (common pixel art tile size)
     ///
     /// Runs on every texture imported under Assets/_Project/.
     /// Place this script in an Editor folder (e.g. Assets/_Project/Scripts/Editor/).

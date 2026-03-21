@@ -7,7 +7,6 @@ namespace RhythmRogue.Battle
     /// <summary>
     /// Handles the battle → map/summary transition.
     /// 
-    /// Sits in the battle scene alongside BattleManager.
     /// Listens for battle completion, records results in RunState,
     /// and triggers the appropriate scene transition.
     /// 
@@ -15,6 +14,9 @@ namespace RhythmRogue.Battle
     ///   Win (normal enemy) → complete node → go to map
     ///   Win (boss)         → complete node → end run (victory) → go to summary
     ///   Lose               → end run (defeat) → go to summary
+    /// 
+    /// Boss detection uses RunState.SelectedNode.EnemyData.IsBoss so there
+    /// is no dependency on static BattleConfig state.
     /// </summary>
     public class BattleResultHandler : MonoBehaviour
     {
@@ -52,11 +54,6 @@ namespace RhythmRogue.Battle
                 _battleScore += result.Amount;
         }
 
-        /// <summary>
-        /// Called by BattleManager when the battle is fully complete
-        /// (after the result overlay delay).
-        /// Wire this to BattleManager.OnBattleComplete or call manually.
-        /// </summary>
         public void HandleBattleComplete(bool victory)
         {
             if (_handled) return;
@@ -71,10 +68,10 @@ namespace RhythmRogue.Battle
 
                 if (victory)
                 {
-                    _runState.CompleteSelectedNode();
+                    // Read boss status from RunState before completing the node clears SelectedNode
+                    bool wasBoss = _runState.SelectedNode?.EnemyData?.IsBoss ?? false;
 
-                    // Check if this was the boss
-                    bool wasBoss = BattleConfig.Enemy != null && BattleConfig.Enemy.IsBoss;
+                    _runState.CompleteSelectedNode();
 
                     if (wasBoss)
                     {
@@ -94,7 +91,6 @@ namespace RhythmRogue.Battle
             }
             else
             {
-                // No RunState — just log (testing battle scene standalone)
                 GameLog.Info($"[BattleResultHandler] No RunState. Result: {(victory ? "WIN" : "LOSS")}");
             }
         }
@@ -105,14 +101,9 @@ namespace RhythmRogue.Battle
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
-            {
                 tm.GoToMap();
-            }
             else
-            {
-                UnityEngine.SceneManagement.SceneManager.LoadScene(
-                    SceneTransitionManager.MAP_SCENE);
-            }
+                UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.MAP_SCENE);
         }
 
         private void TransitionToSummary()
@@ -121,14 +112,9 @@ namespace RhythmRogue.Battle
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
-            {
                 tm.GoToSummary();
-            }
             else
-            {
-                UnityEngine.SceneManagement.SceneManager.LoadScene(
-                    SceneTransitionManager.SUMMARY_SCENE);
-            }
+                UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.SUMMARY_SCENE);
         }
     }
 }

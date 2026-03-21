@@ -14,8 +14,10 @@ namespace RhythmRogue.Map
     ///   - If no map, generate a new one (new run)
     /// 
     /// On node confirm:
-    ///   - Enemy/Boss: store in RunState, transition to BattleScene
-    ///   - Rest: heal inline, complete node, refresh UI
+    ///   - Enemy/Boss: stores node + chart in RunState, transitions to BattleScene
+    ///   - Rest: transitions to RestScene
+    /// 
+    /// No longer sets BattleConfig — all cross-scene data lives in RunState.
     /// </summary>
     public class MapScreen : MonoBehaviour
     {
@@ -36,7 +38,6 @@ namespace RhythmRogue.Map
 
         private void Start()
         {
-            // Ensure PlayerHealth exists
             var ph = PlayerHealth.Instance;
 
             if (_runState == null)
@@ -45,7 +46,6 @@ namespace RhythmRogue.Map
                 return;
             }
 
-            // If no active run, start one
             if (!_runState.IsRunActive || _runState.MapData == null)
             {
                 string seed = !string.IsNullOrWhiteSpace(_forcedSeed)
@@ -57,14 +57,11 @@ namespace RhythmRogue.Map
                 else
                     _runState.StartNewRun(seed);
 
-                // Reset player HP for new run
                 ph.ResetForNewRun();
 
-                // Generate map
                 _runState.MapData = MapGenerator.Generate(_runState.Seed, _slimeData, _bossData);
             }
 
-            // Build UI from map data
             _mapUI.BuildMap(_runState.MapData);
             _mapUI.OnNodeConfirmed += HandleNodeConfirmed;
         }
@@ -77,7 +74,6 @@ namespace RhythmRogue.Map
 
         private void HandleNodeConfirmed(MapNode node)
         {
-            // Block if already transitioning
             if (SceneTransitionManager.Instance != null &&
                 SceneTransitionManager.Instance.IsTransitioning)
                 return;
@@ -98,7 +94,6 @@ namespace RhythmRogue.Map
 
                 case NodeType.Event:
                 case NodeType.Shop:
-                    // Stub: complete and move on
                     GameLog.Info($"[MapScreen] {node.Type} not implemented — skipping.");
                     _runState.SelectedNode = node;
                     _runState.CompleteSelectedNode();
@@ -109,26 +104,17 @@ namespace RhythmRogue.Map
 
         private void StartBattle(MapNode node)
         {
+            // Store everything BattleScene needs in RunState
             _runState.SelectedNode = node;
-
-            // Set BattleConfig for the battle scene to read
-            BattleConfig.Enemy = node.EnemyData;
-            BattleConfig.ChartAsset = _defaultChart;
+            _runState.SelectedChart = _defaultChart;
 
             GameLog.Info($"[MapScreen] → Battle: {node.EnemyData?.enemyName ?? "Unknown"}");
 
-            // Transition to battle scene
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
-            {
                 tm.GoToBattle();
-            }
             else
-            {
-                // Fallback: direct load (no fade)
-                UnityEngine.SceneManagement.SceneManager.LoadScene(
-                    SceneTransitionManager.BATTLE_SCENE);
-            }
+                UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.BATTLE_SCENE);
         }
 
         private void DoRest(MapNode node)
@@ -139,13 +125,9 @@ namespace RhythmRogue.Map
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
-            {
                 tm.GoTo("RestScene");
-            }
             else
-            {
                 UnityEngine.SceneManagement.SceneManager.LoadScene("RestScene");
-            }
         }
     }
 }

@@ -13,11 +13,13 @@ namespace RhythmRogue.Battle
     ///   - Score counter (top-right)
     ///   - Victory/Defeated overlay on battle end
     /// 
-    /// Fully event-driven — subscribes to health, combo, damage,
-    /// and battle manager events. No Update polling for values.
+    /// Event-driven — subscribes to health, combo, damage, and battle
+    /// manager events. No Update polling for values.
     /// 
-    /// Sized for 384×216 reference resolution. Uses Unity UI Canvas
-    /// with Screen Space - Overlay.
+    /// Enemy display data is sourced from BattleManager.CurrentEnemy,
+    /// with a serialized fallback for standalone testing.
+    /// 
+    /// Sized for 384×216 reference resolution.
     /// </summary>
     public class BattleUI : MonoBehaviour
     {
@@ -32,7 +34,7 @@ namespace RhythmRogue.Battle
         [SerializeField] private EnemyHealth _enemyHealth;
 
         [Header("Enemy Info")]
-        [Tooltip("Fallback if BattleConfig.Enemy is null (testing standalone).")]
+        [Tooltip("Fallback enemy data used when no RunState selection exists (standalone testing).")]
         [SerializeField] private Data.EnemyData _fallbackEnemyData;
 
         // =================================================================
@@ -120,14 +122,13 @@ namespace RhythmRogue.Battle
                 _enemyHealth.Health.OnDamaged += OnEnemyDamaged;
             }
 
-            // Set initial values
             UpdatePlayerHP();
             UpdateEnemyHP();
             SetCombo(0, 1f);
             SetScore(0);
 
-            // Enemy name and boss indicator
-            var enemyData = BattleConfig.Enemy ?? _fallbackEnemyData;
+            // Prefer enemy data from BattleManager (sourced from RunState), fall back to inspector asset
+            var enemyData = _battleManager?.CurrentEnemy ?? _fallbackEnemyData;
             if (enemyData != null)
             {
                 _enemyNameText.text = enemyData.enemyName;
@@ -184,11 +185,9 @@ namespace RhythmRogue.Battle
             _enemyGhostTarget = Mathf.Lerp(_enemyGhostTarget, _enemyHPTarget, Time.deltaTime * 3f);
             _enemyHPGhost.fillAmount = _enemyGhostTarget;
 
-            // HP bar colors based on percentage
             _playerHPFill.color = UIHelpers.HPColor(_playerHPDisplay);
             _enemyHPFill.color = UIHelpers.HPColor(_enemyHPDisplay);
 
-            // Flash white on damage (overrides color briefly)
             if (_playerFlash > 0f)
             {
                 _playerFlash -= Time.deltaTime * 4f;
@@ -201,14 +200,12 @@ namespace RhythmRogue.Battle
                 _enemyHPFill.color = Color.Lerp(_enemyHPFill.color, Color.white, _enemyFlash);
             }
 
-            // Combo pop decay
             if (_comboPopScale > 1f)
             {
                 _comboPopScale = Mathf.Lerp(_comboPopScale, 1f, Time.deltaTime * 10f);
                 _comboRect.localScale = Vector3.one * _comboPopScale;
             }
 
-            // Score roll
             if (_displayScore < _currentScore)
             {
                 _displayScore = (int)Mathf.Lerp(_displayScore, _currentScore, Time.deltaTime * 12f);
@@ -283,14 +280,12 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // RESULT OVERLAY — called by BattleManager
+        // RESULT OVERLAY
         // =================================================================
 
-        /// <summary>Show victory or defeat text.</summary>
         public void ShowResult(bool victory)
         {
             _resultBG.gameObject.SetActive(true);
-
             _resultText.text = victory ? "VICTORY" : "DEFEATED";
             _resultText.color = victory
                 ? new Color(0.3f, 1f, 0.3f)
@@ -321,12 +316,11 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // UI CREATION — all code, no prefabs needed
+        // UI CREATION
         // =================================================================
 
         private void CreateUI()
         {
-            // Canvas
             GameObject canvasGO = new GameObject("BattleCanvas");
             canvasGO.transform.SetParent(transform);
             _canvas = canvasGO.AddComponent<Canvas>();
@@ -347,13 +341,11 @@ namespace RhythmRogue.Battle
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -2), new Vector2(120, 10), 7, TextAnchor.MiddleCenter);
 
-            // BOSS label — red, larger, above enemy name. Hidden for non-bosses.
             _bossLabel = CreateText(canvasRT, "BossLabel", "",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -2), new Vector2(50, 10), 7, TextAnchor.MiddleRight);
             _bossLabel.fontStyle = FontStyle.Bold;
             _bossLabel.color = new Color(1f, 0.2f, 0.2f);
-            // Position left of enemy name
             _bossLabel.rectTransform.anchoredPosition = new Vector2(-65, -2);
             _bossLabel.gameObject.SetActive(false);
 
@@ -393,7 +385,7 @@ namespace RhythmRogue.Battle
                 new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
                 new Vector2(-4, -3), new Vector2(60, 10), 7, TextAnchor.MiddleRight);
 
-            // --- RESULT OVERLAY (center, hidden by default) ---
+            // --- RESULT OVERLAY ---
             GameObject resultBGObj = CreatePanel(canvasRT, "ResultBG",
                 new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f),
                 Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0.6f));
@@ -415,12 +407,10 @@ namespace RhythmRogue.Battle
             Vector2 pos, Vector2 size,
             Color fillColor, out Image fill, out Image ghost)
         {
-            // Background
             GameObject bgObj = CreatePanel(parent, name + "_BG",
                 anchorMin, anchorMax, pivot, pos, size, new Color(0.15f, 0.15f, 0.15f, 0.8f));
             RectTransform bgRT = bgObj.GetComponent<RectTransform>();
 
-            // Ghost bar (white, trails behind)
             GameObject ghostObj = CreatePanel(bgRT, name + "_Ghost",
                 new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f),
                 Vector2.zero, Vector2.zero, new Color(1, 1, 1, 0.3f));
@@ -428,11 +418,9 @@ namespace RhythmRogue.Battle
             ghost.type = Image.Type.Filled;
             ghost.fillMethod = Image.FillMethod.Horizontal;
             ghost.fillAmount = 1f;
-            RectTransform ghostRT = ghostObj.GetComponent<RectTransform>();
-            ghostRT.offsetMin = Vector2.one;
-            ghostRT.offsetMax = -Vector2.one;
+            ghostObj.GetComponent<RectTransform>().offsetMin = Vector2.one;
+            ghostObj.GetComponent<RectTransform>().offsetMax = -Vector2.one;
 
-            // Fill bar
             GameObject fillObj = CreatePanel(bgRT, name + "_Fill",
                 new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f),
                 Vector2.zero, Vector2.zero, fillColor);
@@ -440,9 +428,8 @@ namespace RhythmRogue.Battle
             fill.type = Image.Type.Filled;
             fill.fillMethod = Image.FillMethod.Horizontal;
             fill.fillAmount = 1f;
-            RectTransform fillRT = fillObj.GetComponent<RectTransform>();
-            fillRT.offsetMin = Vector2.one;
-            fillRT.offsetMax = -Vector2.one;
+            fillObj.GetComponent<RectTransform>().offsetMin = Vector2.one;
+            fillObj.GetComponent<RectTransform>().offsetMax = -Vector2.one;
         }
 
         private static GameObject CreatePanel(RectTransform parent, string name,
@@ -459,9 +446,7 @@ namespace RhythmRogue.Battle
             rt.anchoredPosition = pos;
             rt.sizeDelta = size;
 
-            Image img = obj.GetComponent<Image>();
-            img.color = color;
-
+            obj.GetComponent<Image>().color = color;
             return obj;
         }
 

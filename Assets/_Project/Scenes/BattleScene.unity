@@ -167,7 +167,7 @@ MonoBehaviour:
   _comboSystem: {fileID: 1147190660}
   _damagePipeline: {fileID: 435255123}
   _enemyHealth: {fileID: 1009257967}
-  _enemyData: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
+  _fallbackEnemyData: {fileID: 0}
 --- !u!1 &312867616
 GameObject:
   m_ObjectHideFlags: 0
@@ -304,10 +304,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1563ba407e1b9984789e4360d2f9b18e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _perfectWindowMs: 35
-  _goodWindowMs: 70
-  _badWindowMs: 110
-  _calibrationOffsetMs: 0
+  _config: {fileID: 0}
   _noteMatcher: {fileID: 994168257}
   _highway: {fileID: 312867617}
 --- !u!4 &425582199
@@ -511,11 +508,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 58a8aa7b4380d264ebaf1046071b74a4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _perfectDamage: 5
-  _goodDamage: 3
-  _badDamage: 1
-  _missDamage: 5
-  _holdTickDamage: 1
+  _config: {fileID: 0}
   _judgmentSystem: {fileID: 425582198}
   _comboSystem: {fileID: 1147190660}
   _enemyHealth: {fileID: 1009257967}
@@ -619,10 +612,10 @@ Camera:
   m_LensShift: {x: 0, y: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
-    x: 0.0026041667
+    x: 0
     y: 0
-    width: 2.46875
-    height: 2.3333333
+    width: 1
+    height: 1
   near clip plane: 0.3
   far clip plane: 1000
   field of view: 34
@@ -1055,9 +1048,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8f87142da2624d4f8bca2f7fef12f93, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _multiplierPerHit: 0.1
-  _maxMultiplier: 3
-  _milestoneThresholds: 0a000000190000003200000064000000
+  _config: {fileID: 0}
   _judgmentSystem: {fileID: 425582198}
 --- !u!1 &1177386013
 GameObject:
@@ -1104,6 +1095,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f1a3a17f949173479a784f5761fb079, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _runState: {fileID: 11400000, guid: fd05c793c93cd014e9de44853e693de3, type: 2}
   _defaultEnemy: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
   _defaultChart: {fileID: 4900000, guid: d115e938fc061524cb34f6d6a03b6b30, type: 3}
   _introDelay: 2
@@ -1290,52 +1282,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1848496892}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1683007464
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1683007466}
-  - component: {fileID: 1683007465}
-  m_Layer: 0
-  m_Name: MapTest
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1683007465
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1683007464}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 2b61bcb6754020647a7c4873f0376c4e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _slimeData: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
-  _bossData: {fileID: 11400000, guid: c823af6097ed0544481d28bb4c41acba, type: 2}
---- !u!4 &1683007466
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1683007464}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 1.6406147, y: 4.712534, z: -0.028668718}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1794601931
 GameObject:
   m_ObjectHideFlags: 0
@@ -1442,4 +1388,3 @@ SceneRoots:
   - {fileID: 1848496892}
   - {fileID: 1101065309}
   - {fileID: 1009257968}
-  - {fileID: 1683007466}

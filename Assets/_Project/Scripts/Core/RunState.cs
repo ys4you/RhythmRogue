@@ -46,6 +46,12 @@ namespace RhythmRogue.Core
         /// <summary>The node the player selected (set before battle scene load).</summary>
         [System.NonSerialized] public MapNode SelectedNode;
 
+        /// <summary>
+        /// The chart asset to play in the next battle (set before battle scene load).
+        /// Replaces the old static BattleConfig.ChartAsset.
+        /// </summary>
+        [System.NonSerialized] public TextAsset SelectedChart;
+
         // =================================================================
         // METHODS
         // =================================================================
@@ -69,6 +75,7 @@ namespace RhythmRogue.Core
 
             MapData = null;
             SelectedNode = null;
+            SelectedChart = null;
 
             GameLog.Info($"[RunState] New run started. Seed: {Seed}");
         }
@@ -107,6 +114,7 @@ namespace RhythmRogue.Core
             MapData.CompleteNode(SelectedNode);
             CurrentNodeId = SelectedNode.Id;
             SelectedNode = null;
+            SelectedChart = null;
         }
 
         /// <summary>

@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Util.FSM;
@@ -13,7 +12,7 @@ namespace RhythmRogue.Battle
     /// Uses StateMachine&lt;BattlePhase&gt; from Util to manage phases:
     ///   Intro → Playing → Won or Lost
     /// 
-    /// On Awake, reads BattleConfig for which enemy/chart to use.
+    /// On Awake, reads RunState.SelectedNode for enemy/chart data.
     /// Falls back to serialized defaults for testing without scene transitions.
     /// 
     /// Responsibilities:
@@ -29,10 +28,13 @@ namespace RhythmRogue.Battle
     public class BattleManager : MonoBehaviour
     {
         // =================================================================
-        // INSPECTOR — fallback defaults for testing
+        // INSPECTOR
         // =================================================================
 
-        [Header("Defaults (used if BattleConfig is empty)")]
+        [Header("Run State")]
+        [SerializeField] private RunState _runState;
+
+        [Header("Defaults (used if RunState has no selection)")]
         [SerializeField] private EnemyData _defaultEnemy;
         [SerializeField] private TextAsset _defaultChart;
 
@@ -83,6 +85,9 @@ namespace RhythmRogue.Battle
         /// <summary>Whether the battle is paused.</summary>
         public bool IsPaused => _conductor != null && _conductor.IsPaused;
 
+        /// <summary>The current enemy being fought. Read by BattleUI.</summary>
+        public EnemyData CurrentEnemy => _currentEnemy;
+
         /// <summary>Fired when the battle is fully complete (after result overlay).</summary>
         public event System.Action<bool> OnBattleCompleted;
 
@@ -95,9 +100,9 @@ namespace RhythmRogue.Battle
             _conductor = Conductor.Instance;
             _playerHealth = PlayerHealth.Instance;
 
-            // Read config or fall back to defaults
-            _currentEnemy = BattleConfig.Enemy ?? _defaultEnemy;
-            TextAsset chartAsset = BattleConfig.ChartAsset ?? _defaultChart;
+            // Prefer data from RunState; fall back to inspector defaults for standalone testing
+            _currentEnemy = (_runState?.SelectedNode?.EnemyData) ?? _defaultEnemy;
+            TextAsset chartAsset = _runState?.SelectedChart ?? _defaultChart;
 
             if (_currentEnemy == null)
             {
@@ -111,7 +116,6 @@ namespace RhythmRogue.Battle
                 return;
             }
 
-            // Load chart
             _currentChart = ChartLoader.Load(chartAsset);
 
             if (_currentChart == null)
@@ -131,7 +135,6 @@ namespace RhythmRogue.Battle
 
         private void OnEnable()
         {
-            // Wire receptor visual feedback: input → highway sprite swap
             if (_inputHandler != null)
             {
                 _inputHandler.OnLanePressed += OnReceptorPress;
@@ -163,32 +166,23 @@ namespace RhythmRogue.Battle
 
         private void InitializeBattle()
         {
-            // Enemy health
             _enemyHealth.InitForBattle(_currentEnemy.maxHP);
 
-            // Subscribe to death events
             _enemyHealth.Health.OnDeath += OnEnemyDied;
             _playerHealth.Health.OnDeath += OnPlayerDied;
 
-            // Enemy display
             if (_enemyRenderer != null && _currentEnemy.sprite != null)
                 _enemyRenderer.sprite = _currentEnemy.sprite;
 
-            // Load chart into highway
             _highway.LoadChart(_currentChart);
 
-            // Calculate effective BPM
-            float effectiveBPM = _currentChart.BPM * _currentEnemy.bpmModifier;
-
-            // Point damage pipeline at this enemy
             _damagePipeline.SetEnemyHealth(_enemyHealth);
 
-            // Reset trackers
             _comboSystem.ResetAll();
             _accuracyTracker.Reset();
 
             GameLog.Info($"[BattleManager] Battle initialized: {_currentEnemy.enemyName} " +
-                      $"({_currentEnemy.maxHP} HP) at {effectiveBPM} BPM");
+                      $"({_currentEnemy.maxHP} HP) at {_currentChart.BPM * _currentEnemy.bpmModifier} BPM");
         }
 
         // =================================================================
@@ -199,28 +193,22 @@ namespace RhythmRogue.Battle
         {
             _fsm = new StateMachine<BattlePhase>();
 
-            // --- INTRO: countdown before song starts ---
             _fsm.AddState(new LambdaState<BattlePhase>(
                 BattlePhase.Intro,
                 enter: _ =>
                 {
                     _phaseTimer = _introDelay;
                     _battleEnded = false;
-
                     GameLog.Info($"[BattleManager] INTRO — {_currentEnemy.enemyName} appears!");
                 },
                 update: () =>
                 {
                     _phaseTimer -= Time.deltaTime;
-
                     if (_phaseTimer <= 0f)
-                    {
                         _fsm.TransitionTo(BattlePhase.Playing);
-                    }
                 }
             ));
 
-            // --- PLAYING: song active, all systems running ---
             _fsm.AddState(new LambdaState<BattlePhase>(
                 BattlePhase.Playing,
                 enter: _ =>
@@ -228,22 +216,18 @@ namespace RhythmRogue.Battle
                     float effectiveBPM = _currentChart.BPM * _currentEnemy.bpmModifier;
                     _conductor.OnSongFinished += OnSongEnded;
                     _conductor.Play(effectiveBPM, _currentChart.Offset);
-
                     GameLog.Info("[BattleManager] PLAYING — song started!");
                 },
                 exit: _ =>
                 {
                     _conductor.OnSongFinished -= OnSongEnded;
-
                     if (_conductor.IsPlaying)
                         _conductor.Stop();
-
                     _highway.ClearAllNotes();
                     _holdTracker.ClearAll();
                 }
             ));
 
-            // --- WON: enemy defeated ---
             _fsm.AddState(new LambdaState<BattlePhase>(
                 BattlePhase.Won,
                 enter: _ =>
@@ -251,24 +235,16 @@ namespace RhythmRogue.Battle
                     _phaseTimer = _endDelay;
                     CollectStats(true);
                     _battleUI?.ShowResult(true);
-
                     GameLog.Info("<color=green>[BattleManager] VICTORY!</color>");
-                    GameLog.Info($"  HP remaining: {_playerHealth.CurrentHP}/{_playerHealth.MaxHP}");
-                    GameLog.Info($"  Max combo: {_comboSystem.MaxCombo}");
-                    GameLog.Info($"  Accuracy: {_accuracyTracker.Accuracy:P1}");
                 },
                 update: () =>
                 {
                     _phaseTimer -= Time.deltaTime;
-
                     if (_phaseTimer <= 0f)
-                    {
                         OnBattleComplete();
-                    }
                 }
             ));
 
-            // --- LOST: player died or song ended ---
             _fsm.AddState(new LambdaState<BattlePhase>(
                 BattlePhase.Lost,
                 enter: _ =>
@@ -276,20 +252,13 @@ namespace RhythmRogue.Battle
                     _phaseTimer = _endDelay;
                     CollectStats(false);
                     _battleUI?.ShowResult(false);
-
                     GameLog.Info("<color=red>[BattleManager] DEFEATED!</color>");
-                    GameLog.Info($"  Enemy HP remaining: {_enemyHealth.CurrentHP}/{_enemyHealth.MaxHP}");
-                    GameLog.Info($"  Max combo: {_comboSystem.MaxCombo}");
-                    GameLog.Info($"  Accuracy: {_accuracyTracker.Accuracy:P1}");
                 },
                 update: () =>
                 {
                     _phaseTimer -= Time.deltaTime;
-
                     if (_phaseTimer <= 0f)
-                    {
                         OnBattleComplete();
-                    }
                 }
             ));
         }
@@ -351,28 +320,18 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // BATTLE COMPLETE — transition out
+        // BATTLE COMPLETE
         // =================================================================
 
         private void OnBattleComplete()
         {
-            // Unsubscribe death events
             if (_enemyHealth.Health != null)
                 _enemyHealth.Health.OnDeath -= OnEnemyDied;
             _playerHealth.Health.OnDeath -= OnPlayerDied;
 
-            // For prototype: log stats.
             GameLog.Info("[BattleManager] Battle complete — ready for scene transition.");
-            GameLog.Info($"  Result: {(LastBattleStats.Victory ? "WIN" : "LOSE")}");
-            GameLog.Info($"  Notes hit: {LastBattleStats.NotesHit}/{LastBattleStats.TotalNotes}");
-            GameLog.Info($"  Accuracy: {LastBattleStats.Accuracy:P1}");
-            GameLog.Info($"  Max combo: {LastBattleStats.MaxCombo}");
 
-            // Notify result handler for scene transition
             OnBattleCompleted?.Invoke(LastBattleStats.Victory);
-
-            // Clear config after handler has read it
-            BattleConfig.Clear();
         }
 
         // =================================================================

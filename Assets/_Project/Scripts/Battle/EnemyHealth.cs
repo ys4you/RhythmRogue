@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using RhythmRogue.Util.Events;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
@@ -87,7 +88,7 @@ namespace RhythmRogue.Battle
             Health.OnDamaged += (amount, current) => PublishHPChanged(-amount);
             Health.OnHealed += (amount, current) => PublishHPChanged(amount);
 
-            Debug.Log($"[EnemyHealth] Initialized: {_maxHP} HP");
+            GameLog.Info($"[EnemyHealth] Initialized: {_maxHP} HP");
         }
 
         // =================================================================

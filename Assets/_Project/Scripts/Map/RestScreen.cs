@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
+using RhythmRogue.UI;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Map
 {
@@ -70,7 +72,7 @@ namespace RhythmRogue.Map
             var ph = PlayerHealth.Instance;
             if (ph == null)
             {
-                Debug.LogError("[RestScreen] No PlayerHealth found.");
+                GameLog.Error("[RestScreen] No PlayerHealth found.");
                 return;
             }
 
@@ -114,7 +116,7 @@ namespace RhythmRogue.Map
                 float fill = Mathf.Lerp(startFill, endFill, t);
 
                 _hpBarFill.fillAmount = fill;
-                _hpBarFill.color = HPColor(fill);
+                _hpBarFill.color = UIHelpers.HPColor(fill);
 
                 int displayHP = Mathf.RoundToInt(Mathf.Lerp(_currentHP, _newHP, t));
                 _hpText.text = $"{displayHP} / {_maxHP}";
@@ -124,7 +126,7 @@ namespace RhythmRogue.Map
 
             // Ensure final values
             _hpBarFill.fillAmount = endFill;
-            _hpBarFill.color = HPColor(endFill);
+            _hpBarFill.color = UIHelpers.HPColor(endFill);
             _hpText.text = $"{_newHP} / {_maxHP}";
 
             // Apply heal
@@ -170,17 +172,6 @@ namespace RhythmRogue.Map
                 UnityEngine.SceneManagement.SceneManager.LoadScene(
                     SceneTransitionManager.MAP_SCENE);
             }
-        }
-
-        // =================================================================
-        // HELPER
-        // =================================================================
-
-        private static Color HPColor(float pct)
-        {
-            if (pct > 0.5f) return Color.Lerp(Color.yellow, Color.green, (pct - 0.5f) * 2f);
-            if (pct > 0.25f) return Color.Lerp(Color.red, Color.yellow, (pct - 0.25f) * 4f);
-            return Color.red;
         }
 
         // =================================================================
@@ -260,7 +251,7 @@ namespace RhythmRogue.Map
             GameObject fillGO = MakePanel(barParent, "HPFill",
                 Vector2.zero, Vector2.one, new Vector2(0, 0.5f),
                 Vector2.zero, Vector2.zero,
-                HPColor((float)_currentHP / _maxHP));
+                UIHelpers.HPColor((float)_currentHP / _maxHP));
             fillGO.GetComponent<RectTransform>().offsetMin = new Vector2(1, 1);
             fillGO.GetComponent<RectTransform>().offsetMax = new Vector2(-1, -1);
             _hpBarFill = fillGO.GetComponent<Image>();

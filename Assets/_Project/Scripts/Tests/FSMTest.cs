@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Util.FSM;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -60,7 +61,7 @@ namespace RhythmRogue.Tests
             // Listen to ALL state transitions from the outside
             _fsm.OnStateChanged += (from, to) =>
             {
-                Debug.Log($"<color=grey>  [FSM] Transition: {from} → {to}</color>");
+                GameLog.Info($"<color=grey>  [FSM] Transition: {from} → {to}</color>");
             };
 
             // -----------------------------------------------------------
@@ -70,11 +71,11 @@ namespace RhythmRogue.Tests
                 CoinFlipState.Menu,
                 enter: _ =>
                 {
-                    Debug.Log("<color=white>========================================</color>");
-                    Debug.Log("<color=white>  COIN FLIP — FSM TEST</color>");
-                    Debug.Log("<color=white>  Reach 20 coins to win!</color>");
-                    Debug.Log("<color=white>========================================</color>");
-                    Debug.Log("<color=cyan>  [Space] Start Game</color>");
+                    GameLog.Info("<color=white>========================================</color>");
+                    GameLog.Info("<color=white>  COIN FLIP — FSM TEST</color>");
+                    GameLog.Info("<color=white>  Reach 20 coins to win!</color>");
+                    GameLog.Info("<color=white>========================================</color>");
+                    GameLog.Info("<color=cyan>  [Space] Start Game</color>");
                 }
             ));
 
@@ -91,7 +92,7 @@ namespace RhythmRogue.Tests
                 enter: _ =>
                 {
                     _flipTimer = 1.5f;
-                    Debug.Log("<color=yellow>  Flipping coin...</color>");
+                    GameLog.Info("<color=yellow>  Flipping coin...</color>");
                 },
                 update: () =>
                 {
@@ -124,29 +125,29 @@ namespace RhythmRogue.Tests
 
                     if (_lastWon)
                     {
-                        Debug.Log($"<color=green>  Coin landed {coinSide}! You bet {betSide}. WIN +2!</color>");
+                        GameLog.Info($"<color=green>  Coin landed {coinSide}! You bet {betSide}. WIN +2!</color>");
                     }
                     else
                     {
-                        Debug.Log($"<color=red>  Coin landed {coinSide}! You bet {betSide}. LOSE -1!</color>");
+                        GameLog.Info($"<color=red>  Coin landed {coinSide}! You bet {betSide}. LOSE -1!</color>");
                     }
 
-                    Debug.Log($"<color=white>  Coins: {_coins}</color>");
+                    GameLog.Info($"<color=white>  Coins: {_coins}</color>");
 
                     // Check win/lose conditions
                     if (_coins >= 20)
                     {
-                        Debug.Log("<color=green>  You reached 20 coins!</color>");
-                        Debug.Log("<color=cyan>  [Space] Continue</color>");
+                        GameLog.Info("<color=green>  You reached 20 coins!</color>");
+                        GameLog.Info("<color=cyan>  [Space] Continue</color>");
                     }
                     else if (_coins <= 0)
                     {
-                        Debug.Log("<color=red>  You're broke!</color>");
-                        Debug.Log("<color=cyan>  [Space] Continue</color>");
+                        GameLog.Info("<color=red>  You're broke!</color>");
+                        GameLog.Info("<color=cyan>  [Space] Continue</color>");
                     }
                     else
                     {
-                        Debug.Log("<color=cyan>  [Space] Next Round</color>");
+                        GameLog.Info("<color=cyan>  [Space] Next Round</color>");
                     }
                 }
             ));
@@ -162,11 +163,11 @@ namespace RhythmRogue.Tests
                     string result = won ? "VICTORY" : "DEFEAT";
                     string color = won ? "green" : "red";
 
-                    Debug.Log($"<color={color}>========================================</color>");
-                    Debug.Log($"<color={color}>  GAME OVER — {result}</color>");
-                    Debug.Log($"<color={color}>  Final: {_coins} coins in {_round} rounds</color>");
-                    Debug.Log($"<color={color}>========================================</color>");
-                    Debug.Log("<color=cyan>  [R] Restart</color>");
+                    GameLog.Info($"<color={color}>========================================</color>");
+                    GameLog.Info($"<color={color}>  GAME OVER — {result}</color>");
+                    GameLog.Info($"<color={color}>  Final: {_coins} coins in {_round} rounds</color>");
+                    GameLog.Info($"<color={color}>========================================</color>");
+                    GameLog.Info("<color=cyan>  [R] Restart</color>");
                 }
             ));
 
@@ -226,8 +227,8 @@ namespace RhythmRogue.Tests
             {
                 _game._round++;
 
-                Debug.Log($"<color=white>  ── Round {_game._round} ── Coins: {_game._coins} ──</color>");
-                Debug.Log("<color=cyan>  [H] Bet Heads   [T] Bet Tails</color>");
+                GameLog.Info($"<color=white>  ── Round {_game._round} ── Coins: {_game._coins} ──</color>");
+                GameLog.Info("<color=cyan>  [H] Bet Heads   [T] Bet Tails</color>");
             }
 
             public override void Update()
@@ -235,13 +236,13 @@ namespace RhythmRogue.Tests
                 if (Input.GetKeyDown(KeyCode.H))
                 {
                     _game._betHeads = true;
-                    Debug.Log("<color=magenta>  You bet: HEADS</color>");
+                    GameLog.Info("<color=magenta>  You bet: HEADS</color>");
                     _game._fsm.TransitionTo(CoinFlipState.Flipping);
                 }
                 else if (Input.GetKeyDown(KeyCode.T))
                 {
                     _game._betHeads = false;
-                    Debug.Log("<color=magenta>  You bet: TAILS</color>");
+                    GameLog.Info("<color=magenta>  You bet: TAILS</color>");
                     _game._fsm.TransitionTo(CoinFlipState.Flipping);
                 }
             }

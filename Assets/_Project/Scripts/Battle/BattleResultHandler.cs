@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Core;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
@@ -94,13 +95,13 @@ namespace RhythmRogue.Battle
             else
             {
                 // No RunState — just log (testing battle scene standalone)
-                Debug.Log($"[BattleResultHandler] No RunState. Result: {(victory ? "WIN" : "LOSS")}");
+                GameLog.Info($"[BattleResultHandler] No RunState. Result: {(victory ? "WIN" : "LOSS")}");
             }
         }
 
         private void TransitionToMap()
         {
-            Debug.Log("[BattleResultHandler] → MapScene");
+            GameLog.Info("[BattleResultHandler] → MapScene");
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
@@ -116,7 +117,7 @@ namespace RhythmRogue.Battle
 
         private void TransitionToSummary()
         {
-            Debug.Log("[BattleResultHandler] → SummaryScene");
+            GameLog.Info("[BattleResultHandler] → SummaryScene");
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)

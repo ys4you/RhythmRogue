@@ -2,6 +2,7 @@ using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -55,18 +56,18 @@ namespace RhythmRogue.Tests
 
             if (_loadedChart == null)
             {
-                Debug.LogError("[InputTest] Failed to load chart.");
+                GameLog.Error("[InputTest] Failed to load chart.");
                 return;
             }
 
             _highway.LoadChart(_loadedChart);
 
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=white>  INPUT + MATCHING TEST (New Input System)</color>");
-            Debug.Log($"<color=white>  Chart: {_loadedChart.SongName} — {_loadedChart.NoteCount} notes</color>");
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
-            Debug.Log("<color=cyan>  [Arrows / D-pad / Face buttons] Hit notes!</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=white>  INPUT + MATCHING TEST (New Input System)</color>");
+            GameLog.Info($"<color=white>  Chart: {_loadedChart.SongName} — {_loadedChart.NoteCount} notes</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
+            GameLog.Info("<color=cyan>  [Arrows / D-pad / Face buttons] Hit notes!</color>");
         }
 
         private void OnEnable()
@@ -110,17 +111,17 @@ namespace RhythmRogue.Tests
                 {
                     _conductor.Play(_loadedChart.BPM, _loadedChart.Offset);
                     _hitCount = 0;
-                    Debug.Log("<color=green>  ▶ Playing</color>");
+                    GameLog.Info("<color=green>  ▶ Playing</color>");
                 }
                 else if (_conductor.IsPaused)
                 {
                     _conductor.Resume();
-                    Debug.Log("<color=green>  ▶ Resumed</color>");
+                    GameLog.Info("<color=green>  ▶ Resumed</color>");
                 }
                 else
                 {
                     _conductor.Pause();
-                    Debug.Log("<color=yellow>  ⏸ Paused</color>");
+                    GameLog.Info("<color=yellow>  ⏸ Paused</color>");
                 }
             }
 
@@ -129,7 +130,7 @@ namespace RhythmRogue.Tests
                 _conductor.Stop();
                 _highway.ClearAllNotes();
                 _highway.LoadChart(_loadedChart);
-                Debug.Log("<color=red>  ⏹ Stopped and reset</color>");
+                GameLog.Info("<color=red>  ⏹ Stopped and reset</color>");
             }
         }
 
@@ -165,7 +166,7 @@ namespace RhythmRogue.Tests
             else if (abs <= 70f) color = "green";    // Good
             else color = "orange";                    // Bad
 
-            Debug.Log(
+            GameLog.Info(
                 $"<color={color}>  HIT #{_hitCount} | Lane {result.Lane} | " +
                 $"{direction} {absOffset} | Beat {result.Note.Data.BeatPosition:F2}</color>");
         }

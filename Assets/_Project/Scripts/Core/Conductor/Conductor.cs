@@ -1,4 +1,5 @@
 using System;
+using RhythmRogue.Util;
 using UnityEngine;
 
 namespace RhythmRogue.Core
@@ -171,7 +172,7 @@ namespace RhythmRogue.Core
         {
             if (_audioSource.clip == null)
             {
-                Debug.LogError("[Conductor] No AudioClip assigned to AudioSource. Cannot play.");
+                GameLog.Error("[Conductor] No AudioClip assigned to AudioSource. Cannot play.");
                 return;
             }
 
@@ -199,7 +200,7 @@ namespace RhythmRogue.Core
             _isPlaying = true;
             _isPaused = false;
 
-            Debug.Log($"[Conductor] Playing at {_bpm} BPM, offset {_songOffset}s, " +
+            GameLog.Info($"[Conductor] Playing at {_bpm} BPM, offset {_songOffset}s, " +
                       $"scheduled at DSP {startDsp:F4}");
         }
 
@@ -248,7 +249,7 @@ namespace RhythmRogue.Core
         {
             if (newBpm <= 0f)
             {
-                Debug.LogError($"[Conductor] Invalid BPM: {newBpm}. Must be positive.");
+                GameLog.Error($"[Conductor] Invalid BPM: {newBpm}. Must be positive.");
                 return;
             }
 
@@ -266,7 +267,7 @@ namespace RhythmRogue.Core
             _bpm = newBpm;
             _secPerBeat = 60f / _bpm;
 
-            Debug.Log($"[Conductor] BPM changed: {oldBpm} → {newBpm} at beat {_bpmChangeBeatOrigin:F2}");
+            GameLog.Info($"[Conductor] BPM changed: {oldBpm} → {newBpm} at beat {_bpmChangeBeatOrigin:F2}");
 
             OnBpmChanged?.Invoke(oldBpm, newBpm);
         }

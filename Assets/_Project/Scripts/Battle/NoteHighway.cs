@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
@@ -205,7 +206,7 @@ namespace RhythmRogue.Battle
         {
             if (chart == null)
             {
-                Debug.LogError("[NoteHighway] Cannot load null chart.");
+                GameLog.Error("[NoteHighway] Cannot load null chart.");
                 return;
             }
 
@@ -214,7 +215,7 @@ namespace RhythmRogue.Battle
             _chart = chart;
             _nextSpawnIndex = 0;
 
-            Debug.Log($"[NoteHighway] Chart loaded: {chart.SongName} — {chart.NoteCount} notes");
+            GameLog.Info($"[NoteHighway] Chart loaded: {chart.SongName} — {chart.NoteCount} notes");
         }
 
         /// <summary>

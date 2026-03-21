@@ -2,6 +2,7 @@ using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -51,18 +52,18 @@ namespace RhythmRogue.Tests
 
             if (_loadedChart == null)
             {
-                Debug.LogError("[HoldTest] Failed to load chart.");
+                GameLog.Error("[HoldTest] Failed to load chart.");
                 return;
             }
 
             _highway.LoadChart(_loadedChart);
 
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=white>  HOLD NOTE TEST</color>");
-            Debug.Log($"<color=white>  Chart: {_loadedChart.SongName} — {_loadedChart.NoteCount} notes</color>");
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
-            Debug.Log("<color=cyan>  [Arrows] Tap + Hold through hold notes!</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=white>  HOLD NOTE TEST</color>");
+            GameLog.Info($"<color=white>  Chart: {_loadedChart.SongName} — {_loadedChart.NoteCount} notes</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
+            GameLog.Info("<color=cyan>  [Arrows] Tap + Hold through hold notes!</color>");
         }
 
         private void OnEnable()
@@ -108,7 +109,7 @@ namespace RhythmRogue.Tests
                 {
                     _conductor.Play(_loadedChart.BPM, _loadedChart.Offset);
                     _hitCount = 0;
-                    Debug.Log("<color=green>  ▶ Playing</color>");
+                    GameLog.Info("<color=green>  ▶ Playing</color>");
                 }
                 else if (_conductor.IsPaused)
                 {
@@ -117,7 +118,7 @@ namespace RhythmRogue.Tests
                 else
                 {
                     _conductor.Pause();
-                    Debug.Log("<color=yellow>  ⏸ Paused</color>");
+                    GameLog.Info("<color=yellow>  ⏸ Paused</color>");
                 }
             }
 
@@ -127,7 +128,7 @@ namespace RhythmRogue.Tests
                 _highway.ClearAllNotes();
                 _holdTracker.ClearAll();
                 _highway.LoadChart(_loadedChart);
-                Debug.Log("<color=red>  ⏹ Stopped and reset</color>");
+                GameLog.Info("<color=red>  ⏹ Stopped and reset</color>");
             }
         }
 
@@ -150,7 +151,7 @@ namespace RhythmRogue.Tests
 
             string noteType = result.Note.Data.Type == Data.NoteType.Hold ? "HOLD START" : "TAP";
 
-            Debug.Log(
+            GameLog.Info(
                 $"<color={color}>  {noteType} #{_hitCount} | Lane {result.Lane} | " +
                 $"{direction} {absOffset} | Beat {result.Note.Data.BeatPosition:F2}</color>");
         }
@@ -161,7 +162,7 @@ namespace RhythmRogue.Tests
 
         private void HandleHoldTick(HoldState state)
         {
-            Debug.Log(
+            GameLog.Info(
                 $"<color=cyan>    HOLD TICK | Lane {state.Lane} | " +
                 $"Tick {state.TicksHeld}/{state.TotalTicks} | " +
                 $"Progress {state.Progress:P0}</color>");
@@ -175,13 +176,13 @@ namespace RhythmRogue.Tests
         {
             if (result.Completed)
             {
-                Debug.Log(
+                GameLog.Info(
                     $"<color=green>    HOLD COMPLETE | Lane {result.Lane} | " +
                     $"{result.TicksHeld}/{result.TotalTicks} ticks | 100%</color>");
             }
             else
             {
-                Debug.Log(
+                GameLog.Info(
                     $"<color=yellow>    HOLD EARLY RELEASE | Lane {result.Lane} | " +
                     $"{result.TicksHeld}/{result.TotalTicks} ticks | {result.Progress:P0}</color>");
             }

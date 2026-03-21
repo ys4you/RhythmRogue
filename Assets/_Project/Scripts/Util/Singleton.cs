@@ -22,7 +22,7 @@ namespace RhythmRogue.Util
             {
                 if (_applicationIsQuitting)
                 {
-                    Debug.LogWarning($"[Singleton] Instance of {typeof(T)} already destroyed. Returning null.");
+                    GameLog.Warn($"[Singleton] Instance of {typeof(T)} already destroyed. Returning null.");
                     return null;
                 }
 
@@ -39,7 +39,7 @@ namespace RhythmRogue.Util
                             GameObject singletonObject = new GameObject($"{typeof(T).Name} (Singleton)");
                             _instance = singletonObject.AddComponent<T>();
                             
-                            Debug.Log($"[Singleton] Created new instance of {typeof(T)}");
+                            GameLog.Info($"[Singleton] Created new instance of {typeof(T)}");
                         }
                     }
 
@@ -60,7 +60,7 @@ namespace RhythmRogue.Util
             }
             else if (_instance != this)
             {
-                Debug.LogWarning($"[Singleton] Duplicate instance of {typeof(T)} found. Destroying duplicate.");
+                GameLog.Warn($"[Singleton] Duplicate instance of {typeof(T)} found. Destroying duplicate.");
                 Destroy(gameObject);
             }
         }

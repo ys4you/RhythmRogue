@@ -1,4 +1,5 @@
 using System;
+using RhythmRogue.Util;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -94,7 +95,7 @@ namespace RhythmRogue.Battle
         {
             if (_inputActions == null)
             {
-                Debug.LogError("[InputHandler] No InputActionAsset assigned!");
+                GameLog.Error("[InputHandler] No InputActionAsset assigned!");
                 return;
             }
 
@@ -103,7 +104,7 @@ namespace RhythmRogue.Battle
 
             if (_rhythmMap == null)
             {
-                Debug.LogError("[InputHandler] 'Rhythm' action map not found in InputActionAsset.");
+                GameLog.Error("[InputHandler] 'Rhythm' action map not found in InputActionAsset.");
                 return;
             }
 
@@ -117,7 +118,7 @@ namespace RhythmRogue.Battle
 
                 if (_laneActions[i] == null)
                 {
-                    Debug.LogError($"[InputHandler] Action '{actionName}' not found in Rhythm map.");
+                    GameLog.Error($"[InputHandler] Action '{actionName}' not found in Rhythm map.");
                 }
             }
         }

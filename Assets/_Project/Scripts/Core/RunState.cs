@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Map;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Core
 {
@@ -69,7 +70,7 @@ namespace RhythmRogue.Core
             MapData = null;
             SelectedNode = null;
 
-            Debug.Log($"[RunState] New run started. Seed: {Seed}");
+            GameLog.Info($"[RunState] New run started. Seed: {Seed}");
         }
 
         /// <summary>
@@ -88,7 +89,7 @@ namespace RhythmRogue.Core
             if (maxCombo > MaxCombo)
                 MaxCombo = maxCombo;
 
-            Debug.Log($"[RunState] Battle recorded: {(won ? "WIN" : "LOSS")} " +
+            GameLog.Info($"[RunState] Battle recorded: {(won ? "WIN" : "LOSS")} " +
                       $"Score+{score} Acc:{accuracy:P0} Combo:{maxCombo}");
         }
 
@@ -99,7 +100,7 @@ namespace RhythmRogue.Core
         {
             if (MapData == null || SelectedNode == null)
             {
-                Debug.LogWarning("[RunState] No map or selected node to complete.");
+                GameLog.Warn("[RunState] No map or selected node to complete.");
                 return;
             }
 
@@ -116,7 +117,7 @@ namespace RhythmRogue.Core
             WasVictory = victory;
             IsRunActive = false;
 
-            Debug.Log($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} " +
+            GameLog.Info($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} " +
                       $"Battles:{BattlesWon} Score:{TotalScore}");
         }
     }

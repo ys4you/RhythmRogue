@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using RhythmRogue.Util.Events;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -66,16 +67,16 @@ namespace RhythmRogue.Tests
                 .Add<EnemyHpChangedEvent>(_bus, OnEnemyHpChanged)
                 .Add<CurrencyChangedEvent>(_bus, OnCurrencyChanged);
 
-            Debug.Log("<color=white>=== Event Bus Test Ready ===</color>");
-            Debug.Log("<color=white>[B] Start Battle  [1-4] Notes (Perfect/Good/Bad/Miss)</color>");
-            Debug.Log("<color=white>[E] End Battle  [H] Take Damage  [R] Heal</color>");
+            GameLog.Info("<color=white>=== Event Bus Test Ready ===</color>");
+            GameLog.Info("<color=white>[B] Start Battle  [1-4] Notes (Perfect/Good/Bad/Miss)</color>");
+            GameLog.Info("<color=white>[E] End Battle  [H] Take Damage  [R] Heal</color>");
         }
 
         private void OnDisable()
         {
             // One line cleans up ALL subscriptions
             _bindings?.Dispose();
-            Debug.Log("<color=grey>All event bindings disposed.</color>");
+            GameLog.Info("<color=grey>All event bindings disposed.</color>");
         }
 
         // ===================================================================
@@ -107,7 +108,7 @@ namespace RhythmRogue.Tests
             _enemyHp = _enemyMaxHp;
             _beats = 0;
 
-            Debug.Log("<color=yellow>--- PUBLISHING: BattleStartedEvent ---</color>");
+            GameLog.Info("<color=yellow>--- PUBLISHING: BattleStartedEvent ---</color>");
 
             _bus.Publish(new BattleStartedEvent
             {
@@ -121,11 +122,11 @@ namespace RhythmRogue.Tests
         {
             if (!_battleActive)
             {
-                Debug.Log("<color=red>No active battle! Press [B] first.</color>");
+                GameLog.Info("<color=red>No active battle! Press [B] first.</color>");
                 return;
             }
 
-            Debug.Log($"<color=yellow>--- PUBLISHING: NoteJudgedEvent ({_judgmentNames[judgment]}) ---</color>");
+            GameLog.Info($"<color=yellow>--- PUBLISHING: NoteJudgedEvent ({_judgmentNames[judgment]}) ---</color>");
 
             // Publish the judgment — combo system and UI will react
             _bus.Publish(new NoteJudgedEvent
@@ -146,7 +147,7 @@ namespace RhythmRogue.Tests
                 _combo = 0;
                 _multiplier = 1f;
 
-                Debug.Log($"<color=yellow>--- PUBLISHING: ComboResetEvent (lost {lostCombo}) ---</color>");
+                GameLog.Info($"<color=yellow>--- PUBLISHING: ComboResetEvent (lost {lostCombo}) ---</color>");
                 _bus.Publish(new ComboResetEvent { LostCombo = lostCombo });
             }
             else
@@ -154,7 +155,7 @@ namespace RhythmRogue.Tests
                 _combo++;
                 _multiplier = Mathf.Min(1f + _combo * 0.1f, 3f);
 
-                Debug.Log($"<color=yellow>--- PUBLISHING: ComboChangedEvent ({_combo}x, {_multiplier:F1}x) ---</color>");
+                GameLog.Info($"<color=yellow>--- PUBLISHING: ComboChangedEvent ({_combo}x, {_multiplier:F1}x) ---</color>");
                 _bus.Publish(new ComboChangedEvent
                 {
                     CurrentCombo = _combo,
@@ -168,7 +169,7 @@ namespace RhythmRogue.Tests
             {
                 _enemyHp = Mathf.Max(0, _enemyHp - dmgToEnemy);
 
-                Debug.Log($"<color=yellow>--- PUBLISHING: EnemyHpChangedEvent (-{dmgToEnemy}) ---</color>");
+                GameLog.Info($"<color=yellow>--- PUBLISHING: EnemyHpChangedEvent (-{dmgToEnemy}) ---</color>");
                 _bus.Publish(new EnemyHpChangedEvent
                 {
                     CurrentHp = _enemyHp,
@@ -182,7 +183,7 @@ namespace RhythmRogue.Tests
             {
                 _playerHp = Mathf.Max(0, _playerHp - playerDamage[judgment]);
 
-                Debug.Log($"<color=yellow>--- PUBLISHING: PlayerHpChangedEvent (-{playerDamage[judgment]}) ---</color>");
+                GameLog.Info($"<color=yellow>--- PUBLISHING: PlayerHpChangedEvent (-{playerDamage[judgment]}) ---</color>");
                 _bus.Publish(new PlayerHpChangedEvent
                 {
                     CurrentHp = _playerHp,
@@ -196,7 +197,7 @@ namespace RhythmRogue.Tests
         {
             if (!_battleActive)
             {
-                Debug.Log("<color=red>No active battle!</color>");
+                GameLog.Info("<color=red>No active battle!</color>");
                 return;
             }
 
@@ -204,14 +205,14 @@ namespace RhythmRogue.Tests
             int earned = 25;
             _beats += earned;
 
-            Debug.Log($"<color=yellow>--- PUBLISHING: CurrencyChangedEvent (+{earned}) ---</color>");
+            GameLog.Info($"<color=yellow>--- PUBLISHING: CurrencyChangedEvent (+{earned}) ---</color>");
             _bus.Publish(new CurrencyChangedEvent
             {
                 CurrentBeats = _beats,
                 Delta = earned
             });
 
-            Debug.Log("<color=yellow>--- PUBLISHING: BattleEndedEvent ---</color>");
+            GameLog.Info("<color=yellow>--- PUBLISHING: BattleEndedEvent ---</color>");
             _bus.Publish(new BattleEndedEvent
             {
                 Victory = _enemyHp <= 0,
@@ -226,7 +227,7 @@ namespace RhythmRogue.Tests
 
             _playerHp = Mathf.Max(0, _playerHp - 10);
 
-            Debug.Log("<color=yellow>--- PUBLISHING: PlayerHpChangedEvent (-10) ---</color>");
+            GameLog.Info("<color=yellow>--- PUBLISHING: PlayerHpChangedEvent (-10) ---</color>");
             _bus.Publish(new PlayerHpChangedEvent
             {
                 CurrentHp = _playerHp,
@@ -242,7 +243,7 @@ namespace RhythmRogue.Tests
             int healAmount = Mathf.Min(15, _playerMaxHp - _playerHp);
             _playerHp += healAmount;
 
-            Debug.Log("<color=yellow>--- PUBLISHING: PlayerHpChangedEvent (+{healAmount}) ---</color>");
+            GameLog.Info("<color=yellow>--- PUBLISHING: PlayerHpChangedEvent (+{healAmount}) ---</color>");
             _bus.Publish(new PlayerHpChangedEvent
             {
                 CurrentHp = _playerHp,
@@ -258,44 +259,44 @@ namespace RhythmRogue.Tests
 
         private void OnBattleStarted(BattleStartedEvent evt)
         {
-            Debug.Log($"<color=cyan>  [BattleHUD] Battle started! Enemy #{evt.EnemyId} at {evt.Bpm} BPM, {evt.EnemyHp} HP</color>");
+            GameLog.Info($"<color=cyan>  [BattleHUD] Battle started! Enemy #{evt.EnemyId} at {evt.Bpm} BPM, {evt.EnemyHp} HP</color>");
         }
 
         private void OnBattleEnded(BattleEndedEvent evt)
         {
             string result = evt.Victory ? "VICTORY" : "DEFEAT";
-            Debug.Log($"<color=cyan>  [BattleHUD] Battle ended: {result} | HP left: {evt.PlayerHpRemaining} | Accuracy: {evt.Accuracy:P0}</color>");
+            GameLog.Info($"<color=cyan>  [BattleHUD] Battle ended: {result} | HP left: {evt.PlayerHpRemaining} | Accuracy: {evt.Accuracy:P0}</color>");
         }
 
         private void OnNoteJudged(NoteJudgedEvent evt)
         {
-            Debug.Log($"<color=green>  [HitEffects] Showing {_judgmentNames[evt.Judgment]} effect on lane {evt.Lane} (offset: {evt.OffsetMs:+0.0;-0.0}ms)</color>");
+            GameLog.Info($"<color=green>  [HitEffects] Showing {_judgmentNames[evt.Judgment]} effect on lane {evt.Lane} (offset: {evt.OffsetMs:+0.0;-0.0}ms)</color>");
         }
 
         private void OnComboChanged(ComboChangedEvent evt)
         {
-            Debug.Log($"<color=magenta>  [ComboUI] Combo: {evt.CurrentCombo} | Multiplier: {evt.Multiplier:F1}x</color>");
+            GameLog.Info($"<color=magenta>  [ComboUI] Combo: {evt.CurrentCombo} | Multiplier: {evt.Multiplier:F1}x</color>");
         }
 
         private void OnComboReset(ComboResetEvent evt)
         {
-            Debug.Log($"<color=red>  [ComboUI] COMBO BROKEN! Lost {evt.LostCombo} combo</color>");
+            GameLog.Info($"<color=red>  [ComboUI] COMBO BROKEN! Lost {evt.LostCombo} combo</color>");
         }
 
         private void OnPlayerHpChanged(PlayerHpChangedEvent evt)
         {
             string dir = evt.Delta >= 0 ? "+" : "";
-            Debug.Log($"<color=orange>  [PlayerHP] {dir}{evt.Delta} → {evt.CurrentHp}/{evt.MaxHp}</color>");
+            GameLog.Info($"<color=orange>  [PlayerHP] {dir}{evt.Delta} → {evt.CurrentHp}/{evt.MaxHp}</color>");
         }
 
         private void OnEnemyHpChanged(EnemyHpChangedEvent evt)
         {
-            Debug.Log($"<color=orange>  [EnemyHP] {evt.Delta} → {evt.CurrentHp}/{evt.MaxHp}</color>");
+            GameLog.Info($"<color=orange>  [EnemyHP] {evt.Delta} → {evt.CurrentHp}/{evt.MaxHp}</color>");
         }
 
         private void OnCurrencyChanged(CurrencyChangedEvent evt)
         {
-            Debug.Log($"<color=#FFD700>  [Wallet] +{evt.Delta} Beats (total: {evt.CurrentBeats})</color>");
+            GameLog.Info($"<color=#FFD700>  [Wallet] +{evt.Delta} Beats (total: {evt.CurrentBeats})</color>");
         }
     }
 }

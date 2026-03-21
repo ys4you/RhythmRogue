@@ -2,6 +2,7 @@ using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Map
 {
@@ -40,7 +41,7 @@ namespace RhythmRogue.Map
 
             if (_runState == null)
             {
-                Debug.LogError("[MapScreen] No RunState assigned!");
+                GameLog.Error("[MapScreen] No RunState assigned!");
                 return;
             }
 
@@ -81,7 +82,7 @@ namespace RhythmRogue.Map
                 SceneTransitionManager.Instance.IsTransitioning)
                 return;
 
-            Debug.Log($"[MapScreen] Node confirmed: {node}");
+            GameLog.Info($"[MapScreen] Node confirmed: {node}");
 
             switch (node.Type)
             {
@@ -98,7 +99,7 @@ namespace RhythmRogue.Map
                 case NodeType.Event:
                 case NodeType.Shop:
                     // Stub: complete and move on
-                    Debug.Log($"[MapScreen] {node.Type} not implemented — skipping.");
+                    GameLog.Info($"[MapScreen] {node.Type} not implemented — skipping.");
                     _runState.SelectedNode = node;
                     _runState.CompleteSelectedNode();
                     _mapUI.UpdateVisuals();
@@ -114,7 +115,7 @@ namespace RhythmRogue.Map
             BattleConfig.Enemy = node.EnemyData;
             BattleConfig.ChartAsset = _defaultChart;
 
-            Debug.Log($"[MapScreen] → Battle: {node.EnemyData?.enemyName ?? "Unknown"}");
+            GameLog.Info($"[MapScreen] → Battle: {node.EnemyData?.enemyName ?? "Unknown"}");
 
             // Transition to battle scene
             var tm = SceneTransitionManager.Instance;
@@ -134,7 +135,7 @@ namespace RhythmRogue.Map
         {
             _runState.SelectedNode = node;
 
-            Debug.Log("[MapScreen] → RestScene");
+            GameLog.Info("[MapScreen] → RestScene");
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)

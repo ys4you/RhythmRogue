@@ -36,8 +36,8 @@ namespace RhythmRogue.Util.Extensions
         /// <summary>
         /// Wrap a string in Unity rich text color tags.
         /// 
-        ///   Debug.Log("Perfect!".Colored("green"));
-        ///   Debug.Log($"+{damage}".Colored("#FF5555"));
+        ///   GameLog.Info("Perfect!".Colored("green"));
+        ///   GameLog.Info($"+{damage}".Colored("#FF5555"));
         /// </summary>
         public static string Colored(this string str, string color)
         {
@@ -47,7 +47,7 @@ namespace RhythmRogue.Util.Extensions
         /// <summary>
         /// Wrap in bold rich text tags.
         /// 
-        ///   Debug.Log("COMBO BROKEN!".Bold());
+        ///   GameLog.Info("COMBO BROKEN!".Bold());
         /// </summary>
         public static string Bold(this string str)
         {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using RhythmRogue.Util;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -74,7 +75,7 @@ namespace RhythmRogue.Core
         {
             if (_isTransitioning)
             {
-                Debug.LogWarning("[SceneTransition] Already transitioning, ignoring.");
+                GameLog.Warn("[SceneTransition] Already transitioning, ignoring.");
                 return;
             }
 
@@ -132,7 +133,7 @@ namespace RhythmRogue.Core
 
             if (op == null)
             {
-                Debug.LogError($"[SceneTransition] Failed to load scene: {sceneName}");
+                GameLog.Error($"[SceneTransition] Failed to load scene: {sceneName}");
                 _isTransitioning = false;
                 yield break;
             }

@@ -1,59 +1,35 @@
 using System;
 using UnityEngine;
+using RhythmRogue.Data;
 using RhythmRogue.Util.Events;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
     /// <summary>
     /// Evaluates timing offsets and assigns hit judgments.
     /// 
-    /// The bridge between input detection and combat. Receives raw
-    /// timing deltas from NoteMatcher, applies calibration offset,
-    /// classifies into Perfect/Good/Bad/Miss using the GDD timing
-    /// windows, and fires events for all downstream systems.
+    /// REFACTORED (PROTO-025):
+    ///   Before: 3 serialized floats for timing windows inline.
+    ///   After:  1 JudgmentConfig ScriptableObject reference.
+    ///   Why:    Designers tune timing in the SO asset, not per-scene.
+    ///           Relics can swap the config reference at runtime.
+    ///           Multiple presets (Easy/Normal/Hard) are just different SO assets.
     /// 
     /// Two event layers (matching the established pattern):
     ///   1. C# event OnJudgment — for direct subscribers in the battle scene
     ///   2. EventBus NoteJudgedEvent — for decoupled systems (UI, analytics)
-    /// 
-    /// Timing windows from GDD §3.3:
-    ///   Perfect: ±35ms
-    ///   Good:    ±70ms
-    ///   Bad:     ±110ms
-    ///   Miss:    beyond ±110ms
-    /// 
-    /// Calibration offset:
-    ///   Positive offset = player is hitting early (notes judged later)
-    ///   Negative offset = player is hitting late (notes judged earlier)
-    ///   adjustedDelta = rawDelta - calibrationOffset
-    /// 
-    /// SOLID breakdown:
-    /// - S: Only evaluates timing and fires events. No damage, no combo.
-    /// - O: New judgment tiers added by extending windows, not modifying logic.
-    /// - L: Consumers see JudgmentResult regardless of how evaluation works.
-    /// - I: One input (timing delta), one output (JudgmentResult event).
-    /// - D: Depends on NoteMatcher/NoteHighway abstractions.
     /// </summary>
+    [DisallowMultipleComponent]
     public class JudgmentSystem : MonoBehaviour
     {
         // =================================================================
-        // TIMING WINDOWS — GDD §3.3, exposed for inspector tuning
+        // INSPECTOR
         // =================================================================
 
-        [Header("Timing Windows (ms)")]
-        [Tooltip("±35ms — tightest window, highest reward.")]
-        [SerializeField] private float _perfectWindowMs = 35f;
-
-        [Tooltip("±70ms — moderate window.")]
-        [SerializeField] private float _goodWindowMs = 70f;
-
-        [Tooltip("±110ms — widest hit window. Beyond this is a Miss.")]
-        [SerializeField] private float _badWindowMs = 110f;
-
-        [Header("Calibration")]
-        [Tooltip("Audio offset in milliseconds. Loaded from PlayerPrefs. " +
-                 "Positive = player is early, negative = player is late.")]
-        [SerializeField] private float _calibrationOffsetMs = 0f;
+        [Header("Config")]
+        [Tooltip("Timing window configuration. Create via Assets → Create → RhythmRogue → JudgmentConfig.")]
+        [SerializeField] private JudgmentConfig _config;
 
         [Header("References")]
         [SerializeField] private NoteMatcher _noteMatcher;
@@ -65,7 +41,6 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Fired for every judgment — player hits AND auto-misses.
-        /// Direct subscribers: combo system, damage pipeline, hit feedback.
         /// </summary>
         public event Action<JudgmentResult> OnJudgment;
 
@@ -74,6 +49,7 @@ namespace RhythmRogue.Battle
         // =================================================================
 
         private IEventBus _eventBus;
+        private float _calibrationOffsetMs;
 
         // =================================================================
         // LIFECYCLE
@@ -81,10 +57,11 @@ namespace RhythmRogue.Battle
 
         private void Awake()
         {
-            // Load saved calibration offset
             _calibrationOffsetMs = PlayerPrefs.GetFloat("audioOffset", 0f);
 
-            // Get EventBus for broadcasting NoteJudgedEvent
+            if (_config == null)
+                GameLog.Error("[JudgmentSystem] No JudgmentConfig assigned! Create one via Assets → Create → RhythmRogue → JudgmentConfig.");
+
             if (EventBusProvider.Instance != null)
                 _eventBus = EventBusProvider.Instance.Bus;
         }
@@ -113,35 +90,24 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Evaluate a raw timing delta and return a judgment.
-        /// 
-        /// Applies calibration offset, then checks against timing windows
-        /// using absolute value (symmetric early/late windows).
-        /// 
-        /// This method is stateless — same input always gives same output.
+        /// Reads windows from the assigned JudgmentConfig SO.
         /// </summary>
-        /// <param name="rawDeltaMs">
-        /// Raw timing offset in milliseconds.
-        /// Negative = early, positive = late.
-        /// </param>
-        /// <returns>Judgment classification.</returns>
         public Judgment Judge(float rawDeltaMs)
         {
             float adjusted = Mathf.Abs(rawDeltaMs - _calibrationOffsetMs);
 
-            if (adjusted <= _perfectWindowMs) return Judgment.Perfect;
-            if (adjusted <= _goodWindowMs) return Judgment.Good;
-            if (adjusted <= _badWindowMs) return Judgment.Bad;
+            if (_config == null) return Judgment.Miss;
+
+            if (adjusted <= _config.perfectWindowMs) return Judgment.Perfect;
+            if (adjusted <= _config.goodWindowMs) return Judgment.Good;
+            if (adjusted <= _config.badWindowMs) return Judgment.Bad;
             return Judgment.Miss;
         }
 
         // =================================================================
-        // PLAYER HIT — from NoteMatcher
+        // PLAYER HIT
         // =================================================================
 
-        /// <summary>
-        /// Called when NoteMatcher matches a player input to a note.
-        /// Evaluates the timing, builds a JudgmentResult, and fires events.
-        /// </summary>
         private void HandleNoteHit(NoteMatchResult match)
         {
             float rawMs = match.OffsetMs;
@@ -160,18 +126,9 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // AUTO-MISS — called by NoteHighway for unplayed notes
+        // AUTO-MISS
         // =================================================================
 
-        /// <summary>
-        /// Judge a note as an auto-miss. Called when a note passes the
-        /// despawn window without being hit.
-        /// 
-        /// Call this from NoteHighway.OnNoteMissed or wire it up externally.
-        /// Fires the same event chain as a player-triggered judgment so
-        /// combo, damage, and UI all react identically.
-        /// </summary>
-        /// <param name="note">The note that was missed.</param>
         public void AutoMiss(NoteView note)
         {
             var result = new JudgmentResult(
@@ -186,18 +143,13 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // EVENT DISPATCH — both C# event and EventBus
+        // EVENT DISPATCH
         // =================================================================
 
-        /// <summary>
-        /// Fire judgment to all listeners via both event layers.
-        /// </summary>
         private void FireJudgment(JudgmentResult result)
         {
-            // Layer 1: C# event for direct battle scene subscribers
             OnJudgment?.Invoke(result);
 
-            // Layer 2: EventBus for decoupled systems (UI, analytics)
             _eventBus?.Publish(new NoteJudgedEvent
             {
                 Judgment = (int)result.Judgment,
@@ -210,37 +162,28 @@ namespace RhythmRogue.Battle
         // CALIBRATION
         // =================================================================
 
-        /// <summary>
-        /// Update the calibration offset at runtime (from settings UI).
-        /// Persists to PlayerPrefs immediately.
-        /// </summary>
-        /// <param name="offsetMs">New offset in milliseconds.</param>
         public void SetCalibrationOffset(float offsetMs)
         {
             _calibrationOffsetMs = offsetMs;
             PlayerPrefs.SetFloat("audioOffset", offsetMs);
             PlayerPrefs.Save();
-
-            Debug.Log($"[JudgmentSystem] Calibration offset set to {offsetMs:F1}ms");
         }
 
-        /// <summary>
-        /// Current calibration offset in milliseconds.
-        /// </summary>
         public float CalibrationOffsetMs => _calibrationOffsetMs;
 
         // =================================================================
-        // PUBLIC QUERIES — for debug/UI
+        // CONFIG ACCESS — for debug overlays and relic system
         // =================================================================
 
-        /// <summary>Perfect window in ms.</summary>
-        public float PerfectWindowMs => _perfectWindowMs;
+        /// <summary>Current config reference. Relics can swap this at runtime.</summary>
+        public JudgmentConfig Config => _config;
 
-        /// <summary>Good window in ms.</summary>
-        public float GoodWindowMs => _goodWindowMs;
+        /// <summary>Swap the timing config at runtime (for relics).</summary>
+        public void SetConfig(JudgmentConfig config) => _config = config;
 
-        /// <summary>Bad window in ms.</summary>
-        public float BadWindowMs => _badWindowMs;
+        public float PerfectWindowMs => _config != null ? _config.perfectWindowMs : 35f;
+        public float GoodWindowMs => _config != null ? _config.goodWindowMs : 70f;
+        public float BadWindowMs => _config != null ? _config.badWindowMs : 110f;
 
         // =================================================================
         // CLEANUP

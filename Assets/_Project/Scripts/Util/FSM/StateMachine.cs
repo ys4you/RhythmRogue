@@ -46,7 +46,7 @@ namespace RhythmRogue.Util.FSM
 
             if (_states.ContainsKey(state.Key))
             {
-                Debug.LogWarning($"[StateMachine] State '{state.Key}' is already registered. Overwriting.");
+                GameLog.Warn($"[StateMachine] State '{state.Key}' is already registered. Overwriting.");
             }
 
             _states[state.Key] = state;
@@ -57,7 +57,7 @@ namespace RhythmRogue.Util.FSM
         {
             if (IsRunning)
             {
-                Debug.LogWarning("[StateMachine] Already running. Use TransitionTo to change states.");
+                GameLog.Warn("[StateMachine] Already running. Use TransitionTo to change states.");
                 return;
             }
 
@@ -70,7 +70,7 @@ namespace RhythmRogue.Util.FSM
         {
             if (!IsRunning)
             {
-                Debug.LogWarning("[StateMachine] Not running. Call Start first.");
+                GameLog.Warn("[StateMachine] Not running. Call Start first.");
                 return;
             }
 
@@ -83,7 +83,7 @@ namespace RhythmRogue.Util.FSM
             // Guard: no transitions during a transition
             if (_isTransitioning)
             {
-                Debug.LogWarning(
+                GameLog.Warn(
                     $"[StateMachine] Transition to '{newState}' blocked — already transitioning " +
                     $"from '{PreviousStateKey}' to '{CurrentStateKey}'.");
                 return;

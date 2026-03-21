@@ -1,3 +1,4 @@
+using RhythmRogue.Util;
 using UnityEngine;
 
 namespace RhythmRogue.Tests
@@ -60,13 +61,13 @@ namespace RhythmRogue.Tests
             // Create a simple visual metronome sprite
             CreateMetronomeVisual();
 
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=white>  CONDUCTOR TEST</color>");
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
-            Debug.Log("<color=cyan>  [Up] BPM +10  [Down] BPM -10</color>");
-            Debug.Log("<color=cyan>  [F1] Toggle Debug Overlay</color>");
-            Debug.Log($"<color=white>  Starting BPM: {_startingBpm}</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=white>  CONDUCTOR TEST</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
+            GameLog.Info("<color=cyan>  [Up] BPM +10  [Down] BPM -10</color>");
+            GameLog.Info("<color=cyan>  [F1] Toggle Debug Overlay</color>");
+            GameLog.Info($"<color=white>  Starting BPM: {_startingBpm}</color>");
         }
 
         private void OnEnable()
@@ -105,24 +106,24 @@ namespace RhythmRogue.Tests
                 if (!_conductor.IsPlaying)
                 {
                     _conductor.Play(_startingBpm, _songOffset);
-                    Debug.Log("<color=green>  ▶ Playing</color>");
+                    GameLog.Info("<color=green>  ▶ Playing</color>");
                 }
                 else if (_conductor.IsPaused)
                 {
                     _conductor.Resume();
-                    Debug.Log("<color=green>  ▶ Resumed</color>");
+                    GameLog.Info("<color=green>  ▶ Resumed</color>");
                 }
                 else
                 {
                     _conductor.Pause();
-                    Debug.Log("<color=yellow>  ⏸ Paused</color>");
+                    GameLog.Info("<color=yellow>  ⏸ Paused</color>");
                 }
             }
 
             if (Input.GetKeyDown(KeyCode.S))
             {
                 _conductor.Stop();
-                Debug.Log("<color=red>  ⏹ Stopped</color>");
+                GameLog.Info("<color=red>  ⏹ Stopped</color>");
             }
 
             if (Input.GetKeyDown(KeyCode.UpArrow) && _conductor.IsPlaying)
@@ -148,7 +149,7 @@ namespace RhythmRogue.Tests
 
         private void OnBpmChanged(float oldBpm, float newBpm)
         {
-            Debug.Log($"<color=magenta>  BPM: {oldBpm:F0} → {newBpm:F0}</color>");
+            GameLog.Info($"<color=magenta>  BPM: {oldBpm:F0} → {newBpm:F0}</color>");
         }
 
         // =================================================================

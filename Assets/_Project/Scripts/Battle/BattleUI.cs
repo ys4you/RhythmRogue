@@ -1,4 +1,5 @@
 using System.Collections;
+using RhythmRogue.UI;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -184,8 +185,8 @@ namespace RhythmRogue.Battle
             _enemyHPGhost.fillAmount = _enemyGhostTarget;
 
             // HP bar colors based on percentage
-            _playerHPFill.color = HPColor(_playerHPDisplay);
-            _enemyHPFill.color = HPColor(_enemyHPDisplay);
+            _playerHPFill.color = UIHelpers.HPColor(_playerHPDisplay);
+            _enemyHPFill.color = UIHelpers.HPColor(_enemyHPDisplay);
 
             // Flash white on damage (overrides color briefly)
             if (_playerFlash > 0f)
@@ -317,17 +318,6 @@ namespace RhythmRogue.Battle
             }
 
             rt.localScale = Vector3.one;
-        }
-
-        // =================================================================
-        // HELPER
-        // =================================================================
-
-        private static Color HPColor(float pct)
-        {
-            if (pct > 0.5f) return Color.Lerp(Color.yellow, Color.green, (pct - 0.5f) * 2f);
-            if (pct > 0.25f) return Color.Lerp(Color.red, Color.yellow, (pct - 0.25f) * 4f);
-            return Color.red;
         }
 
         // =================================================================

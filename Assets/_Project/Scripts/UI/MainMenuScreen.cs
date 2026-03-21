@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.UI
 {
@@ -71,7 +72,7 @@ namespace RhythmRogue.UI
         {
             if (_runState == null)
             {
-                Debug.LogError("[MainMenu] No RunState assigned!");
+                GameLog.Error("[MainMenu] No RunState assigned!");
                 return;
             }
 
@@ -87,7 +88,7 @@ namespace RhythmRogue.UI
             if (ph != null)
                 ph.ResetForNewRun();
 
-            Debug.Log($"[MainMenu] Starting run. Seed: {_runState.Seed}");
+            GameLog.Info($"[MainMenu] Starting run. Seed: {_runState.Seed}");
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
@@ -116,7 +117,7 @@ namespace RhythmRogue.UI
 
         private void OnQuit()
         {
-            Debug.Log("[MainMenu] Quit");
+            GameLog.Info("[MainMenu] Quit");
             Application.Quit();
 
 #if UNITY_EDITOR

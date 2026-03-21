@@ -3,6 +3,7 @@ using UnityEngine.SceneManagement;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Util.FSM;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
@@ -100,13 +101,13 @@ namespace RhythmRogue.Battle
 
             if (_currentEnemy == null)
             {
-                Debug.LogError("[BattleManager] No enemy data! Assign a default in Inspector.");
+                GameLog.Error("[BattleManager] No enemy data! Assign a default in Inspector.");
                 return;
             }
 
             if (chartAsset == null)
             {
-                Debug.LogError("[BattleManager] No chart data! Assign a default in Inspector.");
+                GameLog.Error("[BattleManager] No chart data! Assign a default in Inspector.");
                 return;
             }
 
@@ -115,7 +116,7 @@ namespace RhythmRogue.Battle
 
             if (_currentChart == null)
             {
-                Debug.LogError("[BattleManager] Failed to load chart.");
+                GameLog.Error("[BattleManager] Failed to load chart.");
                 return;
             }
 
@@ -186,7 +187,7 @@ namespace RhythmRogue.Battle
             _comboSystem.ResetAll();
             _accuracyTracker.Reset();
 
-            Debug.Log($"[BattleManager] Battle initialized: {_currentEnemy.enemyName} " +
+            GameLog.Info($"[BattleManager] Battle initialized: {_currentEnemy.enemyName} " +
                       $"({_currentEnemy.maxHP} HP) at {effectiveBPM} BPM");
         }
 
@@ -206,7 +207,7 @@ namespace RhythmRogue.Battle
                     _phaseTimer = _introDelay;
                     _battleEnded = false;
 
-                    Debug.Log($"[BattleManager] INTRO — {_currentEnemy.enemyName} appears!");
+                    GameLog.Info($"[BattleManager] INTRO — {_currentEnemy.enemyName} appears!");
                 },
                 update: () =>
                 {
@@ -228,7 +229,7 @@ namespace RhythmRogue.Battle
                     _conductor.OnSongFinished += OnSongEnded;
                     _conductor.Play(effectiveBPM, _currentChart.Offset);
 
-                    Debug.Log("[BattleManager] PLAYING — song started!");
+                    GameLog.Info("[BattleManager] PLAYING — song started!");
                 },
                 exit: _ =>
                 {
@@ -251,10 +252,10 @@ namespace RhythmRogue.Battle
                     CollectStats(true);
                     _battleUI?.ShowResult(true);
 
-                    Debug.Log("<color=green>[BattleManager] VICTORY!</color>");
-                    Debug.Log($"  HP remaining: {_playerHealth.CurrentHP}/{_playerHealth.MaxHP}");
-                    Debug.Log($"  Max combo: {_comboSystem.MaxCombo}");
-                    Debug.Log($"  Accuracy: {_accuracyTracker.Accuracy:P1}");
+                    GameLog.Info("<color=green>[BattleManager] VICTORY!</color>");
+                    GameLog.Info($"  HP remaining: {_playerHealth.CurrentHP}/{_playerHealth.MaxHP}");
+                    GameLog.Info($"  Max combo: {_comboSystem.MaxCombo}");
+                    GameLog.Info($"  Accuracy: {_accuracyTracker.Accuracy:P1}");
                 },
                 update: () =>
                 {
@@ -276,10 +277,10 @@ namespace RhythmRogue.Battle
                     CollectStats(false);
                     _battleUI?.ShowResult(false);
 
-                    Debug.Log("<color=red>[BattleManager] DEFEATED!</color>");
-                    Debug.Log($"  Enemy HP remaining: {_enemyHealth.CurrentHP}/{_enemyHealth.MaxHP}");
-                    Debug.Log($"  Max combo: {_comboSystem.MaxCombo}");
-                    Debug.Log($"  Accuracy: {_accuracyTracker.Accuracy:P1}");
+                    GameLog.Info("<color=red>[BattleManager] DEFEATED!</color>");
+                    GameLog.Info($"  Enemy HP remaining: {_enemyHealth.CurrentHP}/{_enemyHealth.MaxHP}");
+                    GameLog.Info($"  Max combo: {_comboSystem.MaxCombo}");
+                    GameLog.Info($"  Accuracy: {_accuracyTracker.Accuracy:P1}");
                 },
                 update: () =>
                 {
@@ -315,7 +316,7 @@ namespace RhythmRogue.Battle
 
             if (_enemyHealth.IsAlive)
             {
-                Debug.Log("[BattleManager] Song ended — enemy survived!");
+                GameLog.Info("[BattleManager] Song ended — enemy survived!");
                 EndBattle(false);
             }
         }
@@ -361,11 +362,11 @@ namespace RhythmRogue.Battle
             _playerHealth.Health.OnDeath -= OnPlayerDied;
 
             // For prototype: log stats.
-            Debug.Log("[BattleManager] Battle complete — ready for scene transition.");
-            Debug.Log($"  Result: {(LastBattleStats.Victory ? "WIN" : "LOSE")}");
-            Debug.Log($"  Notes hit: {LastBattleStats.NotesHit}/{LastBattleStats.TotalNotes}");
-            Debug.Log($"  Accuracy: {LastBattleStats.Accuracy:P1}");
-            Debug.Log($"  Max combo: {LastBattleStats.MaxCombo}");
+            GameLog.Info("[BattleManager] Battle complete — ready for scene transition.");
+            GameLog.Info($"  Result: {(LastBattleStats.Victory ? "WIN" : "LOSE")}");
+            GameLog.Info($"  Notes hit: {LastBattleStats.NotesHit}/{LastBattleStats.TotalNotes}");
+            GameLog.Info($"  Accuracy: {LastBattleStats.Accuracy:P1}");
+            GameLog.Info($"  Max combo: {LastBattleStats.MaxCombo}");
 
             // Notify result handler for scene transition
             OnBattleCompleted?.Invoke(LastBattleStats.Victory);
@@ -395,13 +396,13 @@ namespace RhythmRogue.Battle
         private void PauseBattle()
         {
             _conductor.Pause();
-            Debug.Log("[BattleManager] PAUSED");
+            GameLog.Info("[BattleManager] PAUSED");
         }
 
         private void ResumeBattle()
         {
             _conductor.Resume();
-            Debug.Log("[BattleManager] RESUMED");
+            GameLog.Info("[BattleManager] RESUMED");
         }
 
         // =================================================================

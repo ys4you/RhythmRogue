@@ -1,3 +1,4 @@
+using RhythmRogue.Util;
 using UnityEngine;
 
 namespace RhythmRogue.Core
@@ -70,7 +71,7 @@ namespace RhythmRogue.Core
             if (beatNumber % 4 == 0 && beatNumber != _lastBeatLogged)
             {
                 _lastBeatLogged = beatNumber;
-                Debug.Log($"[Conductor] Beat {beatNumber} | " +
+                GameLog.Info($"[Conductor] Beat {beatNumber} | " +
                           $"DSP: {AudioSettings.dspTime:F4} | " +
                           $"Pos: {Conductor.Instance.SongPositionInSeconds:F3}s");
             }

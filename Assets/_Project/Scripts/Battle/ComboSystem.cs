@@ -1,47 +1,30 @@
 using System;
 using UnityEngine;
+using RhythmRogue.Data;
 using RhythmRogue.Util.Events;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
     /// <summary>
     /// Tracks consecutive non-Miss hits and calculates a combo multiplier.
     /// 
-    /// Forgiving reset model (GDD §3.4): combo resets ONLY on Miss.
-    /// Bad hits still increment combo, keeping the flow going but
-    /// dealing reduced damage through the judgment system.
-    /// 
-    /// Multiplier formula: 1.0 + (combo × multiplierPerHit), capped.
-    /// At default settings (0.1 per hit, 3.0 cap), 20 consecutive
-    /// hits reach the maximum multiplier.
-    /// 
-    /// Two event layers (established pattern):
-    ///   1. C# events for direct battle scene subscribers
-    ///   2. EventBus ComboChangedEvent/ComboResetEvent for decoupled systems
-    /// 
-    /// SOLID breakdown:
-    /// - S: Only tracks combo state and fires events. No damage, no UI.
-    /// - O: Relic modifiers change serialized fields, not this class.
-    /// - L: Consumers read CurrentCombo/Multiplier without knowing internals.
-    /// - I: Focused events: changed, reset, milestone.
-    /// - D: Depends on JudgmentSystem abstraction via OnJudgment event.
+    /// REFACTORED (PROTO-025):
+    ///   Before: serialized rate, cap, milestones array inline.
+    ///   After:  1 ComboConfig ScriptableObject reference.
+    ///   Why:    Designers tune combo scaling in the SO asset.
+    ///           Relics swap the config reference (e.g. "Combo Crown" = higher cap).
     /// </summary>
+    [DisallowMultipleComponent]
     public class ComboSystem : MonoBehaviour
     {
         // =================================================================
-        // INSPECTOR — tunable, overridable by relics post-prototype
+        // INSPECTOR
         // =================================================================
 
-        [Header("Multiplier")]
-        [Tooltip("Multiplier increase per consecutive hit. Default 0.1 = +10% per hit.")]
-        [SerializeField] private float _multiplierPerHit = 0.1f;
-
-        [Tooltip("Maximum multiplier cap. Default 3.0 = reached at 20 consecutive hits.")]
-        [SerializeField] private float _maxMultiplier = 3.0f;
-
-        [Header("Milestones")]
-        [Tooltip("Combo thresholds that trigger milestone events (for UI effects, relic triggers).")]
-        [SerializeField] private int[] _milestoneThresholds = { 10, 25, 50, 100 };
+        [Header("Config")]
+        [Tooltip("Combo configuration. Create via Assets → Create → RhythmRogue → ComboConfig.")]
+        [SerializeField] private ComboConfig _config;
 
         [Header("References")]
         [SerializeField] private JudgmentSystem _judgmentSystem;
@@ -59,38 +42,22 @@ namespace RhythmRogue.Battle
         // PUBLIC PROPERTIES
         // =================================================================
 
-        /// <summary>Current consecutive hit count.</summary>
         public int CurrentCombo => _currentCombo;
-
-        /// <summary>Current damage multiplier (1.0 to maxMultiplier).</summary>
         public float Multiplier => _currentMultiplier;
-
-        /// <summary>Highest combo achieved this battle.</summary>
         public int MaxCombo { get; private set; }
-
-        /// <summary>Number of times the combo was reset to 0.</summary>
         public int TotalResets { get; private set; }
 
         // =================================================================
         // EVENTS
         // =================================================================
 
-        /// <summary>
-        /// Fired on every non-Miss hit.
-        /// Parameters: new combo count, new multiplier.
-        /// </summary>
+        /// <summary>Fired on every non-Miss hit. Params: combo, multiplier.</summary>
         public event Action<int, float> OnComboChanged;
 
-        /// <summary>
-        /// Fired when combo resets to 0 on a Miss.
-        /// Parameter: the combo that was lost.
-        /// </summary>
+        /// <summary>Fired when combo resets. Param: lost combo count.</summary>
         public event Action<int> OnComboReset;
 
-        /// <summary>
-        /// Fired when combo crosses a milestone threshold.
-        /// Parameter: the milestone value (10, 25, 50, 100).
-        /// </summary>
+        /// <summary>Fired at milestone thresholds. Param: milestone value.</summary>
         public event Action<int> OnComboMilestone;
 
         // =================================================================
@@ -99,6 +66,9 @@ namespace RhythmRogue.Battle
 
         private void Awake()
         {
+            if (_config == null)
+                GameLog.Error("[ComboSystem] No ComboConfig assigned!");
+
             if (EventBusProvider.Instance != null)
                 _eventBus = EventBusProvider.Instance.Bus;
         }
@@ -122,21 +92,17 @@ namespace RhythmRogue.Battle
         private void HandleJudgment(JudgmentResult result)
         {
             if (result.Judgment == Judgment.Miss)
-            {
                 ResetCombo();
-            }
             else
-            {
                 IncrementCombo();
-            }
         }
 
         private void IncrementCombo()
         {
             _currentCombo++;
-            _currentMultiplier = Mathf.Min(
-                1f + _currentCombo * _multiplierPerHit,
-                _maxMultiplier);
+            _currentMultiplier = _config != null
+                ? _config.GetMultiplier(_currentCombo)
+                : Mathf.Min(1f + _currentCombo * 0.1f, 3f);
 
             if (_currentCombo > MaxCombo)
                 MaxCombo = _currentCombo;
@@ -165,35 +131,31 @@ namespace RhythmRogue.Battle
 
             OnComboReset?.Invoke(lostCombo);
 
-            _eventBus?.Publish(new ComboResetEvent
-            {
-                LostCombo = lostCombo
-            });
+            _eventBus?.Publish(new ComboResetEvent { LostCombo = lostCombo });
         }
 
         private void CheckMilestones()
         {
-            if (_milestoneThresholds == null) return;
+            int[] thresholds = _config != null ? _config.milestoneThresholds : null;
+            if (thresholds == null) return;
 
-            for (int i = 0; i < _milestoneThresholds.Length; i++)
+            for (int i = 0; i < thresholds.Length; i++)
             {
                 if (i <= _lastMilestoneIndex) continue;
 
-                if (_currentCombo >= _milestoneThresholds[i])
+                if (_currentCombo >= thresholds[i])
                 {
                     _lastMilestoneIndex = i;
-                    OnComboMilestone?.Invoke(_milestoneThresholds[i]);
+                    OnComboMilestone?.Invoke(thresholds[i]);
                 }
             }
         }
 
         // =================================================================
-        // PUBLIC — reset for new battle
+        // PUBLIC
         // =================================================================
 
-        /// <summary>
-        /// Reset all combo state. Call at battle start.
-        /// </summary>
+        /// <summary>Reset all state for a new battle.</summary>
         public void ResetAll()
         {
             _currentCombo = 0;
@@ -203,25 +165,8 @@ namespace RhythmRogue.Battle
             TotalResets = 0;
         }
 
-        // =================================================================
-        // PUBLIC — relic modifier hooks
-        // =================================================================
-
-        /// <summary>
-        /// Override the multiplier rate. Called by relic system post-prototype.
-        /// </summary>
-        public void SetMultiplierRate(float rate)
-        {
-            _multiplierPerHit = Mathf.Max(0f, rate);
-        }
-
-        /// <summary>
-        /// Override the multiplier cap. Called by relic system post-prototype.
-        /// </summary>
-        public void SetMaxMultiplier(float max)
-        {
-            _maxMultiplier = Mathf.Max(1f, max);
-        }
+        /// <summary>Swap config at runtime (for relics).</summary>
+        public void SetConfig(ComboConfig config) => _config = config;
 
         // =================================================================
         // CLEANUP

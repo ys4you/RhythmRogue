@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Util.Timing;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -55,10 +56,10 @@ namespace RhythmRogue.Tests
             _wiresCut = new bool[4];
             _cutterCooldown = new Cooldown(2f);
 
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=white>  BOMB DEFUSAL — Timer/Cooldown Test</color>");
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=cyan>  [Space] Start Bomb</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=white>  BOMB DEFUSAL — Timer/Cooldown Test</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=cyan>  [Space] Start Bomb</color>");
         }
 
         private void Update()
@@ -106,12 +107,12 @@ namespace RhythmRogue.Tests
             // Randomize which wire is the danger wire
             _dangerWire = Random.Range(0, 4);
 
-            Debug.Log("<color=red>========================================</color>");
-            Debug.Log("<color=red>  BOMB ARMED! 15 seconds!</color>");
-            Debug.Log($"<color=yellow>  (Hint: wire {_dangerWire + 1} is dangerous...)</color>");
-            Debug.Log("<color=red>========================================</color>");
+            GameLog.Info("<color=red>========================================</color>");
+            GameLog.Info("<color=red>  BOMB ARMED! 15 seconds!</color>");
+            GameLog.Info($"<color=yellow>  (Hint: wire {_dangerWire + 1} is dangerous...)</color>");
+            GameLog.Info("<color=red>========================================</color>");
             PrintWireStatus();
-            Debug.Log("<color=white>  [1-4] Cut Wire  [P] Pause  [R] Restart</color>");
+            GameLog.Info("<color=white>  [1-4] Cut Wire  [P] Pause  [R] Restart</color>");
 
             // --- ONE-SHOT TIMER: bomb countdown ---
             _bombTimer = TimerService.Lerp(_bombDuration,
@@ -124,10 +125,10 @@ namespace RhythmRogue.Tests
                     {
                         _gameActive = false;
                         _tickTimer?.Cancel();
-                        Debug.Log("<color=red>========================================</color>");
-                        Debug.Log("<color=red>  BOOM! The bomb exploded!</color>");
-                        Debug.Log("<color=red>========================================</color>");
-                        Debug.Log("<color=cyan>  [Space] Try Again</color>");
+                        GameLog.Info("<color=red>========================================</color>");
+                        GameLog.Info("<color=red>  BOOM! The bomb exploded!</color>");
+                        GameLog.Info("<color=red>========================================</color>");
+                        GameLog.Info("<color=cyan>  [Space] Try Again</color>");
                     }
                 }
             );
@@ -139,7 +140,7 @@ namespace RhythmRogue.Tests
                 {
                     float remaining = _bombTimer.Remaining;
                     string urgency = remaining < 5f ? "<color=red>  TICK!</color>" : "<color=grey>  tick</color>";
-                    Debug.Log($"{urgency} <color=grey>({remaining:F0}s remaining)</color>");
+                    GameLog.Info($"{urgency} <color=grey>({remaining:F0}s remaining)</color>");
                 }
             });
 
@@ -152,14 +153,14 @@ namespace RhythmRogue.Tests
 
             if (_wiresCut[wireIndex])
             {
-                Debug.Log($"<color=grey>  Wire {wireIndex + 1} already cut.</color>");
+                GameLog.Info($"<color=grey>  Wire {wireIndex + 1} already cut.</color>");
                 return;
             }
 
             // --- COOLDOWN: wire cutter tool ---
             if (!_cutterCooldown.TryUse())
             {
-                Debug.Log($"<color=yellow>  Cutter on cooldown! {_cutterCooldown.Remaining:F1}s</color>");
+                GameLog.Info($"<color=yellow>  Cutter on cooldown! {_cutterCooldown.Remaining:F1}s</color>");
                 return;
             }
 
@@ -169,7 +170,7 @@ namespace RhythmRogue.Tests
             if (wireIndex == _dangerWire)
             {
                 // Danger wire! Speed up the bomb
-                Debug.Log($"<color=red>  WRONG WIRE! Bomb speeds up!</color>");
+                GameLog.Info($"<color=red>  WRONG WIRE! Bomb speeds up!</color>");
 
                 // Cancel old bomb timer and create a faster one
                 float remaining = _bombTimer.Remaining;
@@ -184,15 +185,15 @@ namespace RhythmRogue.Tests
                         {
                             _gameActive = false;
                             _tickTimer?.Cancel();
-                            Debug.Log("<color=red>  BOOM! The bomb exploded!</color>");
-                            Debug.Log("<color=cyan>  [Space] Try Again</color>");
+                            GameLog.Info("<color=red>  BOOM! The bomb exploded!</color>");
+                            GameLog.Info("<color=cyan>  [Space] Try Again</color>");
                         }
                     }
                 );
             }
             else
             {
-                Debug.Log($"<color=green>  Wire {wireIndex + 1} cut! ({_wiresCutCount}/4)</color>");
+                GameLog.Info($"<color=green>  Wire {wireIndex + 1} cut! ({_wiresCutCount}/4)</color>");
             }
 
             PrintWireStatus();
@@ -212,11 +213,11 @@ namespace RhythmRogue.Tests
                 _bombTimer.Cancel();
                 _tickTimer.Cancel();
 
-                Debug.Log("<color=green>========================================</color>");
-                Debug.Log("<color=green>  DEFUSED! You saved the day!</color>");
-                Debug.Log($"<color=green>  Time remaining: {_bombTimer.Remaining:F1}s</color>");
-                Debug.Log("<color=green>========================================</color>");
-                Debug.Log("<color=cyan>  [Space] Play Again</color>");
+                GameLog.Info("<color=green>========================================</color>");
+                GameLog.Info("<color=green>  DEFUSED! You saved the day!</color>");
+                GameLog.Info($"<color=green>  Time remaining: {_bombTimer.Remaining:F1}s</color>");
+                GameLog.Info("<color=green>========================================</color>");
+                GameLog.Info("<color=cyan>  [Space] Play Again</color>");
             }
         }
 
@@ -230,14 +231,14 @@ namespace RhythmRogue.Tests
             {
                 // --- GLOBAL RESUME ---
                 timers.ResumeAll();
-                Debug.Log("<color=yellow>  RESUMED — all timers running</color>");
+                GameLog.Info("<color=yellow>  RESUMED — all timers running</color>");
             }
             else
             {
                 // --- GLOBAL PAUSE ---
                 timers.PauseAll();
-                Debug.Log("<color=yellow>  PAUSED — all timers frozen</color>");
-                Debug.Log($"<color=grey>  Bomb at {_bombTimer.Remaining:F1}s | Cutter at {_cutterCooldown.Remaining:F1}s</color>");
+                GameLog.Info("<color=yellow>  PAUSED — all timers frozen</color>");
+                GameLog.Info($"<color=grey>  Bomb at {_bombTimer.Remaining:F1}s | Cutter at {_cutterCooldown.Remaining:F1}s</color>");
             }
         }
 
@@ -251,8 +252,8 @@ namespace RhythmRogue.Tests
             if (timers.IsGloballyPaused)
                 timers.ResumeAll();
 
-            Debug.Log("<color=yellow>  --- RESET ---</color>");
-            Debug.Log("<color=cyan>  [Space] Start Bomb</color>");
+            GameLog.Info("<color=yellow>  --- RESET ---</color>");
+            GameLog.Info("<color=cyan>  [Space] Start Bomb</color>");
         }
 
         // ===================================================================
@@ -269,7 +270,7 @@ namespace RhythmRogue.Tests
             string bar = new string('█', filled) + new string('░', barLength - filled);
 
             string color = remaining < 5f ? "red" : remaining < 10f ? "yellow" : "green";
-            Debug.Log($"<color={color}>  [{bar}] {remaining:F1}s</color>");
+            GameLog.Info($"<color={color}>  [{bar}] {remaining:F1}s</color>");
         }
 
         private void PrintWireStatus()
@@ -279,7 +280,7 @@ namespace RhythmRogue.Tests
             string w3 = _wiresCut[2] ? (2 == _dangerWire ? "XX" : "OK") : "--";
             string w4 = _wiresCut[3] ? (3 == _dangerWire ? "XX" : "OK") : "--";
 
-            Debug.Log($"<color=white>  Wires: [1:{w1}] [2:{w2}] [3:{w3}] [4:{w4}]</color>");
+            GameLog.Info($"<color=white>  Wires: [1:{w1}] [2:{w2}] [3:{w3}] [4:{w4}]</color>");
         }
     }
 }

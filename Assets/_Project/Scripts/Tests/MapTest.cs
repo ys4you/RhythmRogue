@@ -1,6 +1,7 @@
 using UnityEngine;
 using RhythmRogue.Data;
 using RhythmRogue.Map;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -24,11 +25,11 @@ namespace RhythmRogue.Tests
 
         private void Start()
         {
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=white>  MAP GENERATOR TEST</color>");
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=cyan>  [Space] Random seed  [S] Same seed</color>");
-            Debug.Log("<color=cyan>  [1-4] Select accessible node</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=white>  MAP GENERATOR TEST</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=cyan>  [Space] Random seed  [S] Same seed</color>");
+            GameLog.Info("<color=cyan>  [1-4] Select accessible node</color>");
 
             GenerateRandom();
         }
@@ -57,7 +58,7 @@ namespace RhythmRogue.Tests
         {
             if (_lastSeed != null)
             {
-                Debug.Log($"<color=yellow>  Regenerating with same seed: {_lastSeed}</color>");
+                GameLog.Info($"<color=yellow>  Regenerating with same seed: {_lastSeed}</color>");
                 Generate(_lastSeed);
             }
         }
@@ -76,12 +77,12 @@ namespace RhythmRogue.Tests
 
             if (index >= accessible.Count)
             {
-                Debug.Log("<color=red>  No node at that index</color>");
+                GameLog.Info("<color=red>  No node at that index</color>");
                 return;
             }
 
             var node = accessible[index];
-            Debug.Log($"<color=green>  Selected: {node}</color>");
+            GameLog.Info($"<color=green>  Selected: {node}</color>");
 
             _map.CompleteNode(node);
             PrintAccessible();
@@ -89,14 +90,14 @@ namespace RhythmRogue.Tests
             // Check for boss reached
             if (node.Type == NodeType.Boss)
             {
-                Debug.Log("<color=magenta>  BOSS REACHED — run would end here!</color>");
+                GameLog.Info("<color=magenta>  BOSS REACHED — run would end here!</color>");
             }
         }
 
         private void PrintMap()
         {
-            Debug.Log($"<color=white>  Seed: {_map.Seed}</color>");
-            Debug.Log($"<color=white>  Layers: {_map.LayerCount}, Nodes: {_map.AllNodes.Count}</color>");
+            GameLog.Info($"<color=white>  Seed: {_map.Seed}</color>");
+            GameLog.Info($"<color=white>  Layers: {_map.LayerCount}, Nodes: {_map.AllNodes.Count}</color>");
 
             for (int i = _map.Layers.Count - 1; i >= 0; i--)
             {
@@ -115,7 +116,7 @@ namespace RhythmRogue.Tests
                                 $" {conns.Trim()}] ";
                 }
 
-                Debug.Log($"<color=white>{layerStr}</color>");
+                GameLog.Info($"<color=white>{layerStr}</color>");
             }
 
             PrintAccessible();
@@ -131,7 +132,7 @@ namespace RhythmRogue.Tests
                 accStr += $"[{i + 1}] {accessible[i]} ";
             }
 
-            Debug.Log($"<color=cyan>{accStr}</color>");
+            GameLog.Info($"<color=cyan>{accStr}</color>");
         }
     }
 }

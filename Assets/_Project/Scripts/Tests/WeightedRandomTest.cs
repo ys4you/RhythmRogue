@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Util.Random;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -67,7 +68,7 @@ namespace RhythmRogue.Tests
             _pickHistory[item]++;
 
             string color = GetRarityColor(item);
-            Debug.Log($"<color={color}>  Chest #{_chestCount}: {item}</color>");
+            GameLog.Info($"<color={color}>  Chest #{_chestCount}: {item}</color>");
         }
 
         private void OpenUniqueChest()
@@ -75,11 +76,11 @@ namespace RhythmRogue.Tests
             _chestCount++;
             List<string> items = _lootTable.PickUnique(_rng, 3);
 
-            Debug.Log($"<color=white>  Chest #{_chestCount} (UNIQUE x3):</color>");
+            GameLog.Info($"<color=white>  Chest #{_chestCount} (UNIQUE x3):</color>");
             foreach (string item in items)
             {
                 string color = GetRarityColor(item);
-                Debug.Log($"<color={color}>    - {item}</color>");
+                GameLog.Info($"<color={color}>    - {item}</color>");
 
                 if (!_pickHistory.ContainsKey(item))
                     _pickHistory[item] = 0;
@@ -89,7 +90,7 @@ namespace RhythmRogue.Tests
 
         private void PrintProbabilities()
         {
-            Debug.Log("<color=white>  ── Probability Table ──</color>");
+            GameLog.Info("<color=white>  ── Probability Table ──</color>");
             for (int i = 0; i < _lootTable.Count; i++)
             {
                 var entry = _lootTable.Entries[i];
@@ -102,16 +103,16 @@ namespace RhythmRogue.Tests
                     ? $" (actual: {actual}/{_chestCount})"
                     : "";
 
-                Debug.Log($"<color={color}>  {entry.Item,-16} {chance,5:F1}% {bar}{stats}</color>");
+                GameLog.Info($"<color={color}>  {entry.Item,-16} {chance,5:F1}% {bar}{stats}</color>");
             }
         }
 
         private void ResetWithSameSeed()
         {
-            Debug.Log("<color=yellow>========================================</color>");
-            Debug.Log($"<color=yellow>  RESET — Same seed: {_currentSeedCode}</color>");
-            Debug.Log("<color=yellow>  Sequence will be IDENTICAL</color>");
-            Debug.Log("<color=yellow>========================================</color>");
+            GameLog.Info("<color=yellow>========================================</color>");
+            GameLog.Info($"<color=yellow>  RESET — Same seed: {_currentSeedCode}</color>");
+            GameLog.Info("<color=yellow>  Sequence will be IDENTICAL</color>");
+            GameLog.Info("<color=yellow>========================================</color>");
 
             int numericSeed = _encoder.Encode(_currentSeedCode);
             _rng = new SeededRandom(numericSeed);
@@ -124,10 +125,10 @@ namespace RhythmRogue.Tests
         {
             _currentSeedCode = _encoder.GenerateCode();
 
-            Debug.Log("<color=cyan>========================================</color>");
-            Debug.Log($"<color=cyan>  NEW SEED: {_currentSeedCode}</color>");
-            Debug.Log($"<color=cyan>  Difficulty: {_difficulty}</color>");
-            Debug.Log("<color=cyan>========================================</color>");
+            GameLog.Info("<color=cyan>========================================</color>");
+            GameLog.Info($"<color=cyan>  NEW SEED: {_currentSeedCode}</color>");
+            GameLog.Info($"<color=cyan>  Difficulty: {_difficulty}</color>");
+            GameLog.Info("<color=cyan>========================================</color>");
 
             int numericSeed = _encoder.Encode(_currentSeedCode);
             _rng = new SeededRandom(numericSeed);
@@ -142,7 +143,7 @@ namespace RhythmRogue.Tests
         {
             _difficulty = _difficulty >= 3 ? 1 : _difficulty + 1;
 
-            Debug.Log($"<color=yellow>  Difficulty changed to {_difficulty} — weights updated!</color>");
+            GameLog.Info($"<color=yellow>  Difficulty changed to {_difficulty} — weights updated!</color>");
             RebuildTable();
             PrintProbabilities();
         }
@@ -172,8 +173,8 @@ namespace RhythmRogue.Tests
 
         private void PrintControls()
         {
-            Debug.Log("<color=white>  [Space] Open Chest  [U] Unique Chest (x3)</color>");
-            Debug.Log("<color=white>  [P] Probabilities  [S] Same Seed  [R] New Seed  [D] Difficulty</color>");
+            GameLog.Info("<color=white>  [Space] Open Chest  [U] Unique Chest (x3)</color>");
+            GameLog.Info("<color=white>  [P] Probabilities  [S] Same Seed  [R] New Seed  [D] Difficulty</color>");
         }
 
         private string GetRarityColor(string item)

@@ -1,57 +1,29 @@
 using System;
 using UnityEngine;
+using RhythmRogue.Data;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
     /// <summary>
     /// Connects judgment, combo, and health into a unified damage pipeline.
     /// 
-    /// On every judgment:
-    ///   - Perfect/Good/Bad → deal baseDamage × comboMultiplier to enemy
-    ///   - Miss → deal flat damage to player (no multiplier)
-    /// 
-    /// On hold ticks:
-    ///   - Each tick → deal tickDamage × comboMultiplier to enemy
-    /// 
-    /// GDD §3.3 base damage values:
-    ///   Perfect: 5, Good: 3, Bad: 1, Miss: 5 (to player)
-    /// 
-    /// GDD §3.5 damage formula:
-    ///   Base Judgment Damage × Combo Multiplier
-    /// 
-    /// All damage values are serialized for Inspector tuning.
-    /// Relic modifiers can override them post-prototype.
-    /// 
-    /// SOLID breakdown:
-    /// - S: Only calculates and applies damage. No combo tracking, no HP logic.
-    /// - O: Relic modifiers override serialized values, not this class.
-    /// - L: Consumers see DamageResult events regardless of calculation internals.
-    /// - I: One event out (OnDamageDealt).
-    /// - D: Depends on JudgmentSystem, ComboSystem, PlayerHealth, EnemyHealth.
+    /// REFACTORED (PROTO-025):
+    ///   Before: 5 serialized ints for damage values inline.
+    ///   After:  1 DamageConfig ScriptableObject reference.
+    ///   Why:    Designers tune damage in the SO asset, not per-scene.
+    ///           Enemy-specific damage overrides become trivial (assign different SO).
     /// </summary>
+    [DisallowMultipleComponent]
     public class DamagePipeline : MonoBehaviour
     {
         // =================================================================
-        // INSPECTOR — base damage values (GDD §3.3)
+        // INSPECTOR
         // =================================================================
 
-        [Header("Enemy Damage (per judgment)")]
-        [Tooltip("Base damage dealt to enemy on Perfect hit.")]
-        [SerializeField] private int _perfectDamage = 5;
-
-        [Tooltip("Base damage dealt to enemy on Good hit.")]
-        [SerializeField] private int _goodDamage = 3;
-
-        [Tooltip("Base damage dealt to enemy on Bad hit.")]
-        [SerializeField] private int _badDamage = 1;
-
-        [Header("Player Damage")]
-        [Tooltip("Flat damage dealt to player on Miss. Not affected by combo.")]
-        [SerializeField] private int _missDamage = 5;
-
-        [Header("Hold Note Damage")]
-        [Tooltip("Damage per hold tick. Multiplied by combo multiplier.")]
-        [SerializeField] private int _holdTickDamage = 1;
+        [Header("Config")]
+        [Tooltip("Damage configuration. Create via Assets → Create → RhythmRogue → DamageConfig.")]
+        [SerializeField] private DamageConfig _config;
 
         [Header("References")]
         [SerializeField] private JudgmentSystem _judgmentSystem;
@@ -64,8 +36,7 @@ namespace RhythmRogue.Battle
         // =================================================================
 
         /// <summary>
-        /// Fired after damage is applied. UI subscribes to show
-        /// floating damage numbers, HP bar flashes, screen shake.
+        /// Fired after damage is applied. UI subscribes for feedback.
         /// </summary>
         public event Action<DamageResult> OnDamageDealt;
 
@@ -82,6 +53,9 @@ namespace RhythmRogue.Battle
         private void Awake()
         {
             _playerHealth = PlayerHealth.Instance;
+
+            if (_config == null)
+                GameLog.Error("[DamagePipeline] No DamageConfig assigned!");
         }
 
         private void OnEnable()
@@ -109,131 +83,73 @@ namespace RhythmRogue.Battle
         private void HandleJudgment(JudgmentResult result)
         {
             if (result.Judgment == Judgment.Miss)
-            {
                 ApplyPlayerDamage(result);
-            }
             else
-            {
                 ApplyEnemyDamage(result);
-            }
         }
 
-        /// <summary>
-        /// Miss → flat damage to player. No multiplier.
-        /// </summary>
         private void ApplyPlayerDamage(JudgmentResult result)
         {
-            if (_playerHealth == null || !_playerHealth.IsAlive) return;
+            if (_playerHealth == null || !_playerHealth.IsAlive || _config == null) return;
 
-            _playerHealth.TakeDamage(_missDamage);
+            _playerHealth.TakeDamage(_config.missDamage);
 
-            var damageResult = new DamageResult(
-                amount: _missDamage,
+            OnDamageDealt?.Invoke(new DamageResult(
+                amount: _config.missDamage,
                 judgment: Judgment.Miss,
                 isPlayerDamage: true,
                 multiplier: 1f,
-                lane: result.Lane);
-
-            OnDamageDealt?.Invoke(damageResult);
+                lane: result.Lane));
         }
 
-        /// <summary>
-        /// Perfect/Good/Bad → base damage × combo multiplier to enemy.
-        /// </summary>
         private void ApplyEnemyDamage(JudgmentResult result)
         {
-            if (_enemyHealth == null || !_enemyHealth.IsAlive) return;
+            if (_enemyHealth == null || !_enemyHealth.IsAlive || _config == null) return;
 
-            int baseDamage = GetBaseDamage(result.Judgment);
+            int baseDamage = _config.GetEnemyDamage((int)result.Judgment);
             float multiplier = _comboSystem != null ? _comboSystem.Multiplier : 1f;
-            int finalDamage = Mathf.RoundToInt(baseDamage * multiplier);
-
-            // Minimum 1 damage on any successful hit
-            finalDamage = Mathf.Max(1, finalDamage);
+            int finalDamage = Mathf.Max(1, Mathf.RoundToInt(baseDamage * multiplier));
 
             _enemyHealth.TakeDamage(finalDamage);
 
-            var damageResult = new DamageResult(
+            OnDamageDealt?.Invoke(new DamageResult(
                 amount: finalDamage,
                 judgment: result.Judgment,
                 isPlayerDamage: false,
                 multiplier: multiplier,
-                lane: result.Lane);
-
-            OnDamageDealt?.Invoke(damageResult);
+                lane: result.Lane));
         }
 
         // =================================================================
         // HOLD TICK DAMAGE
         // =================================================================
 
-        /// <summary>
-        /// Each hold tick → tickDamage × combo multiplier to enemy.
-        /// </summary>
         private void HandleHoldTick(HoldState state)
         {
-            if (_enemyHealth == null || !_enemyHealth.IsAlive) return;
+            if (_enemyHealth == null || !_enemyHealth.IsAlive || _config == null) return;
 
             float multiplier = _comboSystem != null ? _comboSystem.Multiplier : 1f;
-            int finalDamage = Mathf.Max(1, Mathf.RoundToInt(_holdTickDamage * multiplier));
+            int finalDamage = Mathf.Max(1, Mathf.RoundToInt(_config.holdTickDamage * multiplier));
 
             _enemyHealth.TakeDamage(finalDamage);
 
-            var damageResult = new DamageResult(
+            OnDamageDealt?.Invoke(new DamageResult(
                 amount: finalDamage,
-                judgment: Judgment.Perfect, // Ticks are rewarded like perfects
+                judgment: Judgment.Perfect,
                 isPlayerDamage: false,
                 multiplier: multiplier,
-                lane: state.Lane);
-
-            OnDamageDealt?.Invoke(damageResult);
+                lane: state.Lane));
         }
 
         // =================================================================
-        // BASE DAMAGE LOOKUP
+        // PUBLIC — runtime config swap (for relics/enemies)
         // =================================================================
 
-        private int GetBaseDamage(Judgment judgment)
-        {
-            return judgment switch
-            {
-                Judgment.Perfect => _perfectDamage,
-                Judgment.Good => _goodDamage,
-                Judgment.Bad => _badDamage,
-                _ => 0
-            };
-        }
+        /// <summary>Swap damage config at runtime.</summary>
+        public void SetConfig(DamageConfig config) => _config = config;
 
-        // =================================================================
-        // PUBLIC — relic modifier hooks
-        // =================================================================
-
-        /// <summary>Override base damage for a judgment tier.</summary>
-        public void SetBaseDamage(Judgment judgment, int damage)
-        {
-            switch (judgment)
-            {
-                case Judgment.Perfect: _perfectDamage = damage; break;
-                case Judgment.Good:    _goodDamage = damage; break;
-                case Judgment.Bad:     _badDamage = damage; break;
-                case Judgment.Miss:    _missDamage = damage; break;
-            }
-        }
-
-        /// <summary>Override hold tick damage.</summary>
-        public void SetHoldTickDamage(int damage)
-        {
-            _holdTickDamage = Mathf.Max(0, damage);
-        }
-
-        /// <summary>
-        /// Set the enemy health reference. Call when loading a new battle
-        /// with a different enemy.
-        /// </summary>
-        public void SetEnemyHealth(EnemyHealth enemy)
-        {
-            _enemyHealth = enemy;
-        }
+        /// <summary>Set the enemy health reference for a new battle.</summary>
+        public void SetEnemyHealth(EnemyHealth enemy) => _enemyHealth = enemy;
 
         // =================================================================
         // CLEANUP

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RhythmRogue.Util;
 using UnityEngine;
 
 namespace RhythmRogue.Data
@@ -38,7 +39,7 @@ namespace RhythmRogue.Data
         {
             if (chartAsset == null)
             {
-                Debug.LogError("[ChartLoader] Chart TextAsset is null.");
+                GameLog.Error("[ChartLoader] Chart TextAsset is null.");
                 return null;
             }
 
@@ -54,7 +55,7 @@ namespace RhythmRogue.Data
         {
             if (string.IsNullOrWhiteSpace(json))
             {
-                Debug.LogError("[ChartLoader] JSON string is null or empty.");
+                GameLog.Error("[ChartLoader] JSON string is null or empty.");
                 return null;
             }
 
@@ -67,27 +68,27 @@ namespace RhythmRogue.Data
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[ChartLoader] JSON parse failed: {ex.Message}");
+                GameLog.Error($"[ChartLoader] JSON parse failed: {ex.Message}");
                 return null;
             }
 
             if (raw == null)
             {
-                Debug.LogError("[ChartLoader] JSON deserialized to null.");
+                GameLog.Error("[ChartLoader] JSON deserialized to null.");
                 return null;
             }
 
             // Validate metadata
             if (raw.bpm <= 0f)
             {
-                Debug.LogError($"[ChartLoader] Invalid BPM: {raw.bpm}. Must be positive.");
+                GameLog.Error($"[ChartLoader] Invalid BPM: {raw.bpm}. Must be positive.");
                 return null;
             }
 
             // Parse and validate notes
             List<NoteData> notes = ParseNotes(raw.notes);
 
-            Debug.Log($"[ChartLoader] Loaded '{raw.songName}' — {notes.Count} notes, " +
+            GameLog.Info($"[ChartLoader] Loaded '{raw.songName}' — {notes.Count} notes, " +
                       $"{raw.bpm} BPM, offset {raw.offset}s");
 
             return new LoadedChart(raw, notes);
@@ -100,7 +101,7 @@ namespace RhythmRogue.Data
         {
             if (rawNotes == null || rawNotes.Length == 0)
             {
-                Debug.LogWarning("[ChartLoader] Chart has no notes.");
+                GameLog.Warn("[ChartLoader] Chart has no notes.");
                 return new List<NoteData>();
             }
 
@@ -114,7 +115,7 @@ namespace RhythmRogue.Data
                 // Validate lane range
                 if (raw.lane < MinLane || raw.lane > MaxLane)
                 {
-                    Debug.LogWarning(
+                    GameLog.Warn(
                         $"[ChartLoader] Note [{i}]: invalid lane {raw.lane} " +
                         $"(expected {MinLane}-{MaxLane}). Skipping.");
                     continue;
@@ -123,7 +124,7 @@ namespace RhythmRogue.Data
                 // Validate beat position
                 if (raw.beat < 0f)
                 {
-                    Debug.LogWarning(
+                    GameLog.Warn(
                         $"[ChartLoader] Note [{i}]: negative beat position {raw.beat}. Skipping.");
                     continue;
                 }
@@ -138,7 +139,7 @@ namespace RhythmRogue.Data
                 {
                     if (raw.holdDuration <= 0f)
                     {
-                        Debug.LogWarning(
+                        GameLog.Warn(
                             $"[ChartLoader] Note [{i}]: hold note at beat {raw.beat} " +
                             $"has invalid duration {raw.holdDuration}. Treating as tap.");
                         noteType = NoteType.Tap;
@@ -154,7 +155,7 @@ namespace RhythmRogue.Data
 
                 if (!occupied.Add(key))
                 {
-                    Debug.LogWarning(
+                    GameLog.Warn(
                         $"[ChartLoader] Note [{i}]: duplicate at beat {raw.beat}, " +
                         $"lane {raw.lane}. Skipping.");
                     continue;
@@ -191,7 +192,7 @@ namespace RhythmRogue.Data
 
         private static NoteType LogAndDefault(string typeStr)
         {
-            Debug.LogWarning($"[ChartLoader] Unknown note type '{typeStr}'. Defaulting to Tap.");
+            GameLog.Warn($"[ChartLoader] Unknown note type '{typeStr}'. Defaulting to Tap.");
             return NoteType.Tap;
         }
     }

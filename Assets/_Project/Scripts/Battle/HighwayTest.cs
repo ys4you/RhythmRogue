@@ -2,6 +2,7 @@ using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Tests
 {
@@ -54,13 +55,13 @@ namespace RhythmRogue.Tests
 
             if (_chartAsset == null)
             {
-                Debug.LogError("[HighwayTest] No chart assigned! Drag a chart JSON into the inspector.");
+                GameLog.Error("[HighwayTest] No chart assigned! Drag a chart JSON into the inspector.");
                 return;
             }
 
             if (_highway == null)
             {
-                Debug.LogError("[HighwayTest] No NoteHighway assigned!");
+                GameLog.Error("[HighwayTest] No NoteHighway assigned!");
                 return;
             }
 
@@ -69,22 +70,22 @@ namespace RhythmRogue.Tests
 
             if (_loadedChart == null)
             {
-                Debug.LogError("[HighwayTest] Failed to load chart.");
+                GameLog.Error("[HighwayTest] Failed to load chart.");
                 return;
             }
 
             // Prepare the highway
             _highway.LoadChart(_loadedChart);
 
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=white>  HIGHWAY TEST</color>");
-            Debug.Log($"<color=white>  Chart: {_loadedChart.SongName}</color>");
-            Debug.Log($"<color=white>  Notes: {_loadedChart.NoteCount}</color>");
-            Debug.Log($"<color=white>  BPM:   {_loadedChart.BPM}</color>");
-            Debug.Log("<color=white>========================================</color>");
-            Debug.Log("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
-            Debug.Log("<color=cyan>  [Arrow Keys] Flash Receptors</color>");
-            Debug.Log("<color=cyan>  [Shift+Up/Down] BPM ±10</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=white>  HIGHWAY TEST</color>");
+            GameLog.Info($"<color=white>  Chart: {_loadedChart.SongName}</color>");
+            GameLog.Info($"<color=white>  Notes: {_loadedChart.NoteCount}</color>");
+            GameLog.Info($"<color=white>  BPM:   {_loadedChart.BPM}</color>");
+            GameLog.Info("<color=white>========================================</color>");
+            GameLog.Info("<color=cyan>  [Space] Play/Pause  [S] Stop</color>");
+            GameLog.Info("<color=cyan>  [Arrow Keys] Flash Receptors</color>");
+            GameLog.Info("<color=cyan>  [Shift+Up/Down] BPM ±10</color>");
         }
 
         private void Update()
@@ -100,17 +101,17 @@ namespace RhythmRogue.Tests
                 if (!_conductor.IsPlaying)
                 {
                     _conductor.Play(_loadedChart.BPM, _loadedChart.Offset);
-                    Debug.Log("<color=green>  ▶ Playing</color>");
+                    GameLog.Info("<color=green>  ▶ Playing</color>");
                 }
                 else if (_conductor.IsPaused)
                 {
                     _conductor.Resume();
-                    Debug.Log("<color=green>  ▶ Resumed</color>");
+                    GameLog.Info("<color=green>  ▶ Resumed</color>");
                 }
                 else
                 {
                     _conductor.Pause();
-                    Debug.Log("<color=yellow>  ⏸ Paused</color>");
+                    GameLog.Info("<color=yellow>  ⏸ Paused</color>");
                 }
             }
 
@@ -119,7 +120,7 @@ namespace RhythmRogue.Tests
                 _conductor.Stop();
                 _highway.ClearAllNotes();
                 _highway.LoadChart(_loadedChart);
-                Debug.Log("<color=red>  ⏹ Stopped and reset</color>");
+                GameLog.Info("<color=red>  ⏹ Stopped and reset</color>");
             }
 
             // BPM changes with Shift held

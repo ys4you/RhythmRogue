@@ -32,7 +32,7 @@ namespace RhythmRogue.Util.Pooling
 
             if (_pools.ContainsKey(type))
             {
-                Debug.LogWarning($"[PoolRegistry] Pool for {type.Name} is already registered. Overwriting.");
+                GameLog.Warn($"[PoolRegistry] Pool for {type.Name} is already registered. Overwriting.");
             }
 
             _pools[type] = pool;

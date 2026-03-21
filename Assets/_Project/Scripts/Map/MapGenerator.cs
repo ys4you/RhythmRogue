@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Data;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Map
 {
@@ -119,7 +120,7 @@ namespace RhythmRogue.Map
                 node.IsAccessible = true;
             }
 
-            Debug.Log($"[MapGenerator] Generated map from seed '{seed}': " +
+            GameLog.Info($"[MapGenerator] Generated map from seed '{seed}': " +
                       $"{map.AllNodes.Count} nodes, {map.LayerCount} layers");
 
             return map;

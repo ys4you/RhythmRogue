@@ -78,7 +78,7 @@ namespace RhythmRogue.Util.Events
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogException(ex);
+                        GameLog.InfoException(ex);
                     }
                 }
 

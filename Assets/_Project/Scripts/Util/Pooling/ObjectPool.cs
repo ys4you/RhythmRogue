@@ -70,13 +70,13 @@ namespace RhythmRogue.Util.Pooling
         {
             if (item == null)
             {
-                Debug.LogWarning("[ObjectPool] Attempted to release a null object.");
+                GameLog.Warn("[ObjectPool] Attempted to release a null object.");
                 return;
             }
 
             if (!_active.Remove(item))
             {
-                Debug.LogWarning("[ObjectPool] Attempted to release an object not owned by this pool.");
+                GameLog.Warn("[ObjectPool] Attempted to release an object not owned by this pool.");
                 return;
             }
 

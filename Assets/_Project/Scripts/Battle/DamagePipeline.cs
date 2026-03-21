@@ -55,7 +55,10 @@ namespace RhythmRogue.Battle
             _playerHealth = PlayerHealth.Instance;
 
             if (_config == null)
-                GameLog.Error("[DamagePipeline] No DamageConfig assigned!");
+                _config = Resources.Load<DamageConfig>("Configs/DefaultDamage");
+
+            if (_config == null)
+                GameLog.Error("[DamagePipeline] No DamageConfig found! Assign in Inspector or place in Resources/DefaultDamage.");
         }
 
         private void OnEnable()

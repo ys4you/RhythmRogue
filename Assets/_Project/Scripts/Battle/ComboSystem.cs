@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
 using RhythmRogue.Data;
-using RhythmRogue.Util.Events;
 using RhythmRogue.Util;
+using RhythmRogue.Util.Events;
 
 namespace RhythmRogue.Battle
 {
@@ -67,7 +67,10 @@ namespace RhythmRogue.Battle
         private void Awake()
         {
             if (_config == null)
-                GameLog.Error("[ComboSystem] No ComboConfig assigned!");
+                _config = Resources.Load<ComboConfig>("Configs/DefaultCombo");
+
+            if (_config == null)
+                GameLog.Error("[ComboSystem] No ComboConfig found! Assign in Inspector or place in Resources/DefaultCombo.");
 
             if (EventBusProvider.Instance != null)
                 _eventBus = EventBusProvider.Instance.Bus;

@@ -1,8 +1,8 @@
 using System;
 using UnityEngine;
 using RhythmRogue.Data;
-using RhythmRogue.Util.Events;
 using RhythmRogue.Util;
+using RhythmRogue.Util.Events;
 
 namespace RhythmRogue.Battle
 {
@@ -60,7 +60,10 @@ namespace RhythmRogue.Battle
             _calibrationOffsetMs = PlayerPrefs.GetFloat("audioOffset", 0f);
 
             if (_config == null)
-                GameLog.Error("[JudgmentSystem] No JudgmentConfig assigned! Create one via Assets → Create → RhythmRogue → JudgmentConfig.");
+                _config = Resources.Load<JudgmentConfig>("Configs/DefaultJudgment");
+
+            if (_config == null)
+                GameLog.Error("[JudgmentSystem] No JudgmentConfig found! Assign in Inspector or place in Resources/Configs/DefaultJudgment.");
 
             if (EventBusProvider.Instance != null)
                 _eventBus = EventBusProvider.Instance.Bus;

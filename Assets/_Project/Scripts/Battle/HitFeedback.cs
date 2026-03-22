@@ -44,6 +44,7 @@ namespace RhythmRogue.Battle
 
         [Header("Pool Size")]
         [SerializeField] private int _textPoolSize = 8;
+        
 
         // =================================================================
         // STATE
@@ -75,6 +76,10 @@ namespace RhythmRogue.Battle
         private static readonly Color GoodColor = new Color(0.3f, 1f, 0.3f);     // Green
         private static readonly Color BadColor = new Color(1f, 0.6f, 0.2f);      // Orange
         private static readonly Color MissColor = new Color(1f, 0.25f, 0.25f);   // Red
+
+
+        private int _activeTextCount;
+
 
         // =================================================================
         // LIFECYCLE
@@ -117,12 +122,22 @@ namespace RhythmRogue.Battle
         {
             float dt = Time.unscaledDeltaTime;
 
-            // Animate text pool
-            foreach (var inst in _textPool)
-                UpdateTextInstance(inst, dt);
+            // Animate text pool — skip iteration entirely when nothing is active
+            if (_activeTextCount > 0)
+            {
+                foreach (var inst in _textPool)
+                {
+                    if (!inst.Root.gameObject.activeSelf) continue;
+
+                    UpdateTextInstance(inst, dt);
+
+                    if (!inst.Root.gameObject.activeSelf)
+                        _activeTextCount--;
+                }
+            }
 
             // Animate milestone text
-            if (_milestoneText != null)
+            if (_milestoneText != null && _milestoneText.Root.gameObject.activeSelf)
                 UpdateTextInstance(_milestoneText, dt);
 
             // Screen shake decay
@@ -156,7 +171,7 @@ namespace RhythmRogue.Battle
                 }
             }
         }
-
+        
         // =================================================================
         // EVENT HANDLERS
         // =================================================================
@@ -250,6 +265,7 @@ namespace RhythmRogue.Battle
             inst.Timer = 0.5f;
             inst.Root.localScale = Vector3.one * 1.4f;
             inst.Root.gameObject.SetActive(true);
+            _activeTextCount++;
         }
 
         private void ShowMilestoneText(int milestone)

@@ -43,8 +43,11 @@ namespace RhythmRogue.Battle
         /// <summary>Maximum hit points.</summary>
         public int MaxHP => _maxHP;
 
+        private bool _isDead;
+
+
         /// <summary>Whether this entity is alive (HP > 0).</summary>
-        public bool IsAlive => _currentHP > 0;
+        public bool IsAlive => _currentHP > 0 && !_isDead;
 
         /// <summary>HP as a 0.0–1.0 fraction for UI bars.</summary>
         public float HPPercent => _maxHP > 0 ? _currentHP / (float)_maxHP : 0f;
@@ -94,16 +97,18 @@ namespace RhythmRogue.Battle
         /// <param name="amount">Damage to deal (positive).</param>
         public void TakeDamage(int amount)
         {
-            if (!IsAlive) return;
+            if (_isDead) return;
             if (amount <= 0) return;
 
             _currentHP = Mathf.Max(0, _currentHP - amount);
-
             OnDamaged?.Invoke(amount, _currentHP);
             OnHPChanged?.Invoke(_currentHP, _maxHP);
 
             if (_currentHP <= 0)
+            {
+                _isDead = true;
                 OnDeath?.Invoke();
+            }
         }
 
         // =================================================================
@@ -117,8 +122,12 @@ namespace RhythmRogue.Battle
         /// <param name="amount">Amount to heal (positive).</param>
         public void Heal(int amount)
         {
-            if (!IsAlive) return;
-            if (amount <= 0) return;
+            if (_isDead) 
+                return;
+            if (!IsAlive) 
+                return;
+            if (amount <= 0) 
+                return;
 
             int before = _currentHP;
             _currentHP = Mathf.Min(_maxHP, _currentHP + amount);

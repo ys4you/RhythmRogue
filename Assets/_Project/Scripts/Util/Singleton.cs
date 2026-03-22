@@ -13,6 +13,13 @@ namespace RhythmRogue.Util
         private static readonly object _lock = new object();
         private static bool _applicationIsQuitting = false;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _instance = null;
+            _applicationIsQuitting = false;
+        }
+
         /// <summary>
         /// Access singleton instance
         /// </summary>
@@ -80,6 +87,7 @@ namespace RhythmRogue.Util
         {
             if (_instance == this)
             {
+                _instance = null;
                 _applicationIsQuitting = true;
             }
         }

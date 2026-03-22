@@ -290,6 +290,9 @@ namespace RhythmRogue.Core
         {
             double dspNow = AudioSettings.dspTime - _totalPausedDuration;
 
+            if (dspNow < _dspSongStartTime)
+                return;
+
             // Song position in seconds (from song start, adjusted for offset)
             SongPositionInSeconds = (float)(dspNow - _dspSongStartTime) - _songOffset;
 

@@ -131,37 +131,28 @@ namespace RhythmRogue.Battle
         private NoteView FindClosestNote(int lane, float currentBeat, float windowBeats)
         {
             IReadOnlyList<NoteView> activeNotes = _highway.ActiveNotes;
-
             NoteView closest = null;
             float closestDistance = float.MaxValue;
 
             for (int i = 0; i < activeNotes.Count; i++)
             {
                 NoteView note = activeNotes[i];
+                float beatDist = note.Data.BeatPosition - currentBeat;
+                
+                // Notes are sorted — if we're past the window, stop
+                if (beatDist > windowBeats) break;
+                
+                if (note.Data.Lane != lane || note.IsProcessed) continue;
+                
+                float distance = Mathf.Abs(beatDist);
+                if (distance > windowBeats) continue;
 
-                // Skip wrong lane
-                if (note.Data.Lane != lane)
-                    continue;
-
-                // Skip already processed notes
-                if (note.IsProcessed)
-                    continue;
-
-                // Calculate beat distance
-                float distance = Mathf.Abs(note.Data.BeatPosition - currentBeat);
-
-                // Skip notes outside the hit window
-                if (distance > windowBeats)
-                    continue;
-
-                // Track the closest
                 if (distance < closestDistance)
                 {
                     closestDistance = distance;
                     closest = note;
                 }
             }
-
             return closest;
         }
 

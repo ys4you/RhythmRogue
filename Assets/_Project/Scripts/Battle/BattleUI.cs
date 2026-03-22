@@ -467,7 +467,7 @@ namespace RhythmRogue.Battle
             Text t = obj.GetComponent<Text>();
             t.text = text;
             t.fontSize = fontSize;
-            t.font = Font.CreateDynamicFontFromOSFont("Arial", fontSize);
+            t.font = UIHelpers.GetDefaultFont(fontSize);
             t.alignment = alignment;
             t.color = Color.white;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;

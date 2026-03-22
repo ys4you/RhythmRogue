@@ -344,11 +344,13 @@ namespace RhythmRogue.Battle
         private void DespawnPassedNotes(float currentBeat)
         {
             _pendingDespawn.Clear();
-
             float despawnBeat = currentBeat - _beatsDespawnBehind;
 
             foreach (NoteView note in _activeNotes)
             {
+                // Never despawn a note the player is actively holding
+                if (note.IsBeingHeld) continue;
+
                 float relevantBeat = note.Data.Type == NoteType.Hold
                     ? note.Data.EndBeatPosition
                     : note.Data.BeatPosition;

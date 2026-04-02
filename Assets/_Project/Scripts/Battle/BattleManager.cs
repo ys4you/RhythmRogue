@@ -3,6 +3,7 @@ using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Util.FSM;
 using RhythmRogue.Util;
+using RhythmRogue.Util.Random;
 
 namespace RhythmRogue.Battle
 {
@@ -15,15 +16,12 @@ namespace RhythmRogue.Battle
     /// On Awake, reads RunState.SelectedNode for enemy/chart data.
     /// Falls back to serialized defaults for testing without scene transitions.
     /// 
-    /// Responsibilities:
-    ///   - Initialize all battle systems with correct data
-    ///   - Start/stop the Conductor
-    ///   - Monitor win/lose conditions each frame
-    ///   - Collect stats on battle end
-    ///   - Handle pause
+    /// Supports two chart modes:
+    ///   - Legacy: single JSON chart loaded via ChartLoader (original system)
+    ///   - Assembled: dual highway charts built from PatternLibrary via ChartAssembler
     /// 
-    /// Does NOT own the systems — they live on their own GameObjects.
-    /// BattleManager just coordinates them.
+    /// Toggle via _useLegacyChart in Inspector. Both modes use the same
+    /// Conductor, hit detection, combo, and damage systems.
     /// </summary>
     public class BattleManager : MonoBehaviour
     {
@@ -34,9 +32,23 @@ namespace RhythmRogue.Battle
         [Header("Run State")]
         [SerializeField] private RunState _runState;
 
-        [Header("Defaults (used if RunState has no selection)")]
+        [Header("Chart Mode")]
+        [Tooltip("True = load from JSON TextAsset (original system). False = assemble from patterns (dual highway).")]
+        [SerializeField] private bool _useLegacyChart = false;
+
+        [Header("Legacy Defaults (used if _useLegacyChart is true)")]
         [SerializeField] private EnemyData _defaultEnemy;
         [SerializeField] private TextAsset _defaultChart;
+
+        [Header("Chart System (used if _useLegacyChart is false)")]
+        [Tooltip("Fallback pattern library if enemy has none assigned.")]
+        [SerializeField] private PatternLibrary _defaultLibrary;
+
+        [Tooltip("Fallback chart template if enemy has none assigned.")]
+        [SerializeField] private ChartTemplate _defaultTemplate;
+
+        [Tooltip("The enemy's auto-playing highway (left side).")]
+        [SerializeField] private EnemyHighway _enemyHighway;
 
         [Header("Intro")]
         [Tooltip("Seconds of countdown before the song starts.")]
@@ -72,7 +84,8 @@ namespace RhythmRogue.Battle
         private PlayerHealth _playerHealth;
 
         private EnemyData _currentEnemy;
-        private LoadedChart _currentChart;
+        private LoadedChart _currentChart;       // Legacy mode
+        private BattleChart _battleChart;         // Assembled mode
         private float _phaseTimer;
         private bool _battleEnded;
 
@@ -100,9 +113,8 @@ namespace RhythmRogue.Battle
             _conductor = Conductor.Instance;
             _playerHealth = PlayerHealth.Instance;
 
-            // Prefer data from RunState; fall back to inspector defaults for standalone testing
+            // Resolve enemy data
             _currentEnemy = (_runState?.SelectedNode?.EnemyData) ?? _defaultEnemy;
-            TextAsset chartAsset = _runState?.SelectedChart ?? _defaultChart;
 
             if (_currentEnemy == null)
             {
@@ -110,18 +122,13 @@ namespace RhythmRogue.Battle
                 return;
             }
 
-            if (chartAsset == null)
+            if (_useLegacyChart)
             {
-                GameLog.Error("[BattleManager] No chart data! Assign a default in Inspector.");
-                return;
+                LoadLegacyChart();
             }
-
-            _currentChart = ChartLoader.Load(chartAsset);
-
-            if (_currentChart == null)
+            else
             {
-                GameLog.Error("[BattleManager] Failed to load chart.");
-                return;
+                AssembleChart();
             }
 
             SetupFSM();
@@ -161,6 +168,81 @@ namespace RhythmRogue.Battle
         private void OnReceptorRelease(int lane) => _highway.SetReceptorPressed(lane, false);
 
         // =================================================================
+        // CHART LOADING
+        // =================================================================
+
+        /// <summary>
+        /// Legacy path: load a single chart from a JSON TextAsset.
+        /// </summary>
+        private void LoadLegacyChart()
+        {
+            TextAsset chartAsset = _runState?.SelectedChart ?? _defaultChart;
+
+            if (chartAsset == null)
+            {
+                GameLog.Error("[BattleManager] No chart data! Assign a default in Inspector.");
+                return;
+            }
+
+            _currentChart = ChartLoader.Load(chartAsset);
+
+            if (_currentChart == null)
+            {
+                GameLog.Error("[BattleManager] Failed to load chart.");
+                return;
+            }
+        }
+
+        /// <summary>
+        /// New path: assemble a dual-highway chart from the pattern library
+        /// using the run seed for deterministic generation.
+        /// </summary>
+        private void AssembleChart()
+        {
+            ChartTemplate template = _currentEnemy.chartTemplate ?? _defaultTemplate;
+            PatternLibrary library = _currentEnemy.patternLibrary ?? _defaultLibrary;
+
+            if (template == null)
+            {
+                GameLog.Error("[BattleManager] No chart template! Assign one on EnemyData or set a default.");
+                return;
+            }
+
+            if (library == null)
+            {
+                GameLog.Error("[BattleManager] No pattern library! Assign one on EnemyData or set a default.");
+                return;
+            }
+
+            // Get seeded random from the run seed (deterministic per encounter)
+            ISeededRandom chartRng;
+            if (_runState?.RunSeed != null)
+            {
+                chartRng = _runState.RunSeed.GetRandom(RandomDomain.Charts, _runState.SelectedNode?.Id ?? 0);
+            }
+            else
+            {
+                // Standalone testing fallback — fixed seed
+                chartRng = new SeededRandom(42);
+                GameLog.Warn("[BattleManager] No RunSeed available, using fallback seed 42.");
+            }
+
+            // BPM: use the legacy chart BPM if available, otherwise a sensible default
+            float baseBPM = (_defaultChart != null)
+                ? ChartLoader.Load(_defaultChart)?.BPM ?? 135f
+                : 135f;
+            float effectiveBPM = baseBPM * _currentEnemy.bpmModifier;
+
+            _battleChart = ChartAssembler.Assemble(template, library, chartRng, effectiveBPM);
+
+            if (_battleChart == null)
+            {
+                GameLog.Error("[BattleManager] ChartAssembler returned null.");
+                return;
+            }
+        }
+
+        // =================================================================
         // INITIALIZATION
         // =================================================================
 
@@ -174,15 +256,36 @@ namespace RhythmRogue.Battle
             if (_enemyRenderer != null && _currentEnemy.sprite != null)
                 _enemyRenderer.sprite = _currentEnemy.sprite;
 
-            _highway.LoadChart(_currentChart);
+            // Feed notes to highways based on chart mode
+            if (_useLegacyChart)
+            {
+                _highway.LoadChart(_currentChart);
+            }
+            else
+            {
+                _highway.LoadNotes(_battleChart.AllPlayerNotes);
+
+                if (_enemyHighway != null)
+                    _enemyHighway.LoadNotes(_battleChart.AllEnemyNotes);
+            }
 
             _damagePipeline.SetEnemyHealth(_enemyHealth);
 
             _comboSystem.ResetAll();
             _accuracyTracker.Reset();
 
-            GameLog.Info($"[BattleManager] Battle initialized: {_currentEnemy.enemyName} " +
-                      $"({_currentEnemy.maxHP} HP) at {_currentChart.BPM * _currentEnemy.bpmModifier} BPM");
+            if (_useLegacyChart)
+            {
+                GameLog.Info($"[BattleManager] Battle initialized (legacy): {_currentEnemy.enemyName} " +
+                          $"({_currentEnemy.maxHP} HP) at {_currentChart.BPM * _currentEnemy.bpmModifier} BPM");
+            }
+            else
+            {
+                GameLog.Info($"[BattleManager] Battle initialized (assembled): {_currentEnemy.enemyName} " +
+                          $"({_currentEnemy.maxHP} HP) at {_battleChart.BPM} BPM, " +
+                          $"{_battleChart.PlayerNoteCount} player notes, " +
+                          $"{_battleChart.EnemyNoteCount} enemy notes");
+            }
         }
 
         // =================================================================
@@ -213,9 +316,22 @@ namespace RhythmRogue.Battle
                 BattlePhase.Playing,
                 enter: _ =>
                 {
-                    float effectiveBPM = _currentChart.BPM * _currentEnemy.bpmModifier;
+                    float effectiveBPM;
+                    float offset;
+
+                    if (_useLegacyChart)
+                    {
+                        effectiveBPM = _currentChart.BPM * _currentEnemy.bpmModifier;
+                        offset = _currentChart.Offset;
+                    }
+                    else
+                    {
+                        effectiveBPM = _battleChart.BPM;
+                        offset = 0f;
+                    }
+
                     _conductor.OnSongFinished += OnSongEnded;
-                    _conductor.Play(effectiveBPM, _currentChart.Offset);
+                    _conductor.Play(effectiveBPM, offset);
                     GameLog.Info("[BattleManager] PLAYING — song started!");
                 },
                 exit: _ =>
@@ -225,6 +341,9 @@ namespace RhythmRogue.Battle
                         _conductor.Stop();
                     _highway.ClearAllNotes();
                     _holdTracker.ClearAll();
+
+                    if (!_useLegacyChart && _enemyHighway != null)
+                        _enemyHighway.Clear();
                 }
             ));
 

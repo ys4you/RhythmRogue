@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
+using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.UI
 {
@@ -14,6 +15,12 @@ namespace RhythmRogue.UI
     ///   - Run stats with number roll animation
     ///   - Seed for sharing
     ///   - Action buttons: New Run, Retry (same seed), Main Menu
+    /// 
+    /// Fully keyboard/gamepad navigable:
+    ///   - New Run auto-focused after animation
+    ///   - Left/Right navigates between New Run ↔ Retry Seed ↔ Menu
+    ///   - Enter/Space confirms
+    ///   - Escape goes to Main Menu
     /// 
     /// Fully code-generated UI, sized for 384×216.
     /// </summary>
@@ -48,6 +55,10 @@ namespace RhythmRogue.UI
         private Button _menuBtn;
         private Image _bgOverlay;
 
+        // Navigation
+        private UIFocusSetter _focusSetter;
+        private UICancelHandler _cancelHandler;
+
         // Stats to display
         private int _battlesWon;
         private int _totalScore;
@@ -68,7 +79,41 @@ namespace RhythmRogue.UI
         {
             GatherStats();
             CreateUI();
+            SetupNavigation();
             StartCoroutine(AnimateEntrance());
+        }
+
+        // =================================================================
+        // NAVIGATION SETUP
+        // =================================================================
+
+        private void SetupNavigation()
+        {
+            // Focus setter — will be activated after animation reveals buttons
+            _focusSetter = gameObject.AddComponent<UIFocusSetter>();
+
+            // Cancel handler — Escape goes to main menu
+            _cancelHandler = gameObject.AddComponent<UICancelHandler>();
+            _cancelHandler.SetBaseAction(OnMenu);
+        }
+
+        /// <summary>
+        /// Wire navigation after buttons are revealed by the animation.
+        /// Called at the end of AnimateEntrance.
+        /// </summary>
+        private void ActivateButtonNavigation()
+        {
+            // Wire horizontal navigation: New Run ↔ Retry Seed ↔ Menu
+            UINavigationHelper.WireHorizontal(_newRunBtn, _retryBtn, _menuBtn);
+
+            // Apply visual focus styles
+            UISelectableStyle.Apply(_newRunBtn);
+            UISelectableStyle.Apply(_retryBtn);
+            UISelectableStyle.Apply(_menuBtn);
+
+            // Set default focus to New Run
+            _focusSetter.SetDefault(_newRunBtn.gameObject);
+            _focusSetter.ApplyFocus();
         }
 
         // =================================================================
@@ -86,7 +131,6 @@ namespace RhythmRogue.UI
                 _bestAccuracy = _runState.BestAccuracy;
                 _seed = _runState.Seed ?? "???";
 
-                // Count completed and total nodes
                 if (_runState.MapData != null)
                 {
                     _totalNodes = _runState.MapData.AllNodes.Count;
@@ -123,7 +167,6 @@ namespace RhythmRogue.UI
                 t += Time.unscaledDeltaTime;
                 float p = Mathf.Clamp01(t / _headerAnimDuration);
 
-                // Header scale in
                 float scale = Mathf.Lerp(2f, 1f, Mathf.SmoothStep(0, 1, p));
                 _headerText.rectTransform.localScale = Vector3.one * scale;
 
@@ -138,10 +181,8 @@ namespace RhythmRogue.UI
                 yield return null;
             }
 
-            // Subheader fade in
             yield return FadeText(_subHeaderText, 0.3f);
 
-            // Stats roll in one by one
             for (int i = 0; i < _statLabels.Length; i++)
             {
                 StartCoroutine(FadeText(_statLabels[i], 0.2f));
@@ -149,15 +190,16 @@ namespace RhythmRogue.UI
                 yield return new WaitForSecondsRealtime(_statStaggerDelay);
             }
 
-            // Seed
             yield return new WaitForSecondsRealtime(0.2f);
             yield return FadeText(_seedText, 0.3f);
 
-            // Buttons
+            // Show buttons and activate navigation
             yield return new WaitForSecondsRealtime(0.3f);
             _newRunBtn.gameObject.SetActive(true);
             _retryBtn.gameObject.SetActive(true);
             _menuBtn.gameObject.SetActive(true);
+
+            ActivateButtonNavigation();
         }
 
         private IEnumerator FadeText(Text text, float duration)
@@ -256,7 +298,6 @@ namespace RhythmRogue.UI
             if (_runState != null)
                 _runState.StartNewRun();
 
-            // Go to main menu
             ResetPlayerAndTransition(SceneTransitionManager.MAIN_MENU_SCENE);
         }
 
@@ -304,13 +345,8 @@ namespace RhythmRogue.UI
             canvasGO.AddComponent<GraphicRaycaster>();
             _canvasRT = canvasGO.GetComponent<RectTransform>();
 
-            // EventSystem
-            if (UnityEngine.EventSystems.EventSystem.current == null)
-            {
-                GameObject esGO = new GameObject("EventSystem");
-                esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-            }
+            // EventSystem — uses InputSystemUIInputModule
+            UIEventSystemProvider.EnsureEventSystem();
 
             // BG overlay
             GameObject bgGO = MakePanel(_canvasRT, "BG",

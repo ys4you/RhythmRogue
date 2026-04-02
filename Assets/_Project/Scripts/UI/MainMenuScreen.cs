@@ -3,6 +3,7 @@ using UnityEngine.UI;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
 using RhythmRogue.Util;
+using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.UI
 {
@@ -15,6 +16,12 @@ namespace RhythmRogue.UI
     ///   - Settings (audio offset, volume)
     ///   - Quit
     ///   - Version display
+    /// 
+    /// Fully keyboard/gamepad navigable:
+    ///   - Arrow keys / D-pad navigate vertically between buttons
+    ///   - Enter / Space / A confirms
+    ///   - Escape / B closes settings panel or triggers quit
+    ///   - Settings sliders: Left/Right adjusts, Up/Down navigates between them
     /// 
     /// Code-generated UI, sized for 384×216.
     /// </summary>
@@ -44,6 +51,17 @@ namespace RhythmRogue.UI
         private Slider _musicVolSlider;
         private Slider _sfxVolSlider;
 
+        // Button references for navigation wiring
+        private Button _newRunBtn;
+        private Button _seedGoBtn;
+        private Button _settingsBtn;
+        private Button _quitBtn;
+        private Button _settingsCloseBtn;
+
+        // Navigation components
+        private UIFocusSetter _focusSetter;
+        private UICancelHandler _cancelHandler;
+
         // =================================================================
         // LIFECYCLE
         // =================================================================
@@ -51,6 +69,48 @@ namespace RhythmRogue.UI
         private void Start()
         {
             CreateUI();
+            SetupNavigation();
+        }
+
+        // =================================================================
+        // NAVIGATION SETUP
+        // =================================================================
+
+        private void SetupNavigation()
+        {
+            // Wire vertical chain: New Run → Seed Go → Settings → Quit
+            UINavigationHelper.WireVerticalNoWrap(_newRunBtn, _seedGoBtn, _settingsBtn, _quitBtn);
+
+            // Seed input field: Down goes to Settings (skip Go button since it's beside the field)
+            UINavigationHelper.Wire(_seedInput,
+                up: _newRunBtn,
+                down: _settingsBtn,
+                right: _seedGoBtn);
+
+            // Seed Go button: connect to neighbors
+            UINavigationHelper.AddLink(_seedGoBtn, left: _seedInput);
+
+            // Seed input: when done editing, move focus to Go button
+            _seedInput.onEndEdit.AddListener(_ =>
+            {
+                if (_seedInput.isFocused) return;
+                _focusSetter.FocusOn(_seedGoBtn.gameObject);
+            });
+
+            // Apply visual focus styles to all interactive elements
+            UISelectableStyle.Apply(_newRunBtn);
+            UISelectableStyle.Apply(_seedGoBtn);
+            UISelectableStyle.Apply(_settingsBtn);
+            UISelectableStyle.Apply(_quitBtn);
+            UISelectableStyle.Apply(_seedInput);
+
+            // Focus setter — auto-selects New Run on enable
+            _focusSetter = gameObject.AddComponent<UIFocusSetter>();
+            _focusSetter.SetDefault(_newRunBtn.gameObject);
+
+            // Cancel handler — Escape triggers quit (or closes settings if open)
+            _cancelHandler = gameObject.AddComponent<UICancelHandler>();
+            _cancelHandler.SetBaseAction(OnQuit);
         }
 
         // =================================================================
@@ -76,12 +136,10 @@ namespace RhythmRogue.UI
                 return;
             }
 
-            // Block double clicks
             if (SceneTransitionManager.Instance != null &&
                 SceneTransitionManager.Instance.IsTransitioning)
                 return;
 
-            // Reset everything
             _runState.StartNewRun(seed);
 
             var ph = PlayerHealth.Instance;
@@ -101,6 +159,27 @@ namespace RhythmRogue.UI
         private void OnSettings()
         {
             _settingsPanel.SetActive(true);
+
+            // Push cancel handler so Escape closes settings first
+            _cancelHandler.Push(OnSettingsClose);
+
+            // Wire settings sliders vertically
+            UINavigationHelper.WireVerticalNoWrap(
+                _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider);
+
+            // Close button below last slider
+            UINavigationHelper.AddLink(_sfxVolSlider, down: _settingsCloseBtn);
+            UINavigationHelper.Wire(_settingsCloseBtn, up: _sfxVolSlider);
+
+            // Apply slider styles
+            UISelectableStyle.ApplySlider(_offsetSlider);
+            UISelectableStyle.ApplySlider(_masterVolSlider);
+            UISelectableStyle.ApplySlider(_musicVolSlider);
+            UISelectableStyle.ApplySlider(_sfxVolSlider);
+            UISelectableStyle.Apply(_settingsCloseBtn);
+
+            // Focus the first slider
+            _focusSetter.FocusOn(_offsetSlider.gameObject);
         }
 
         private void OnSettingsClose()
@@ -113,6 +192,9 @@ namespace RhythmRogue.UI
             PlayerPrefs.SetFloat("musicVolume", _musicVolSlider.value);
             PlayerPrefs.SetFloat("sfxVolume", _sfxVolSlider.value);
             PlayerPrefs.Save();
+
+            // Restore focus to the Settings button
+            _focusSetter.FocusOn(_settingsBtn.gameObject);
         }
 
         private void OnQuit()
@@ -147,13 +229,8 @@ namespace RhythmRogue.UI
             canvasGO.AddComponent<GraphicRaycaster>();
             _canvasRT = canvasGO.GetComponent<RectTransform>();
 
-            // EventSystem
-            if (UnityEngine.EventSystems.EventSystem.current == null)
-            {
-                GameObject esGO = new GameObject("EventSystem");
-                esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-            }
+            // EventSystem — uses InputSystemUIInputModule
+            UIEventSystemProvider.EnsureEventSystem();
 
             // Background
             GameObject bgGO = MakePanel(_canvasRT, "BG",
@@ -189,10 +266,10 @@ namespace RhythmRogue.UI
             float startY = -68f;
             float gap = 20f;
 
-            MakeMenuButton("New Run", startY, btnW, btnH, new Color(0.2f, 0.45f, 0.2f), OnNewRun);
+            _newRunBtn = MakeMenuButton("New Run", startY, btnW, btnH, new Color(0.2f, 0.45f, 0.2f), OnNewRun);
             CreateSeedEntry(startY - gap, btnW, btnH);
-            MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, new Color(0.3f, 0.3f, 0.45f), OnSettings);
-            MakeMenuButton("Quit", startY - gap * 3, btnW, btnH, new Color(0.4f, 0.2f, 0.2f), OnQuit);
+            _settingsBtn = MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, new Color(0.3f, 0.3f, 0.45f), OnSettings);
+            _quitBtn = MakeMenuButton("Quit", startY - gap * 3, btnW, btnH, new Color(0.4f, 0.2f, 0.2f), OnQuit);
 
             // --- VERSION ---
             Text version = MakeText(_canvasRT, "Version",
@@ -282,7 +359,8 @@ namespace RhythmRogue.UI
                 new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f),
                 new Vector2(btnW * 0.5f + 20, 0), new Vector2(28, btnH),
                 new Color(0.2f, 0.45f, 0.2f));
-            goBtnGO.AddComponent<Button>().onClick.AddListener(OnSeededRun);
+            _seedGoBtn = goBtnGO.AddComponent<Button>();
+            _seedGoBtn.onClick.AddListener(OnSeededRun);
 
             MakeText(goBtnGO.GetComponent<RectTransform>(), "GoText",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -354,7 +432,8 @@ namespace RhythmRogue.UI
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
                 new Vector2(0, 8), new Vector2(50, 14),
                 new Color(0.35f, 0.2f, 0.2f));
-            closeBtnGO.AddComponent<Button>().onClick.AddListener(OnSettingsClose);
+            _settingsCloseBtn = closeBtnGO.AddComponent<Button>();
+            _settingsCloseBtn.onClick.AddListener(OnSettingsClose);
 
             MakeText(closeBtnGO.GetComponent<RectTransform>(), "CloseText",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -402,16 +481,17 @@ namespace RhythmRogue.UI
         }
 
         // =================================================================
-        // MENU BUTTON HELPER
+        // MENU BUTTON HELPER — returns Button for navigation wiring
         // =================================================================
 
-        private void MakeMenuButton(string label, float y, float w, float h,
+        private Button MakeMenuButton(string label, float y, float w, float h,
             Color bgColor, UnityEngine.Events.UnityAction onClick)
         {
             GameObject btnGO = MakePanel(_canvasRT, $"Btn_{label}",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f),
                 new Vector2(0, y), new Vector2(w, h), bgColor);
-            btnGO.AddComponent<Button>().onClick.AddListener(onClick);
+            Button btn = btnGO.AddComponent<Button>();
+            btn.onClick.AddListener(onClick);
 
             Text txt = MakeText(btnGO.GetComponent<RectTransform>(), "Text",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
@@ -419,6 +499,8 @@ namespace RhythmRogue.UI
                 7, TextAnchor.MiddleCenter, Color.white);
             txt.fontStyle = FontStyle.Bold;
             txt.text = label;
+
+            return btn;
         }
 
         // =================================================================
@@ -469,15 +551,10 @@ namespace RhythmRogue.UI
             return t;
         }
 
-        /// <summary>
-        /// Creates a minimal slider using Unity UI primitives.
-        /// No prefab needed.
-        /// </summary>
         private static GameObject CreateSliderGO(RectTransform parent, string name,
             Vector2 ancMin, Vector2 ancMax, Vector2 pivot,
             Vector2 pos, Vector2 size)
         {
-            // Root
             GameObject root = new GameObject(name, typeof(RectTransform), typeof(Slider));
             root.transform.SetParent(parent, false);
 
@@ -488,7 +565,6 @@ namespace RhythmRogue.UI
             rootRT.anchoredPosition = pos;
             rootRT.sizeDelta = size;
 
-            // Background
             GameObject bg = new GameObject("Background", typeof(RectTransform), typeof(Image));
             bg.transform.SetParent(root.transform, false);
             RectTransform bgRT = bg.GetComponent<RectTransform>();
@@ -498,7 +574,6 @@ namespace RhythmRogue.UI
             bgRT.offsetMax = Vector2.zero;
             bg.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.25f);
 
-            // Fill area
             GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
             fillArea.transform.SetParent(root.transform, false);
             RectTransform fillAreaRT = fillArea.GetComponent<RectTransform>();
@@ -507,7 +582,6 @@ namespace RhythmRogue.UI
             fillAreaRT.offsetMin = Vector2.zero;
             fillAreaRT.offsetMax = Vector2.zero;
 
-            // Fill
             GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
             fill.transform.SetParent(fillArea.transform, false);
             RectTransform fillRT = fill.GetComponent<RectTransform>();
@@ -517,7 +591,6 @@ namespace RhythmRogue.UI
             fillRT.offsetMax = Vector2.zero;
             fill.GetComponent<Image>().color = new Color(0.4f, 0.5f, 0.7f);
 
-            // Handle area
             GameObject handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
             handleArea.transform.SetParent(root.transform, false);
             RectTransform handleAreaRT = handleArea.GetComponent<RectTransform>();
@@ -526,14 +599,12 @@ namespace RhythmRogue.UI
             handleAreaRT.offsetMin = Vector2.zero;
             handleAreaRT.offsetMax = Vector2.zero;
 
-            // Handle
             GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
             handle.transform.SetParent(handleArea.transform, false);
             RectTransform handleRT = handle.GetComponent<RectTransform>();
             handleRT.sizeDelta = new Vector2(6, size.y + 2);
             handle.GetComponent<Image>().color = Color.white;
 
-            // Wire slider
             Slider slider = root.GetComponent<Slider>();
             slider.fillRect = fillRT;
             slider.handleRect = handleRT;

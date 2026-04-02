@@ -24,6 +24,11 @@ namespace RhythmRogue.Data
     [CreateAssetMenu(fileName = "NewEnemy", menuName = "RhythmRogue/EnemyData")]
     public class EnemyData : ScriptableObject
     {
+        [Header("Chart")]
+        public ChartTemplate chartTemplate;
+
+        public PatternLibrary patternLibrary;
+
         [Header("Identity")]
         [Tooltip("Display name shown in battle UI.")]
         public string enemyName = "Enemy";

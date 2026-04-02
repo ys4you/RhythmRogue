@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.UI
 {
@@ -42,7 +43,8 @@ namespace RhythmRogue.UI
 
         /// <summary>
         /// Create a standard screen-space overlay Canvas with 384×216 scaler.
-        /// Includes GraphicRaycaster. Optionally creates an EventSystem if none exists.
+        /// Includes GraphicRaycaster. Uses InputSystemUIInputModule via
+        /// UIEventSystemProvider if no EventSystem exists.
         /// </summary>
         /// <param name="parent">Parent transform for the Canvas GameObject.</param>
         /// <param name="name">Canvas GameObject name.</param>
@@ -66,12 +68,8 @@ namespace RhythmRogue.UI
 
             canvasGO.AddComponent<GraphicRaycaster>();
 
-            if (ensureEventSystem && UnityEngine.EventSystems.EventSystem.current == null)
-            {
-                GameObject esGO = new GameObject("EventSystem");
-                esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-            }
+            if (ensureEventSystem)
+                UIEventSystemProvider.EnsureEventSystem();
 
             return canvasGO.GetComponent<RectTransform>();
         }

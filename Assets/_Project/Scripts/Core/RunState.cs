@@ -1,6 +1,7 @@
 using UnityEngine;
 using RhythmRogue.Map;
 using RhythmRogue.Util;
+using RhythmRogue.Util.Random;
 
 namespace RhythmRogue.Core
 {
@@ -52,6 +53,13 @@ namespace RhythmRogue.Core
         /// </summary>
         [System.NonSerialized] public TextAsset SelectedChart;
 
+        /// <summary>
+        /// The seeded random context for this run. Created in StartNewRun
+        /// from the seed code. All procedural systems (map gen, chart assembly,
+        /// enemy selection, rewards) fork from this.
+        /// </summary>
+        [System.NonSerialized] public IRunSeed RunSeed;
+
         // =================================================================
         // METHODS
         // =================================================================
@@ -61,9 +69,25 @@ namespace RhythmRogue.Core
         /// </summary>
         public void StartNewRun(string seed = null)
         {
-            Seed = string.IsNullOrWhiteSpace(seed)
-                ? System.DateTime.Now.Ticks.ToString().Substring(8)
-                : seed;
+            // Generate or use provided seed
+            var encoder = new SeedEncoder();
+
+            if (string.IsNullOrWhiteSpace(seed))
+            {
+                Seed = encoder.GenerateCode();
+            }
+            else
+            {
+                Seed = encoder.Normalize(seed);
+                if (!encoder.IsValid(Seed))
+                {
+                    GameLog.Warn($"[RunState] Invalid seed '{seed}', generating random.");
+                    Seed = encoder.GenerateCode();
+                }
+            }
+
+            // Create the run seed for deterministic procedural generation
+            RunSeed = new RhythmRogue.Util.Random.RunSeed(Seed, encoder);
 
             IsRunActive = true;
             CurrentNodeId = -1;

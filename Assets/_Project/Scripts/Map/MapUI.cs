@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.Map
 {
@@ -14,6 +15,12 @@ namespace RhythmRogue.Map
     ///   - Player position marker
     ///   - HP display and seed text
     ///   - Node info panel on selection
+    /// 
+    /// Fully keyboard/gamepad navigable:
+    ///   - Up/Down moves between map layers
+    ///   - Left/Right moves within a layer
+    ///   - Enter opens info panel → Enter again confirms node
+    ///   - Escape closes info panel and restores node focus
     /// 
     /// Inscryption/Die in the Dungeon style: vertical layout,
     /// bottom (start) to top (boss), branching paths.
@@ -70,6 +77,10 @@ namespace RhythmRogue.Map
         private Button _confirmButton;
         private Image _playerMarker;
 
+        // Navigation
+        private UIFocusSetter _focusSetter;
+        private UICancelHandler _cancelHandler;
+
         // Colors
         private static readonly Color EnemyColor = new Color(0.8f, 0.3f, 0.3f);
         private static readonly Color RestColor = new Color(0.3f, 0.8f, 0.4f);
@@ -98,6 +109,7 @@ namespace RhythmRogue.Map
             CreateNodes();
             CreatePlayerMarker();
             CreateInfoPanel();
+            SetupNavigationComponents();
             UpdateVisuals();
         }
 
@@ -127,6 +139,62 @@ namespace RhythmRogue.Map
                 _infoPanel.SetActive(false);
 
             _selectedNode = null;
+
+            // Rebuild navigation graph for current accessibility state
+            RebuildNavigation();
+        }
+
+        // =================================================================
+        // NAVIGATION
+        // =================================================================
+
+        private void SetupNavigationComponents()
+        {
+            // Focus setter
+            _focusSetter = gameObject.GetComponent<UIFocusSetter>();
+            if (_focusSetter == null)
+                _focusSetter = gameObject.AddComponent<UIFocusSetter>();
+
+            // Cancel handler — base action does nothing on map (no "back" from map)
+            _cancelHandler = gameObject.GetComponent<UICancelHandler>();
+            if (_cancelHandler == null)
+                _cancelHandler = gameObject.AddComponent<UICancelHandler>();
+
+            _cancelHandler.ClearStack();
+        }
+
+        /// <summary>
+        /// Wire keyboard/gamepad navigation for all accessible map nodes.
+        /// Called after BuildMap and after UpdateVisuals (accessibility changes).
+        /// </summary>
+        private void RebuildNavigation()
+        {
+            var entries = new List<MapNavigationBuilder.NodeEntry>();
+
+            foreach (var kvp in _nodeVisuals)
+            {
+                var node = FindNode(kvp.Key);
+                if (node == null) continue;
+
+                bool isNavigable = node.IsAccessible && !node.IsCompleted;
+
+                entries.Add(new MapNavigationBuilder.NodeEntry
+                {
+                    Selectable = kvp.Value.Button,
+                    Layer = node.Layer,
+                    Column = node.Column,
+                    IsAccessible = isNavigable
+                });
+
+                // Apply visual focus style to accessible nodes
+                if (isNavigable)
+                    UISelectableStyle.Apply(kvp.Value.Button);
+            }
+
+            Selectable firstNode = MapNavigationBuilder.Build(entries);
+
+            if (firstNode != null && _focusSetter != null)
+                _focusSetter.SetDefault(firstNode.gameObject);
         }
 
         // =================================================================
@@ -150,13 +218,8 @@ namespace RhythmRogue.Map
             canvasGO.AddComponent<GraphicRaycaster>();
             _canvasRT = canvasGO.GetComponent<RectTransform>();
 
-            // EventSystem is required for button clicks
-            if (UnityEngine.EventSystems.EventSystem.current == null)
-            {
-                GameObject esGO = new GameObject("EventSystem");
-                esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-            }
+            // EventSystem — uses InputSystemUIInputModule
+            UIEventSystemProvider.EnsureEventSystem();
         }
 
         // =================================================================
@@ -215,7 +278,6 @@ namespace RhythmRogue.Map
             GameObject lineGO = new GameObject("Line", typeof(RectTransform), typeof(Image));
             lineGO.transform.SetParent(_canvasRT, false);
 
-            // Move behind nodes
             lineGO.transform.SetAsFirstSibling();
 
             Image img = lineGO.GetComponent<Image>();
@@ -226,7 +288,6 @@ namespace RhythmRogue.Map
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0, 0.5f);
 
-            // Position at 'from', rotate toward 'to'
             Vector2 diff = to - from;
             float dist = diff.magnitude;
             float angle = Mathf.Atan2(diff.y, diff.x) * Mathf.Rad2Deg;
@@ -290,10 +351,10 @@ namespace RhythmRogue.Map
             glowRT.anchorMax = Vector2.one;
             glowRT.offsetMin = new Vector2(-2, -2);
             glowRT.offsetMax = new Vector2(2, 2);
-            glowRT.SetAsFirstSibling(); // Behind content
+            glowRT.SetAsFirstSibling();
 
             Image glow = glowGO.GetComponent<Image>();
-            glow.color = new Color(0, 0, 0, 0); // Hidden by default
+            glow.color = new Color(0, 0, 0, 0);
 
             // Completion checkmark
             Text check = MakeText(rt, "Check",
@@ -371,14 +432,13 @@ namespace RhythmRogue.Map
             }
             else
             {
-                // Before first selection: position below layer 0 center
                 _playerMarker.rectTransform.anchoredPosition = new Vector2(0, -(_canvasRT.rect.height * 0.5f - _mapPaddingBottom - 10f));
                 _playerMarker.gameObject.SetActive(true);
             }
         }
 
         // =================================================================
-        // INFO PANEL — shows on node click
+        // INFO PANEL — shows on node click / Enter
         // =================================================================
 
         private void CreateInfoPanel()
@@ -432,6 +492,9 @@ namespace RhythmRogue.Map
             _confirmButton = btnGO.GetComponent<Button>();
             _confirmButton.onClick.AddListener(OnConfirmClicked);
 
+            // Apply style to confirm button
+            UISelectableStyle.Apply(_confirmButton);
+
             _infoPanel.SetActive(false);
         }
 
@@ -460,11 +523,49 @@ namespace RhythmRogue.Map
                     kvp.Value.Glow.color = (n.Id == nodeId) ? Color.white : AccessibleGlow;
                 }
             }
+
+            // Wire navigation: selected node ↔ confirm button
+            if (_nodeVisuals.TryGetValue(nodeId, out var vis))
+            {
+                MapNavigationBuilder.WireInfoPanel(vis.Button, _confirmButton);
+            }
+
+            // Push Escape handler to close info panel
+            _cancelHandler.Push(() => CloseInfoPanel(nodeId));
+
+            // Focus the confirm button
+            _focusSetter.FocusOn(_confirmButton.gameObject);
+        }
+
+        private void CloseInfoPanel(int nodeIdToRestore)
+        {
+            _infoPanel.SetActive(false);
+            _selectedNode = null;
+
+            // Reset glow highlights
+            foreach (var kvp in _nodeVisuals)
+            {
+                var n = FindNode(kvp.Key);
+                if (n != null && n.IsAccessible && !n.IsCompleted)
+                    kvp.Value.Glow.color = AccessibleGlow;
+            }
+
+            // Rebuild navigation (removes info panel links)
+            RebuildNavigation();
+
+            // Restore focus to the node that was selected
+            if (_nodeVisuals.TryGetValue(nodeIdToRestore, out var vis) && vis.Button.IsInteractable())
+            {
+                _focusSetter.FocusOn(vis.Button.gameObject);
+            }
         }
 
         private void OnConfirmClicked()
         {
             if (_selectedNode == null) return;
+
+            // Pop the info panel cancel handler since we're confirming
+            _cancelHandler.Pop();
 
             OnNodeConfirmed?.Invoke(_selectedNode);
         }
@@ -473,10 +574,6 @@ namespace RhythmRogue.Map
         // HELPERS
         // =================================================================
 
-        /// <summary>
-        /// Convert normalized node position (0-1) to canvas-relative position.
-        /// Center-anchored: (0,0) normalized maps to bottom-left of map area.
-        /// </summary>
         private Vector2 NodeToCanvas(Vector2 normalized)
         {
             float mapWidth = 384f - _mapPadding * 2f;
@@ -485,7 +582,6 @@ namespace RhythmRogue.Map
             float x = (normalized.x - 0.5f) * mapWidth;
             float y = (normalized.y - 0.5f) * mapHeight;
 
-            // Shift up slightly to account for bottom HUD
             y += (_mapPaddingBottom - _mapPaddingTop) * 0.5f;
 
             return new Vector2(x, y);
@@ -551,7 +647,6 @@ namespace RhythmRogue.Map
             _lineObjects.Clear();
             _selectedNode = null;
 
-            // Destroy previous canvas if rebuilding
             if (_canvas != null)
                 Destroy(_canvas.gameObject);
         }

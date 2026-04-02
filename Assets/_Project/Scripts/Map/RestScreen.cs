@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
 using RhythmRogue.UI;
+using RhythmRogue.UI.Navigation;
 using RhythmRogue.Util;
 
 namespace RhythmRogue.Map
@@ -12,7 +13,11 @@ namespace RhythmRogue.Map
     /// Rest node scene. Shows current HP, heal preview, animated
     /// HP bar fill, and a continue button to return to the map.
     /// 
-    /// A breather between battles — warm, simple, satisfying.
+    /// Fully keyboard/gamepad navigable:
+    ///   - Rest button auto-focused on load
+    ///   - Enter confirms heal
+    ///   - After healing, Continue auto-focused
+    ///   - Enter continues to map
     /// 
     /// Reads/writes player HP via PlayerHealth singleton.
     /// Completes the selected node in RunState on confirm.
@@ -57,6 +62,9 @@ namespace RhythmRogue.Map
         private int _newHP;
         private bool _healed;
 
+        // Navigation
+        private UIFocusSetter _focusSetter;
+
         // =================================================================
         // LIFECYCLE
         // =================================================================
@@ -80,9 +88,24 @@ namespace RhythmRogue.Map
             _maxHP = ph.MaxHP;
             _healAmount = Mathf.CeilToInt(_maxHP * _healPercent);
             _newHP = Mathf.Min(_currentHP + _healAmount, _maxHP);
-            _healAmount = _newHP - _currentHP; // Actual heal after clamp
+            _healAmount = _newHP - _currentHP;
 
             CreateUI();
+            SetupNavigation();
+        }
+
+        // =================================================================
+        // NAVIGATION SETUP
+        // =================================================================
+
+        private void SetupNavigation()
+        {
+            // Apply visual focus style
+            UISelectableStyle.Apply(_restButton);
+
+            // Focus setter — auto-selects Rest button
+            _focusSetter = gameObject.AddComponent<UIFocusSetter>();
+            _focusSetter.SetDefault(_restButton.gameObject);
         }
 
         // =================================================================
@@ -151,6 +174,10 @@ namespace RhythmRogue.Map
             _restButton.interactable = true;
             _restButton.onClick.RemoveAllListeners();
             _restButton.onClick.AddListener(OnContinueClicked);
+
+            // Re-apply style and focus the Continue button
+            UISelectableStyle.Apply(_restButton);
+            _focusSetter.FocusOn(_restButton.gameObject);
         }
 
         private void OnContinueClicked()
@@ -195,13 +222,8 @@ namespace RhythmRogue.Map
 
             canvasGO.AddComponent<GraphicRaycaster>();
 
-            // EventSystem
-            if (UnityEngine.EventSystems.EventSystem.current == null)
-            {
-                GameObject esGO = new GameObject("EventSystem");
-                esGO.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                esGO.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
-            }
+            // EventSystem — uses InputSystemUIInputModule
+            UIEventSystemProvider.EnsureEventSystem();
 
             RectTransform canvasRT = canvasGO.GetComponent<RectTransform>();
 
@@ -213,8 +235,8 @@ namespace RhythmRogue.Map
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            // Campfire glow (simple warm circle in center-bottom)
-            GameObject glowGO = MakePanel(canvasRT, "Glow",
+            // Campfire glow
+            MakePanel(canvasRT, "Glow",
                 new Vector2(0.5f, 0.2f), new Vector2(0.5f, 0.2f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, new Vector2(80, 80),
                 new Color(1f, 0.6f, 0.2f, 0.15f));
@@ -235,7 +257,7 @@ namespace RhythmRogue.Map
 
             RectTransform barParent = _hpBarBG.GetComponent<RectTransform>();
 
-            // HP bar preview fill (lighter, shows what HP will be after heal)
+            // HP bar preview fill
             GameObject previewGO = MakePanel(barParent, "PreviewFill",
                 Vector2.zero, Vector2.one, new Vector2(0, 0.5f),
                 Vector2.zero, Vector2.zero,
@@ -282,9 +304,7 @@ namespace RhythmRogue.Map
                 new Vector2(0.5f, 0.15f), new Vector2(0.5f, 0.15f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, new Vector2(70, 18),
                 new Color(0.2f, 0.5f, 0.2f));
-            btnGO.AddComponent<Button>();
-
-            _restButton = btnGO.GetComponent<Button>();
+            _restButton = btnGO.AddComponent<Button>();
             _restButton.onClick.AddListener(OnRestClicked);
 
             _restButtonText = MakeText(btnGO.GetComponent<RectTransform>(), "BtnText",
@@ -293,6 +313,9 @@ namespace RhythmRogue.Map
                 7, TextAnchor.MiddleCenter, Color.white);
             _restButtonText.text = "Rest";
             _restButtonText.fontStyle = FontStyle.Bold;
+
+            // Set explicit navigation (single button — no links needed, just explicit mode)
+            UINavigationHelper.SetExplicit(_restButton);
         }
 
         // =================================================================

@@ -1,4 +1,5 @@
 using System;
+using RhythmRogue.Core;
 using RhythmRogue.Util;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -13,21 +14,8 @@ namespace RhythmRogue.Battle
     /// than Input.GetKeyDown — the callback fires at the moment the input
     /// event is processed, not on the next frame.
     /// 
-    /// Bindings are defined in the RhythmActions.inputactions asset:
-    ///   Lane 0 (Left):  Arrow Left  / D-pad Left  / Gamepad West (X/□)
-    ///   Lane 1 (Down):  Arrow Down  / D-pad Down  / Gamepad South (A/✕)
-    ///   Lane 2 (Up):    Arrow Up    / D-pad Up    / Gamepad North (Y/△)
-    ///   Lane 3 (Right): Arrow Right / D-pad Right / Gamepad East (B/○)
-    /// 
-    /// Players can rebind keys at runtime using Unity's built-in rebinding
-    /// API on the InputActionAsset — no code changes needed.
-    /// 
-    /// SOLID breakdown:
-    /// - S: Only reads input and fires events. No note matching, no scoring.
-    /// - O: Add new devices by editing the InputActions asset, not this code.
-    /// - L: Consumers subscribe to C# events regardless of input source.
-    /// - I: Two focused events, one held-state query.
-    /// - D: No dependencies on gameplay systems.
+    /// On Awake, initializes KeybindManager to load any saved binding
+    /// overrides before input is processed.
     /// </summary>
     public class InputHandler : MonoBehaviour
     {
@@ -46,13 +34,8 @@ namespace RhythmRogue.Battle
         // STATE
         // =================================================================
 
-        /// <summary>Per-lane held state for hold note tracking.</summary>
         private readonly bool[] _isHeld = new bool[LaneCount];
-
-        /// <summary>Resolved action references, one per lane.</summary>
         private InputAction[] _laneActions;
-
-        /// <summary>The Rhythm action map from the asset.</summary>
         private InputActionMap _rhythmMap;
 
         // =================================================================
@@ -62,14 +45,12 @@ namespace RhythmRogue.Battle
         /// <summary>
         /// Fired when a lane key is pressed.
         /// Parameter: lane index (0-3).
-        /// Consumers: NoteMatcher (find nearest note), NoteHighway (receptor flash).
         /// </summary>
         public event Action<int> OnLanePressed;
 
         /// <summary>
         /// Fired when a lane key is released.
         /// Parameter: lane index (0-3).
-        /// Consumers: Hold note detection (PROTO-006).
         /// </summary>
         public event Action<int> OnLaneReleased;
 
@@ -79,7 +60,6 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Check if a lane is currently held down.
-        /// Used by hold note detection to track sustained input.
         /// </summary>
         public bool IsLaneHeld(int lane)
         {
@@ -98,6 +78,10 @@ namespace RhythmRogue.Battle
                 GameLog.Error("[InputHandler] No InputActionAsset assigned!");
                 return;
             }
+
+            // Initialize keybind manager FIRST — loads saved overrides
+            // before we resolve actions, so overrides are already applied
+            KeybindManager.Initialize(_inputActions);
 
             // Find the Rhythm action map
             _rhythmMap = _inputActions.FindActionMap("Rhythm");

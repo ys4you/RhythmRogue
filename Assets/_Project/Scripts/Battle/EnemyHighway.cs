@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Core;
@@ -10,6 +11,7 @@ namespace RhythmRogue.Battle
     /// 
     /// Adds enemy-specific functionality:
     ///   - Auto-hit: flashes receptors when notes reach the line (visual only)
+    ///   - Fires OnAutoHit event for particles/effects
     ///   - No player input, no hit detection, no judgment
     ///   - Notes are purely visual/musical feedback
     /// </summary>
@@ -21,6 +23,16 @@ namespace RhythmRogue.Battle
 
         [Header("Flash")]
         [SerializeField] private float _flashDuration = 0.08f;
+
+        // =================================================================
+        // EVENTS
+        // =================================================================
+
+        /// <summary>
+        /// Fired when a note auto-hits the receptor line. Parameter: lane index (0-3).
+        /// Used by HitParticles to spawn bursts on the enemy side.
+        /// </summary>
+        public event Action<int> OnAutoHit;
 
         // =================================================================
         // STATE
@@ -140,6 +152,7 @@ namespace RhythmRogue.Battle
                     active.AutoHit = true;
                     _activeNotes[i] = active;
                     FlashReceptor(active.Lane);
+                    OnAutoHit?.Invoke(active.Lane);
                 }
 
                 // Despawn
@@ -188,6 +201,7 @@ namespace RhythmRogue.Battle
         private void OnDestroy()
         {
             Clear();
+            OnAutoHit = null;
         }
 
         // =================================================================

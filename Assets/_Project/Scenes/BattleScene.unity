@@ -178,6 +178,7 @@ GameObject:
   m_Component:
   - component: {fileID: 312867618}
   - component: {fileID: 312867617}
+  - component: {fileID: 312867619}
   m_Layer: 0
   m_Name: Note_highway
   m_TagString: Untagged
@@ -240,6 +241,28 @@ Transform:
   - {fileID: 349695878}
   m_Father: {fileID: 1848496892}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &312867619
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 312867616}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ddabec6aababe34e892fd4edbb8665d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _highway: {fileID: 0}
+  _beatPulseEnabled: 1
+  _beatPulseAmount: 0.08
+  _beatPulseDecay: 10
+  _pressScale: 1.25
+  _pressDecay: 15
+  _glowDuration: 0.12
+  _glowBrightness: 2
+  _missShakeAmount: 1.5
+  _missShakeDuration: 0.08
 --- !u!1 &349695876
 GameObject:
   m_ObjectHideFlags: 0
@@ -1915,6 +1938,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1671159283}
   - component: {fileID: 1671159282}
+  - component: {fileID: 1671159284}
   m_Layer: 0
   m_Name: EnemyHighway
   m_TagString: Untagged
@@ -1978,6 +2002,28 @@ Transform:
   - {fileID: 1999661007}
   m_Father: {fileID: 1848496892}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1671159284
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1671159281}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ddabec6aababe34e892fd4edbb8665d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _highway: {fileID: 1671159282}
+  _beatPulseEnabled: 1
+  _beatPulseAmount: 0.08
+  _beatPulseDecay: 10
+  _pressScale: 1.25
+  _pressDecay: 15
+  _glowDuration: 0.12
+  _glowBrightness: 2
+  _missShakeAmount: 1.5
+  _missShakeDuration: 0.08
 --- !u!1 &1794601931
 GameObject:
   m_ObjectHideFlags: 0
@@ -1988,6 +2034,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1794601932}
   - component: {fileID: 1794601933}
+  - component: {fileID: 1794601934}
   m_Layer: 0
   m_Name: Hit_feedbk
   m_TagString: Untagged
@@ -2026,11 +2073,42 @@ MonoBehaviour:
   _comboSystem: {fileID: 1147190660}
   _highway: {fileID: 312867617}
   _mainCamera: {fileID: 519420031}
-  _shakeIntensity: 2
+  _receptorAnimator: {fileID: 0}
+  _hitParticles: {fileID: 1794601934}
+  _missShakeIntensity: 2
+  _badShakeIntensity: 0
+  _perfectShakeIntensity: 0.5
   _shakeDuration: 0.1
   _hitSound: {fileID: 8300000, guid: 346fd3a869d78dc44a6e42056157d3be, type: 3}
   _hitVolume: 0.1
   _textPoolSize: 8
+--- !u!114 &1794601934
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1794601931}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 739f7084860c5e34f96ee97c36547172, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _playerHighway: {fileID: 312867617}
+  _enemyHighway: {fileID: 1671159282}
+  _particleSprite: {fileID: -6363824265964815032, guid: fb3147adc4faed3409790fb1b8faa669, type: 3}
+  _perfectCount: 12
+  _goodCount: 8
+  _badCount: 4
+  _missCount: 0
+  _enemyHitCount: 6
+  _startSpeed: 1.5
+  _gravityModifier: 0.8
+  _lifetime: 0.35
+  _startSize: 0.04
+  _milestoneCount: 24
+  _milestoneSpeed: 2.5
+  _milestoneLifetime: 0.5
 --- !u!1 &1848496891
 GameObject:
   m_ObjectHideFlags: 0

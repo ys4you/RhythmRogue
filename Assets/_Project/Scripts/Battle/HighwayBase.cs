@@ -82,6 +82,19 @@ namespace RhythmRogue.Battle
         protected Conductor _conductor;
 
         // =================================================================
+        // PUBLIC READ-ONLY — for HitFeedback, ReceptorAnimator, etc.
+        // =================================================================
+
+        /// <summary>World X per lane (read-only). Use to position feedback.</summary>
+        public IReadOnlyList<float> LanePositions => _laneX;
+
+        /// <summary>World Y of the receptor / hit line.</summary>
+        public float ReceptorY => _receptorY;
+
+        /// <summary>Receptor SpriteRenderers (read-only). Used by ReceptorAnimator.</summary>
+        public IReadOnlyList<SpriteRenderer> Receptors => _receptors;
+
+        // =================================================================
         // LANE ROTATION
         // =================================================================
 

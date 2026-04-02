@@ -164,6 +164,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _runState: {fileID: 11400000, guid: fd05c793c93cd014e9de44853e693de3, type: 2}
+  _rhythmActions: {fileID: -944628639613478452, guid: 74402dcaaa69c6f4f83eed1b2c4f56d3, type: 3}
   _versionText: Prototype v0.1
 --- !u!1 &1920994944
 GameObject:

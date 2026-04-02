@@ -11,10 +11,13 @@ namespace RhythmRogue.Battle
     /// Handles:
     ///   - Judgment text ("PERFECT", "GOOD", etc.) with scale+fade animation
     ///   - Early/Late subtitle
-    ///   - Screen shake on Miss
-    ///   - Hit SFX via PlayOneShot
-    ///   - Receptor glow tint on hit
+    ///   - Per-judgment screen shake (configurable intensity per tier)
+    ///   - Hit SFX via PlayOneShot with pitch variation
+    ///   - Receptor glow via ReceptorAnimator
     ///   - Combo milestone banners
+    /// 
+    /// Lane positions for text placement are read directly from the highway
+    /// (no more hardcoded defaults).
     /// 
     /// All text instances are pooled to avoid GC during dense sections.
     /// Sized for 384×216 reference resolution.
@@ -31,9 +34,23 @@ namespace RhythmRogue.Battle
         [SerializeField] private NoteHighway _highway;
         [SerializeField] private Camera _mainCamera;
 
+        [Header("Receptor Animator (optional)")]
+        [Tooltip("If assigned, triggers glow effects on judgments. " +
+                 "If empty, auto-detects on the highway GameObject.")]
+        [SerializeField] private ReceptorAnimator _receptorAnimator;
+
+        [Header("Hit Particles (optional)")]
+        [Tooltip("If assigned, spawns particle bursts on judgments. " +
+                 "If empty, auto-detects on this GameObject or highway.")]
+        [SerializeField] private HitParticles _hitParticles;
+
         [Header("Screen Shake")]
         [Tooltip("Pixel displacement on Miss. 0 = disabled.")]
-        [SerializeField] private float _shakeIntensity = 2f;
+        [SerializeField] private float _missShakeIntensity = 2f;
+        [Tooltip("Pixel displacement on Bad. 0 = disabled.")]
+        [SerializeField] private float _badShakeIntensity = 0f;
+        [Tooltip("Subtle pixel bump on Perfect. 0 = disabled.")]
+        [SerializeField] private float _perfectShakeIntensity = 0.5f;
         [Tooltip("Shake duration in seconds.")]
         [SerializeField] private float _shakeDuration = 0.1f;
 
@@ -44,7 +61,6 @@ namespace RhythmRogue.Battle
 
         [Header("Pool Size")]
         [SerializeField] private int _textPoolSize = 8;
-        
 
         // =================================================================
         // STATE
@@ -54,32 +70,25 @@ namespace RhythmRogue.Battle
         private RectTransform _canvasRT;
         private AudioSource _sfxSource;
 
-        // Judgment text pool
         private readonly List<JudgmentTextInstance> _textPool = new();
         private int _nextTextIndex;
 
-        // Milestone text
         private JudgmentTextInstance _milestoneText;
 
-        // Screen shake
         private Vector3 _cameraOriginalPos;
         private float _shakeTimer;
+        private float _shakeIntensity;
 
-        // Receptor glow
-        private readonly float[] _receptorGlow = new float[4];
+        private int _activeTextCount;
 
         // =================================================================
         // COLORS
         // =================================================================
 
-        private static readonly Color PerfectColor = new Color(1f, 0.85f, 0f);   // Gold
-        private static readonly Color GoodColor = new Color(0.3f, 1f, 0.3f);     // Green
-        private static readonly Color BadColor = new Color(1f, 0.6f, 0.2f);      // Orange
-        private static readonly Color MissColor = new Color(1f, 0.25f, 0.25f);   // Red
-
-
-        private int _activeTextCount;
-
+        private static readonly Color PerfectColor = new(1f, 0.85f, 0f);
+        private static readonly Color GoodColor = new(0.3f, 1f, 0.3f);
+        private static readonly Color BadColor = new(1f, 0.6f, 0.2f);
+        private static readonly Color MissColor = new(1f, 0.25f, 0.25f);
 
         // =================================================================
         // LIFECYCLE
@@ -90,11 +99,22 @@ namespace RhythmRogue.Battle
             if (_mainCamera == null)
                 _mainCamera = Camera.main;
 
-            _cameraOriginalPos = _mainCamera != null ? _mainCamera.transform.localPosition : Vector3.zero;
+            _cameraOriginalPos = _mainCamera != null
+                ? _mainCamera.transform.localPosition
+                : Vector3.zero;
 
-            // SFX source — separate from music
             _sfxSource = gameObject.AddComponent<AudioSource>();
             _sfxSource.playOnAwake = false;
+
+            // Auto-detect ReceptorAnimator on the highway if not assigned
+            if (_receptorAnimator == null && _highway != null)
+                _receptorAnimator = _highway.GetComponent<ReceptorAnimator>();
+
+            // Auto-detect HitParticles
+            if (_hitParticles == null)
+                _hitParticles = GetComponent<HitParticles>();
+            if (_hitParticles == null && _highway != null)
+                _hitParticles = _highway.GetComponent<HitParticles>();
 
             CreateCanvas();
             CreateTextPool();
@@ -122,7 +142,7 @@ namespace RhythmRogue.Battle
         {
             float dt = Time.unscaledDeltaTime;
 
-            // Animate text pool — skip iteration entirely when nothing is active
+            // Animate text pool
             if (_activeTextCount > 0)
             {
                 foreach (var inst in _textPool)
@@ -141,37 +161,44 @@ namespace RhythmRogue.Battle
                 UpdateTextInstance(_milestoneText, dt);
 
             // Screen shake decay
-            if (_shakeTimer > 0f && _mainCamera != null)
-            {
-                _shakeTimer -= dt;
+            UpdateScreenShake(dt);
+        }
 
-                if (_shakeTimer > 0f)
-                {
-                    float intensity = _shakeIntensity * (_shakeTimer / _shakeDuration);
-                    float ox = Random.Range(-intensity, intensity);
-                    float oy = Random.Range(-intensity, intensity);
-                    // Convert pixel offset to world units (at 32 PPU)
-                    _mainCamera.transform.localPosition = _cameraOriginalPos +
-                        new Vector3(ox / 32f, oy / 32f, 0f);
-                }
-                else
-                {
-                    _mainCamera.transform.localPosition = _cameraOriginalPos;
-                }
+        // =================================================================
+        // SCREEN SHAKE
+        // =================================================================
+
+        private void TriggerShake(float intensity)
+        {
+            if (intensity <= 0f) return;
+
+            _shakeIntensity = intensity;
+            _shakeTimer = _shakeDuration;
+        }
+
+        private void UpdateScreenShake(float dt)
+        {
+            if (_shakeTimer <= 0f || _mainCamera == null)
+                return;
+
+            _shakeTimer -= dt;
+
+            if (_shakeTimer > 0f)
+            {
+                float fade = _shakeTimer / _shakeDuration;
+                float intensity = _shakeIntensity * fade;
+                float ox = Random.Range(-intensity, intensity);
+                float oy = Random.Range(-intensity, intensity);
+                // Convert pixel offset to world units (at 32 PPU)
+                _mainCamera.transform.localPosition = _cameraOriginalPos +
+                    new Vector3(ox / 32f, oy / 32f, 0f);
             }
-
-            // Receptor glow decay
-            for (int i = 0; i < 4; i++)
+            else
             {
-                if (_receptorGlow[i] > 0f)
-                {
-                    _receptorGlow[i] -= dt * 8f;
-                    if (_receptorGlow[i] <= 0f)
-                        _receptorGlow[i] = 0f;
-                }
+                _mainCamera.transform.localPosition = _cameraOriginalPos;
             }
         }
-        
+
         // =================================================================
         // EVENT HANDLERS
         // =================================================================
@@ -181,13 +208,24 @@ namespace RhythmRogue.Battle
             // Judgment text
             ShowJudgmentText(result);
 
-            // Receptor glow
-            if (result.Judgment != Judgment.Miss)
-                _receptorGlow[Mathf.Clamp(result.Lane, 0, 3)] = 1f;
+            // Receptor glow via animator
+            int lane = Mathf.Clamp(result.Lane, 0, 3);
+            if (_receptorAnimator != null)
+                _receptorAnimator.TriggerGlow(lane, result.Judgment);
 
-            // Screen shake on Miss
-            if (result.Judgment == Judgment.Miss && _shakeIntensity > 0f)
-                _shakeTimer = _shakeDuration;
+            // Particle burst
+            if (_hitParticles != null)
+                _hitParticles.Burst(lane, result.Judgment);
+
+            // Per-judgment screen shake
+            float shake = result.Judgment switch
+            {
+                Judgment.Perfect => _perfectShakeIntensity,
+                Judgment.Bad     => _badShakeIntensity,
+                Judgment.Miss    => _missShakeIntensity,
+                _                => 0f  // Good = no shake
+            };
+            TriggerShake(shake);
 
             // Hit SFX (not on Miss — silence = failure)
             if (result.Judgment != Judgment.Miss && _hitSound != null)
@@ -195,8 +233,8 @@ namespace RhythmRogue.Battle
                 float pitch = result.Judgment switch
                 {
                     Judgment.Perfect => 1.1f,
-                    Judgment.Good => 1.0f,
-                    _ => 0.9f
+                    Judgment.Good    => 1.0f,
+                    _                => 0.9f
                 };
                 _sfxSource.pitch = pitch;
                 _sfxSource.PlayOneShot(_hitSound, _hitVolume);
@@ -206,6 +244,10 @@ namespace RhythmRogue.Battle
         private void HandleMilestone(int milestone)
         {
             ShowMilestoneText(milestone);
+
+            // Milestone particle burst
+            if (_hitParticles != null)
+                _hitParticles.MilestoneBurst(milestone);
         }
 
         // =================================================================
@@ -216,21 +258,20 @@ namespace RhythmRogue.Battle
         {
             var inst = GetNextText();
 
-            // Main text
             string label = result.Judgment switch
             {
                 Judgment.Perfect => "PERFECT",
-                Judgment.Good => "GOOD",
-                Judgment.Bad => "BAD",
-                _ => "MISS"
+                Judgment.Good    => "GOOD",
+                Judgment.Bad     => "BAD",
+                _                => "MISS"
             };
 
             Color color = result.Judgment switch
             {
                 Judgment.Perfect => PerfectColor,
-                Judgment.Good => GoodColor,
-                Judgment.Bad => BadColor,
-                _ => MissColor
+                Judgment.Good    => GoodColor,
+                Judgment.Bad     => BadColor,
+                _                => MissColor
             };
 
             inst.MainText.text = label;
@@ -249,13 +290,12 @@ namespace RhythmRogue.Battle
                 inst.SubText.gameObject.SetActive(false);
             }
 
-            // Position at the lane's hit line location
+            // Position at the lane's hit line — read from highway
             int lane = Mathf.Clamp(result.Lane, 0, 3);
-            Vector3 worldPos = new Vector3(
-                _highway != null ? GetLaneX(lane) : 0f,
-                _highway != null ? _highway.HitLineY + 0.5f : 0f,
-                0f);
+            float laneX = GetLaneX(lane);
+            float hitY = _highway != null ? _highway.HitLineY : 0f;
 
+            Vector3 worldPos = new Vector3(laneX, hitY + 0.5f, 0f);
             Vector2 screenPos = _mainCamera.WorldToScreenPoint(worldPos);
             RectTransformUtility.ScreenPointToLocalPointInRectangle(
                 _canvasRT, screenPos, null, out Vector2 localPos);
@@ -317,14 +357,15 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // LANE POSITIONS — read from highway lane config
+        // LANE POSITIONS — read from highway (source of truth)
         // =================================================================
 
         private float GetLaneX(int lane)
         {
-            // Match NoteHighway default lane positions
-            float[] defaults = { -1.5f, -0.5f, 0.5f, 1.5f };
-            return lane >= 0 && lane < defaults.Length ? defaults[lane] : 0f;
+            if (_highway != null && _highway.LanePositions != null && lane < _highway.LanePositions.Count)
+                return _highway.LanePositions[lane];
+
+            return 0f;
         }
 
         // =================================================================
@@ -357,7 +398,6 @@ namespace RhythmRogue.Battle
                 _textPool.Add(inst);
             }
 
-            // Milestone text (separate, centered)
             _milestoneText = CreateTextInstance("MilestoneText");
             _milestoneText.MainText.fontSize = 10;
             _milestoneText.Root.gameObject.SetActive(false);

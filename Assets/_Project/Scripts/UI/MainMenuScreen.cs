@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
 using RhythmRogue.Util;
@@ -13,15 +14,13 @@ namespace RhythmRogue.UI
     /// Provides:
     ///   - New Run (random seed)
     ///   - Seed Entry (custom seed)
-    ///   - Settings (audio offset, volume)
+    ///   - Settings (audio + controls with rebinding)
     ///   - Quit
     ///   - Version display
     /// 
-    /// Fully keyboard/gamepad navigable:
-    ///   - Arrow keys / D-pad navigate vertically between buttons
-    ///   - Enter / Space / A confirms
-    ///   - Escape / B closes settings panel or triggers quit
-    ///   - Settings sliders: Left/Right adjusts, Up/Down navigates between them
+    /// Settings panel has two sub-panels:
+    ///   - Audio: offset, master/music/sfx volume
+    ///   - Controls: 4 lane rebind buttons, reset to defaults
     /// 
     /// Code-generated UI, sized for 384×216.
     /// </summary>
@@ -33,6 +32,7 @@ namespace RhythmRogue.UI
 
         [Header("References")]
         [SerializeField] private RunState _runState;
+        [SerializeField] private InputActionAsset _rhythmActions;
 
         [Header("Version")]
         [SerializeField] private string _versionText = "Prototype v0.1";
@@ -44,21 +44,39 @@ namespace RhythmRogue.UI
         private Canvas _canvas;
         private RectTransform _canvasRT;
         private InputField _seedInput;
+
+        // Settings
         private GameObject _settingsPanel;
+        private GameObject _audioPanel;
+        private GameObject _controlsPanel;
         private Slider _offsetSlider;
         private Text _offsetValue;
         private Slider _masterVolSlider;
         private Slider _musicVolSlider;
         private Slider _sfxVolSlider;
 
-        // Button references for navigation wiring
+        // Controls panel
+        private Text[] _bindingLabels;       // "Left Arrow" display per lane
+        private Button[] _rebindButtons;     // Click to rebind per lane
+        private Text[] _rebindButtonTexts;   // Text on the rebind buttons
+        private Text[] _secondaryLabels;     // Secondary binding display
+        private Button[] _secondaryButtons;  // Secondary rebind buttons
+        private Text[] _secondaryTexts;      // Text on secondary buttons
+        private Button _resetDefaultsBtn;
+        private Text _conflictWarning;
+
+        // Tab buttons
+        private Button _audioTabBtn;
+        private Button _controlsTabBtn;
+
+        // Main menu buttons
         private Button _newRunBtn;
         private Button _seedGoBtn;
         private Button _settingsBtn;
         private Button _quitBtn;
         private Button _settingsCloseBtn;
 
-        // Navigation components
+        // Navigation
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
 
@@ -68,6 +86,10 @@ namespace RhythmRogue.UI
 
         private void Start()
         {
+            // Initialize keybind manager
+            if (_rhythmActions != null)
+                KeybindManager.Initialize(_rhythmActions);
+
             CreateUI();
             SetupNavigation();
         }
@@ -78,37 +100,30 @@ namespace RhythmRogue.UI
 
         private void SetupNavigation()
         {
-            // Wire vertical chain: New Run → Seed Go → Settings → Quit
             UINavigationHelper.WireVerticalNoWrap(_newRunBtn, _seedGoBtn, _settingsBtn, _quitBtn);
 
-            // Seed input field: Down goes to Settings (skip Go button since it's beside the field)
             UINavigationHelper.Wire(_seedInput,
                 up: _newRunBtn,
                 down: _settingsBtn,
                 right: _seedGoBtn);
 
-            // Seed Go button: connect to neighbors
             UINavigationHelper.AddLink(_seedGoBtn, left: _seedInput);
 
-            // Seed input: when done editing, move focus to Go button
             _seedInput.onEndEdit.AddListener(_ =>
             {
                 if (_seedInput.isFocused) return;
                 _focusSetter.FocusOn(_seedGoBtn.gameObject);
             });
 
-            // Apply visual focus styles to all interactive elements
             UISelectableStyle.Apply(_newRunBtn);
             UISelectableStyle.Apply(_seedGoBtn);
             UISelectableStyle.Apply(_settingsBtn);
             UISelectableStyle.Apply(_quitBtn);
             UISelectableStyle.Apply(_seedInput);
 
-            // Focus setter — auto-selects New Run on enable
             _focusSetter = gameObject.AddComponent<UIFocusSetter>();
             _focusSetter.SetDefault(_newRunBtn.gameObject);
 
-            // Cancel handler — Escape triggers quit (or closes settings if open)
             _cancelHandler = gameObject.AddComponent<UICancelHandler>();
             _cancelHandler.SetBaseAction(OnQuit);
         }
@@ -117,10 +132,7 @@ namespace RhythmRogue.UI
         // ACTIONS
         // =================================================================
 
-        private void OnNewRun()
-        {
-            StartRun(null);
-        }
+        private void OnNewRun() => StartRun(null);
 
         private void OnSeededRun()
         {
@@ -159,41 +171,26 @@ namespace RhythmRogue.UI
         private void OnSettings()
         {
             _settingsPanel.SetActive(true);
+            ShowAudioTab();
 
-            // Push cancel handler so Escape closes settings first
             _cancelHandler.Push(OnSettingsClose);
-
-            // Wire settings sliders vertically
-            UINavigationHelper.WireVerticalNoWrap(
-                _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider);
-
-            // Close button below last slider
-            UINavigationHelper.AddLink(_sfxVolSlider, down: _settingsCloseBtn);
-            UINavigationHelper.Wire(_settingsCloseBtn, up: _sfxVolSlider);
-
-            // Apply slider styles
-            UISelectableStyle.ApplySlider(_offsetSlider);
-            UISelectableStyle.ApplySlider(_masterVolSlider);
-            UISelectableStyle.ApplySlider(_musicVolSlider);
-            UISelectableStyle.ApplySlider(_sfxVolSlider);
-            UISelectableStyle.Apply(_settingsCloseBtn);
-
-            // Focus the first slider
-            _focusSetter.FocusOn(_offsetSlider.gameObject);
+            _focusSetter.FocusOn(_audioTabBtn.gameObject);
         }
 
         private void OnSettingsClose()
         {
+            // Cancel any active rebind
+            if (KeybindManager.IsRebinding)
+                KeybindManager.CancelRebind();
+
             _settingsPanel.SetActive(false);
 
-            // Save prefs
             PlayerPrefs.SetFloat("audioOffset", _offsetSlider.value);
             PlayerPrefs.SetFloat("masterVolume", _masterVolSlider.value);
             PlayerPrefs.SetFloat("musicVolume", _musicVolSlider.value);
             PlayerPrefs.SetFloat("sfxVolume", _sfxVolSlider.value);
             PlayerPrefs.Save();
 
-            // Restore focus to the Settings button
             _focusSetter.FocusOn(_settingsBtn.gameObject);
         }
 
@@ -201,10 +198,178 @@ namespace RhythmRogue.UI
         {
             GameLog.Info("[MainMenu] Quit");
             Application.Quit();
-
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #endif
+        }
+
+        // =================================================================
+        // TAB SWITCHING
+        // =================================================================
+
+        private void ShowAudioTab()
+        {
+            _audioPanel.SetActive(true);
+            _controlsPanel.SetActive(false);
+
+            // Highlight active tab
+            _audioTabBtn.GetComponent<Image>().color = new Color(0.3f, 0.3f, 0.5f);
+            _controlsTabBtn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
+
+            // Wire audio navigation
+            UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn);
+            UINavigationHelper.AddLink(_audioTabBtn, down: _offsetSlider);
+            UINavigationHelper.AddLink(_controlsTabBtn, down: _offsetSlider);
+
+            UINavigationHelper.WireVerticalNoWrap(
+                _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider);
+            UINavigationHelper.AddLink(_offsetSlider, up: _audioTabBtn);
+            UINavigationHelper.AddLink(_sfxVolSlider, down: _settingsCloseBtn);
+            UINavigationHelper.Wire(_settingsCloseBtn, up: _sfxVolSlider);
+
+            UISelectableStyle.Apply(_audioTabBtn);
+            UISelectableStyle.Apply(_controlsTabBtn);
+            UISelectableStyle.ApplySlider(_offsetSlider);
+            UISelectableStyle.ApplySlider(_masterVolSlider);
+            UISelectableStyle.ApplySlider(_musicVolSlider);
+            UISelectableStyle.ApplySlider(_sfxVolSlider);
+            UISelectableStyle.Apply(_settingsCloseBtn);
+
+            _focusSetter.FocusOn(_audioTabBtn.gameObject);
+        }
+
+        private void ShowControlsTab()
+        {
+            _audioPanel.SetActive(false);
+            _controlsPanel.SetActive(true);
+
+            _audioTabBtn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
+            _controlsTabBtn.GetComponent<Image>().color = new Color(0.3f, 0.3f, 0.5f);
+
+            // Refresh binding display
+            RefreshBindingDisplay();
+
+            // Wire controls navigation
+            UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn);
+            UINavigationHelper.AddLink(_audioTabBtn, down: _rebindButtons[0]);
+            UINavigationHelper.AddLink(_controlsTabBtn, down: _rebindButtons[0]);
+
+            // Wire rebind buttons vertically (primary column)
+            UINavigationHelper.WireVerticalNoWrap(_rebindButtons);
+            UINavigationHelper.AddLink(_rebindButtons[0], up: _controlsTabBtn);
+            UINavigationHelper.AddLink(_rebindButtons[3], down: _resetDefaultsBtn);
+
+            // Wire primary ↔ secondary horizontally per row
+            for (int i = 0; i < 4; i++)
+            {
+                UINavigationHelper.AddLink(_rebindButtons[i], right: _secondaryButtons[i]);
+                UINavigationHelper.AddLink(_secondaryButtons[i], left: _rebindButtons[i]);
+
+                if (i > 0)
+                    UINavigationHelper.AddLink(_secondaryButtons[i], up: _secondaryButtons[i - 1]);
+                if (i < 3)
+                    UINavigationHelper.AddLink(_secondaryButtons[i], down: _secondaryButtons[i + 1]);
+            }
+            UINavigationHelper.AddLink(_secondaryButtons[0], up: _controlsTabBtn);
+            UINavigationHelper.AddLink(_secondaryButtons[3], down: _resetDefaultsBtn);
+
+            UINavigationHelper.Wire(_resetDefaultsBtn, up: _rebindButtons[3], down: _settingsCloseBtn);
+            UINavigationHelper.Wire(_settingsCloseBtn, up: _resetDefaultsBtn);
+
+            UISelectableStyle.Apply(_audioTabBtn);
+            UISelectableStyle.Apply(_controlsTabBtn);
+            for (int i = 0; i < 4; i++)
+            {
+                UISelectableStyle.Apply(_rebindButtons[i]);
+                UISelectableStyle.Apply(_secondaryButtons[i]);
+            }
+            UISelectableStyle.Apply(_resetDefaultsBtn);
+            UISelectableStyle.Apply(_settingsCloseBtn);
+
+            _focusSetter.FocusOn(_controlsTabBtn.gameObject);
+        }
+
+        // =================================================================
+        // REBINDING
+        // =================================================================
+
+        private void StartRebind(int lane, int bindingIndex, Text displayText)
+        {
+            if (KeybindManager.IsRebinding) return;
+
+            string originalText = displayText.text;
+            displayText.text = "Press a key...";
+            displayText.color = new Color(1f, 0.85f, 0f);
+
+            HideConflictWarning();
+
+            KeybindManager.StartRebind(lane, bindingIndex,
+                onComplete: newDisplay =>
+                {
+                    displayText.text = newDisplay;
+                    displayText.color = Color.white;
+                    RefreshBindingDisplay();
+                },
+                onCancel: () =>
+                {
+                    displayText.text = originalText;
+                    displayText.color = Color.white;
+                    ShowConflictWarning("Key already in use!");
+                });
+        }
+
+        private void OnResetDefaults()
+        {
+            KeybindManager.ResetToDefaults();
+            RefreshBindingDisplay();
+            HideConflictWarning();
+        }
+
+        private void RefreshBindingDisplay()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                var indices = KeybindManager.GetKeyboardBindingIndices(i);
+
+                // Primary binding (first keyboard binding)
+                if (indices.Count > 0)
+                {
+                    string display = KeybindManager.GetBindingDisplayString(i, indices[0]);
+                    _rebindButtonTexts[i].text = string.IsNullOrEmpty(display) ? "---" : display;
+                }
+                else
+                {
+                    _rebindButtonTexts[i].text = "---";
+                }
+
+                // Secondary binding (second keyboard binding, if exists)
+                if (indices.Count > 1)
+                {
+                    string display = KeybindManager.GetBindingDisplayString(i, indices[1]);
+                    _secondaryTexts[i].text = string.IsNullOrEmpty(display) ? "---" : display;
+                    _secondaryButtons[i].gameObject.SetActive(true);
+                }
+                else
+                {
+                    _secondaryTexts[i].text = "---";
+                    _secondaryButtons[i].gameObject.SetActive(false);
+                }
+            }
+        }
+
+        private void ShowConflictWarning(string msg)
+        {
+            if (_conflictWarning != null)
+            {
+                _conflictWarning.text = msg;
+                _conflictWarning.gameObject.SetActive(true);
+            }
+        }
+
+        private void HideConflictWarning()
+        {
+            if (_conflictWarning != null)
+                _conflictWarning.gameObject.SetActive(false);
         }
 
         // =================================================================
@@ -229,7 +394,6 @@ namespace RhythmRogue.UI
             canvasGO.AddComponent<GraphicRaycaster>();
             _canvasRT = canvasGO.GetComponent<RectTransform>();
 
-            // EventSystem — uses InputSystemUIInputModule
             UIEventSystemProvider.EnsureEventSystem();
 
             // Background
@@ -240,13 +404,13 @@ namespace RhythmRogue.UI
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            // Decorative accent line
+            // Accent line
             MakePanel(_canvasRT, "AccentLine",
                 new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, new Vector2(200, 1),
                 new Color(0.4f, 0.3f, 0.6f, 0.4f));
 
-            // --- TITLE ---
+            // Title
             Text title = MakeText(_canvasRT, "Title",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -30), new Vector2(300, 24),
@@ -260,7 +424,7 @@ namespace RhythmRogue.UI
                 5, TextAnchor.MiddleCenter, new Color(0.6f, 0.5f, 0.7f));
             subtitle.text = "a rhythm roguelike";
 
-            // --- BUTTONS ---
+            // Buttons
             float btnW = 80f;
             float btnH = 16f;
             float startY = -68f;
@@ -271,14 +435,14 @@ namespace RhythmRogue.UI
             _settingsBtn = MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, new Color(0.3f, 0.3f, 0.45f), OnSettings);
             _quitBtn = MakeMenuButton("Quit", startY - gap * 3, btnW, btnH, new Color(0.4f, 0.2f, 0.2f), OnQuit);
 
-            // --- VERSION ---
+            // Version
             Text version = MakeText(_canvasRT, "Version",
                 new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0),
                 new Vector2(-4, 4), new Vector2(80, 8),
                 4, TextAnchor.MiddleRight, new Color(0.35f, 0.35f, 0.35f));
             version.text = _versionText;
 
-            // --- SETTINGS PANEL (hidden) ---
+            // Settings panel
             CreateSettingsPanel();
         }
 
@@ -288,7 +452,6 @@ namespace RhythmRogue.UI
 
         private void CreateSeedEntry(float y, float btnW, float btnH)
         {
-            // Container
             GameObject container = new GameObject("SeedEntry", typeof(RectTransform));
             container.transform.SetParent(_canvasRT, false);
 
@@ -299,7 +462,7 @@ namespace RhythmRogue.UI
             crt.anchoredPosition = new Vector2(0, y);
             crt.sizeDelta = new Vector2(btnW + 40, btnH);
 
-            // Input field background
+            // Input field
             GameObject inputGO = new GameObject("SeedInput", typeof(RectTransform), typeof(Image), typeof(InputField));
             inputGO.transform.SetParent(crt, false);
 
@@ -310,13 +473,10 @@ namespace RhythmRogue.UI
             irt.anchoredPosition = new Vector2(-btnW * 0.5f - 20, 0);
             irt.sizeDelta = new Vector2(btnW - 10, btnH);
 
-            Image inputBG = inputGO.GetComponent<Image>();
-            inputBG.color = new Color(0.15f, 0.15f, 0.2f);
+            inputGO.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
 
-            // Input text child
             GameObject textGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
             textGO.transform.SetParent(inputGO.transform, false);
-
             RectTransform trt = textGO.GetComponent<RectTransform>();
             trt.anchorMin = Vector2.zero;
             trt.anchorMax = Vector2.one;
@@ -330,10 +490,8 @@ namespace RhythmRogue.UI
             inputText.color = Color.white;
             inputText.supportRichText = false;
 
-            // Placeholder
             GameObject placeholderGO = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
             placeholderGO.transform.SetParent(inputGO.transform, false);
-
             RectTransform prt = placeholderGO.GetComponent<RectTransform>();
             prt.anchorMin = Vector2.zero;
             prt.anchorMax = Vector2.one;
@@ -348,7 +506,6 @@ namespace RhythmRogue.UI
             placeholder.fontStyle = FontStyle.Italic;
             placeholder.text = "Enter seed...";
 
-            // Wire InputField
             _seedInput = inputGO.GetComponent<InputField>();
             _seedInput.textComponent = inputText;
             _seedInput.placeholder = placeholder;
@@ -385,49 +542,55 @@ namespace RhythmRogue.UI
 
             RectTransform panelRT = _settingsPanel.GetComponent<RectTransform>();
 
-            // Panel card
+            // Card
             GameObject card = MakePanel(panelRT, "Card",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(200, 140),
+                Vector2.zero, new Vector2(220, 160),
                 new Color(0.1f, 0.1f, 0.15f, 0.95f));
             RectTransform cardRT = card.GetComponent<RectTransform>();
 
             // Title
             Text settingsTitle = MakeText(cardRT, "SettingsTitle",
                 new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -8), new Vector2(180, 14),
+                new Vector2(0, -8), new Vector2(200, 14),
                 8, TextAnchor.MiddleCenter, Color.white);
             settingsTitle.fontStyle = FontStyle.Bold;
             settingsTitle.text = "Settings";
 
-            // Audio offset
-            float sliderY = -28f;
-            float sliderGap = 24f;
+            // Tab buttons
+            float tabY = -22f;
+            float tabW = 60f;
+            float tabH = 12f;
 
-            float savedOffset = PlayerPrefs.GetFloat("audioOffset", 0f);
-            _offsetSlider = CreateSliderRow(cardRT, "Audio Offset", sliderY,
-                -100f, 100f, savedOffset, out _offsetValue);
-            _offsetSlider.wholeNumbers = true;
-            _offsetSlider.onValueChanged.AddListener(v =>
-                _offsetValue.text = $"{v:+0;-0;0} ms");
-            _offsetValue.text = $"{savedOffset:+0;-0;0} ms";
+            GameObject audioTabGO = MakePanel(cardRT, "AudioTab",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                new Vector2(-35, tabY), new Vector2(tabW, tabH),
+                new Color(0.3f, 0.3f, 0.5f));
+            _audioTabBtn = audioTabGO.AddComponent<Button>();
+            _audioTabBtn.onClick.AddListener(ShowAudioTab);
+            MakeText(audioTabGO.GetComponent<RectTransform>(), "T",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(tabW, tabH),
+                5, TextAnchor.MiddleCenter, Color.white).text = "Audio";
 
-            // Master volume
-            float savedMaster = PlayerPrefs.GetFloat("masterVolume", 1f);
-            _masterVolSlider = CreateSliderRow(cardRT, "Master Vol", sliderY - sliderGap,
-                0f, 1f, savedMaster, out _);
+            GameObject ctrlTabGO = MakePanel(cardRT, "ControlsTab",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                new Vector2(35, tabY), new Vector2(tabW, tabH),
+                new Color(0.15f, 0.15f, 0.2f));
+            _controlsTabBtn = ctrlTabGO.AddComponent<Button>();
+            _controlsTabBtn.onClick.AddListener(ShowControlsTab);
+            MakeText(ctrlTabGO.GetComponent<RectTransform>(), "T",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(tabW, tabH),
+                5, TextAnchor.MiddleCenter, Color.white).text = "Controls";
 
-            // Music volume
-            float savedMusic = PlayerPrefs.GetFloat("musicVolume", 1f);
-            _musicVolSlider = CreateSliderRow(cardRT, "Music Vol", sliderY - sliderGap * 2,
-                0f, 1f, savedMusic, out _);
+            // --- AUDIO PANEL ---
+            CreateAudioPanel(cardRT);
 
-            // SFX volume
-            float savedSFX = PlayerPrefs.GetFloat("sfxVolume", 1f);
-            _sfxVolSlider = CreateSliderRow(cardRT, "SFX Vol", sliderY - sliderGap * 3,
-                0f, 1f, savedSFX, out _);
+            // --- CONTROLS PANEL ---
+            CreateControlsPanel(cardRT);
 
-            // Close button
+            // Close button (shared, at bottom of card)
             GameObject closeBtnGO = MakePanel(cardRT, "CloseBtn",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
                 new Vector2(0, 8), new Vector2(50, 14),
@@ -443,45 +606,155 @@ namespace RhythmRogue.UI
             _settingsPanel.SetActive(false);
         }
 
-        private Slider CreateSliderRow(RectTransform parent, string label, float y,
-            float min, float max, float value, out Text valueText)
+        private void CreateAudioPanel(RectTransform cardRT)
         {
-            // Label
-            MakeText(parent, $"{label}_Label",
+            _audioPanel = new GameObject("AudioPanel", typeof(RectTransform));
+            _audioPanel.transform.SetParent(cardRT, false);
+            RectTransform apRT = _audioPanel.GetComponent<RectTransform>();
+            apRT.anchorMin = Vector2.zero;
+            apRT.anchorMax = Vector2.one;
+            apRT.offsetMin = Vector2.zero;
+            apRT.offsetMax = Vector2.zero;
+
+            float sliderY = -38f;
+            float sliderGap = 24f;
+
+            float savedOffset = PlayerPrefs.GetFloat("audioOffset", 0f);
+            _offsetSlider = CreateSliderRow(apRT, "Audio Offset", sliderY,
+                -100f, 100f, savedOffset, out _offsetValue);
+            _offsetSlider.wholeNumbers = true;
+            _offsetSlider.onValueChanged.AddListener(v =>
+                _offsetValue.text = $"{v:+0;-0;0} ms");
+            _offsetValue.text = $"{savedOffset:+0;-0;0} ms";
+
+            float savedMaster = PlayerPrefs.GetFloat("masterVolume", 1f);
+            _masterVolSlider = CreateSliderRow(apRT, "Master Vol", sliderY - sliderGap,
+                0f, 1f, savedMaster, out _);
+
+            float savedMusic = PlayerPrefs.GetFloat("musicVolume", 1f);
+            _musicVolSlider = CreateSliderRow(apRT, "Music Vol", sliderY - sliderGap * 2,
+                0f, 1f, savedMusic, out _);
+
+            float savedSFX = PlayerPrefs.GetFloat("sfxVolume", 1f);
+            _sfxVolSlider = CreateSliderRow(apRT, "SFX Vol", sliderY - sliderGap * 3,
+                0f, 1f, savedSFX, out _);
+        }
+
+        private void CreateControlsPanel(RectTransform cardRT)
+        {
+            _controlsPanel = new GameObject("ControlsPanel", typeof(RectTransform));
+            _controlsPanel.transform.SetParent(cardRT, false);
+            RectTransform cpRT = _controlsPanel.GetComponent<RectTransform>();
+            cpRT.anchorMin = Vector2.zero;
+            cpRT.anchorMax = Vector2.one;
+            cpRT.offsetMin = Vector2.zero;
+            cpRT.offsetMax = Vector2.zero;
+
+            _bindingLabels = new Text[4];
+            _rebindButtons = new Button[4];
+            _rebindButtonTexts = new Text[4];
+            _secondaryLabels = new Text[4];
+            _secondaryButtons = new Button[4];
+            _secondaryTexts = new Text[4];
+
+            float rowY = -38f;
+            float rowGap = 18f;
+
+            // Column headers
+            MakeText(cpRT, "HdrLane",
                 new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(10, y), new Vector2(60, 10),
-                5, TextAnchor.MiddleLeft, new Color(0.7f, 0.7f, 0.7f)).text = label;
+                new Vector2(10, rowY + 12), new Vector2(40, 10),
+                4, TextAnchor.MiddleLeft, new Color(0.5f, 0.5f, 0.5f)).text = "Lane";
 
-            // Slider
-            GameObject sliderGO = CreateSliderGO(parent, $"{label}_Slider",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(15, y - 10), new Vector2(120, 8));
+            MakeText(cpRT, "HdrPrimary",
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(55, rowY + 12), new Vector2(60, 10),
+                4, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f)).text = "Primary";
 
-            Slider slider = sliderGO.GetComponent<Slider>();
-            slider.minValue = min;
-            slider.maxValue = max;
-            slider.value = value;
+            MakeText(cpRT, "HdrSecondary",
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(130, rowY + 12), new Vector2(60, 10),
+                4, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f)).text = "Alt";
 
-            // Value text
-            valueText = MakeText(parent, $"{label}_Value",
-                new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-10, y), new Vector2(40, 10),
-                5, TextAnchor.MiddleRight, Color.white);
-
-            // Default display for volume sliders
-            if (max <= 1f)
+            for (int i = 0; i < 4; i++)
             {
-                Text volText = valueText;
-                volText.text = $"{Mathf.RoundToInt(value * 100)}%";
-                slider.onValueChanged.AddListener(v =>
-                    volText.text = $"{Mathf.RoundToInt(v * 100)}%");
+                float y = rowY - i * rowGap;
+                int lane = i;
+
+                // Lane label
+                _bindingLabels[i] = MakeText(cpRT, $"Lane{i}Label",
+                    new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                    new Vector2(10, y), new Vector2(40, 12),
+                    5, TextAnchor.MiddleLeft, new Color(0.8f, 0.8f, 0.8f));
+                _bindingLabels[i].text = KeybindManager.LaneNames[i];
+
+                // Primary rebind button
+                GameObject primaryGO = MakePanel(cpRT, $"Rebind{i}",
+                    new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                    new Vector2(55, y), new Vector2(60, 12),
+                    new Color(0.2f, 0.2f, 0.25f));
+                _rebindButtons[i] = primaryGO.AddComponent<Button>();
+                _rebindButtonTexts[i] = MakeText(primaryGO.GetComponent<RectTransform>(), "KeyText",
+                    new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    Vector2.zero, new Vector2(56, 12),
+                    5, TextAnchor.MiddleCenter, Color.white);
+                _rebindButtonTexts[i].text = "---";
+
+                // Primary click handler
+                int primaryLane = lane;
+                _rebindButtons[i].onClick.AddListener(() =>
+                {
+                    var indices = KeybindManager.GetKeyboardBindingIndices(primaryLane);
+                    if (indices.Count > 0)
+                        StartRebind(primaryLane, indices[0], _rebindButtonTexts[primaryLane]);
+                });
+
+                // Secondary rebind button
+                GameObject secondaryGO = MakePanel(cpRT, $"Rebind{i}Alt",
+                    new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                    new Vector2(130, y), new Vector2(60, 12),
+                    new Color(0.2f, 0.2f, 0.25f));
+                _secondaryButtons[i] = secondaryGO.AddComponent<Button>();
+                _secondaryTexts[i] = MakeText(secondaryGO.GetComponent<RectTransform>(), "KeyText",
+                    new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    Vector2.zero, new Vector2(56, 12),
+                    5, TextAnchor.MiddleCenter, Color.white);
+                _secondaryTexts[i].text = "---";
+
+                int secLane = lane;
+                _secondaryButtons[i].onClick.AddListener(() =>
+                {
+                    var indices = KeybindManager.GetKeyboardBindingIndices(secLane);
+                    if (indices.Count > 1)
+                        StartRebind(secLane, indices[1], _secondaryTexts[secLane]);
+                });
             }
 
-            return slider;
+            // Reset defaults button
+            GameObject resetGO = MakePanel(cpRT, "ResetDefaults",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                new Vector2(0, rowY - 4 * rowGap - 4), new Vector2(80, 12),
+                new Color(0.35f, 0.25f, 0.15f));
+            _resetDefaultsBtn = resetGO.AddComponent<Button>();
+            _resetDefaultsBtn.onClick.AddListener(OnResetDefaults);
+            MakeText(resetGO.GetComponent<RectTransform>(), "ResetText",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(76, 12),
+                5, TextAnchor.MiddleCenter, Color.white).text = "Reset Defaults";
+
+            // Conflict warning
+            _conflictWarning = MakeText(cpRT, "ConflictWarn",
+                new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
+                new Vector2(0, 24), new Vector2(180, 10),
+                5, TextAnchor.MiddleCenter, new Color(1f, 0.4f, 0.3f));
+            _conflictWarning.text = "";
+            _conflictWarning.gameObject.SetActive(false);
+
+            _controlsPanel.SetActive(false);
         }
 
         // =================================================================
-        // MENU BUTTON HELPER — returns Button for navigation wiring
+        // MENU BUTTON HELPER
         // =================================================================
 
         private Button MakeMenuButton(string label, float y, float w, float h,
@@ -501,6 +774,43 @@ namespace RhythmRogue.UI
             txt.text = label;
 
             return btn;
+        }
+
+        // =================================================================
+        // SLIDER ROW HELPER
+        // =================================================================
+
+        private Slider CreateSliderRow(RectTransform parent, string label, float y,
+            float min, float max, float value, out Text valueText)
+        {
+            MakeText(parent, $"{label}_Label",
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(10, y), new Vector2(60, 10),
+                5, TextAnchor.MiddleLeft, new Color(0.7f, 0.7f, 0.7f)).text = label;
+
+            GameObject sliderGO = CreateSliderGO(parent, $"{label}_Slider",
+                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
+                new Vector2(15, y - 10), new Vector2(120, 8));
+
+            Slider slider = sliderGO.GetComponent<Slider>();
+            slider.minValue = min;
+            slider.maxValue = max;
+            slider.value = value;
+
+            valueText = MakeText(parent, $"{label}_Value",
+                new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-10, y), new Vector2(40, 10),
+                5, TextAnchor.MiddleRight, Color.white);
+
+            if (max <= 1f)
+            {
+                Text volText = valueText;
+                volText.text = $"{Mathf.RoundToInt(value * 100)}%";
+                slider.onValueChanged.AddListener(v =>
+                    volText.text = $"{Mathf.RoundToInt(v * 100)}%");
+            }
+
+            return slider;
         }
 
         // =================================================================

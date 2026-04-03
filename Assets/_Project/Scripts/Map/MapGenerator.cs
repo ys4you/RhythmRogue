@@ -10,9 +10,9 @@ namespace RhythmRogue.Map
     /// the Dungeon style.
     /// 
     /// Layout (bottom to top):
-    ///   Layer 0: 2 enemy nodes — the first branch choice
-    ///   Layer 1: 2-3 nodes — enemy or rest
-    ///   Layer 2: 2 nodes — paths narrowing toward boss
+    ///   Layer 0: 2 enemy nodes — the first branch choice (safe, no elites)
+    ///   Layer 1: 2-3 nodes — enemy, elite, or rest
+    ///   Layer 2: 2 nodes — paths narrowing toward boss (higher elite chance)
     ///   Layer 3: 1 boss node — all paths converge
     /// 
     /// Connections flow upward. Each node connects to 1-2 nodes in
@@ -43,22 +43,23 @@ namespace RhythmRogue.Map
         {
             public int MinNodes;
             public int MaxNodes;
-            public NodeType[] AllowedTypes;
-            public float RestChance; // 0-1, chance a node is Rest instead of Enemy
+            public float RestChance;
+            public float EliteChance;
         }
 
         private static readonly LayerConfig[] PrototypeLayers =
         {
-            new LayerConfig { MinNodes = 2, MaxNodes = 2, AllowedTypes = new[] { NodeType.Enemy }, RestChance = 0f },
-            new LayerConfig { MinNodes = 2, MaxNodes = 3, AllowedTypes = new[] { NodeType.Enemy, NodeType.Rest }, RestChance = 0.3f },
-            new LayerConfig { MinNodes = 2, MaxNodes = 2, AllowedTypes = new[] { NodeType.Enemy, NodeType.Rest }, RestChance = 0.5f },
+            // Layer 0: first encounters — safe, no elites or rest
+            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0.0f, EliteChance = 1f },
+            new() { MinNodes = 2, MaxNodes = 2, RestChance = 0f,  EliteChance = 0f },
+            new() { MinNodes = 2, MaxNodes = 3, RestChance = 0.3f, EliteChance = 0.2f },
+            new() { MinNodes = 2, MaxNodes = 2, RestChance = 0.4f, EliteChance = 0.35f },
             // Boss layer is added separately — always 1 node
         };
 
         // =================================================================
         // GENERATION
         // =================================================================
-
         /// <summary>
         /// Generate a complete map from a seed string.
         /// Same seed → same map, always.
@@ -86,8 +87,8 @@ namespace RhythmRogue.Map
 
                     var node = new MapNode(nextId++, map.Layers.Count, col, type);
 
-                    // Assign enemy data to battle nodes
-                    if (type == NodeType.Enemy)
+                    // Assign enemy data to battle nodes (Elite uses same base data)
+                    if (type == NodeType.Enemy || type == NodeType.Elite)
                         node.EnemyData = slimeData;
 
                     layer.Add(node);
@@ -130,8 +131,18 @@ namespace RhythmRogue.Map
         // NODE TYPE SELECTION
         // =================================================================
 
+        /// <summary>
+        /// Pick a node type based on layer probabilities.
+        /// Elite and Rest are rolled independently — if both hit,
+        /// Elite takes priority (it's the rarer, more impactful choice).
+        /// </summary>
         private static NodeType PickNodeType(LayerConfig config, System.Random rng)
         {
+            // Roll elite first — it's the rarer event
+            if (config.EliteChance > 0f && rng.NextDouble() < config.EliteChance)
+                return NodeType.Elite;
+
+            // Then roll rest
             if (config.RestChance > 0f && rng.NextDouble() < config.RestChance)
                 return NodeType.Rest;
 
@@ -198,7 +209,9 @@ namespace RhythmRogue.Map
                     Mathf.RoundToInt((float)j / (nextCount - 1) * (curCount - 1)),
                     0, curCount - 1);
 
-                current[closestCur].Connections.Add(next[j]);
+                if (!current[closestCur].Connections.Contains(next[j]))
+                    current[closestCur].Connections.Add(next[j]);
+
                 nextReached[j] = true;
             }
         }

@@ -9,12 +9,9 @@ namespace RhythmRogue.Battle
     /// <summary>
     /// Evaluates timing offsets and assigns hit judgments.
     /// 
-    /// REFACTORED (PROTO-025):
-    ///   Before: 3 serialized floats for timing windows inline.
-    ///   After:  1 JudgmentConfig ScriptableObject reference.
-    ///   Why:    Designers tune timing in the SO asset, not per-scene.
-    ///           Relics can swap the config reference at runtime.
-    ///           Multiple presets (Easy/Normal/Hard) are just different SO assets.
+    /// Reads timing windows from JudgmentConfig SO, with additive
+    /// relic bonuses applied on top. Config stays immutable —
+    /// relics modify via ApplyRelicModifiers() at battle start.
     /// 
     /// Two event layers (matching the established pattern):
     ///   1. C# event OnJudgment — for direct subscribers in the battle scene
@@ -50,6 +47,9 @@ namespace RhythmRogue.Battle
 
         private IEventBus _eventBus;
         private float _calibrationOffsetMs;
+
+        // Relic bonuses — applied at battle start, reset each battle
+        private float _relicBonusPerfectMs;
 
         // =================================================================
         // LIFECYCLE
@@ -88,12 +88,40 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
+        // RELIC MODIFIERS
+        // =================================================================
+
+        /// <summary>
+        /// Apply relic bonuses to timing windows.
+        /// Called by BattleManager at battle start.
+        /// </summary>
+        /// <param name="bonusPerfectMs">
+        /// Additive bonus to the Perfect window (ms).
+        /// E.g. 10 means Perfect window widens from ±35ms to ±45ms.
+        /// </param>
+        public void ApplyRelicModifiers(float bonusPerfectMs)
+        {
+            _relicBonusPerfectMs = bonusPerfectMs;
+
+            if (bonusPerfectMs > 0f)
+                GameLog.Info($"[JudgmentSystem] Relic bonus: Perfect window +{bonusPerfectMs}ms");
+        }
+
+        /// <summary>
+        /// Clear relic bonuses. Called at battle start before applying new ones.
+        /// </summary>
+        public void ClearRelicModifiers()
+        {
+            _relicBonusPerfectMs = 0f;
+        }
+
+        // =================================================================
         // CORE JUDGMENT — stateless evaluation
         // =================================================================
 
         /// <summary>
         /// Evaluate a raw timing delta and return a judgment.
-        /// Reads windows from the assigned JudgmentConfig SO.
+        /// Reads windows from the assigned JudgmentConfig SO + relic bonuses.
         /// </summary>
         public Judgment Judge(float rawDeltaMs)
         {
@@ -101,7 +129,7 @@ namespace RhythmRogue.Battle
 
             if (_config == null) return Judgment.Miss;
 
-            if (adjusted <= _config.perfectWindowMs) return Judgment.Perfect;
+            if (adjusted <= _config.perfectWindowMs + _relicBonusPerfectMs) return Judgment.Perfect;
             if (adjusted <= _config.goodWindowMs) return Judgment.Good;
             if (adjusted <= _config.badWindowMs) return Judgment.Bad;
             return Judgment.Miss;
@@ -184,7 +212,7 @@ namespace RhythmRogue.Battle
         /// <summary>Swap the timing config at runtime (for relics).</summary>
         public void SetConfig(JudgmentConfig config) => _config = config;
 
-        public float PerfectWindowMs => _config != null ? _config.perfectWindowMs : 35f;
+        public float PerfectWindowMs => (_config != null ? _config.perfectWindowMs : 35f) + _relicBonusPerfectMs;
         public float GoodWindowMs => _config != null ? _config.goodWindowMs : 70f;
         public float BadWindowMs => _config != null ? _config.badWindowMs : 110f;
 

@@ -3,62 +3,36 @@ using UnityEngine;
 namespace RhythmRogue.Data
 {
     /// <summary>
-    /// Data asset for a single relic.
+    /// Data definition for a single relic.
     /// 
-    /// Relics are temporary run upgrades acquired from post-battle
-    /// reward picks. Each relic has one effect that modifies a
-    /// gameplay config value. Multiple relics of the same effect
-    /// type stack additively.
+    /// Relics are passive modifiers collected during a run that alter
+    /// gameplay systems (hit windows, damage, combo, HP, economy).
+    /// Each relic has exactly one effect with a numeric value.
     /// 
-    /// Create via: Assets → Create → RhythmRogue → RelicData
-    /// 
-    /// SOLID: Pure data container (S). New relics are new assets,
-    /// not code changes (O). RelicApplier reads these without
-    /// knowing how many exist (D).
+    /// Create via: Assets → Create → RhythmRogue → Data → Relic
     /// </summary>
-    [CreateAssetMenu(fileName = "NewRelic", menuName = "RhythmRogue/RelicData")]
+    [CreateAssetMenu(fileName = "NewRelic", menuName = "RhythmRogue/Data/Relic")]
     public class RelicData : ScriptableObject
     {
         [Header("Identity")]
-        [Tooltip("Unique identifier. Used for save/unlock tracking.")]
-        public string relicId;
+        public string relicName = "New Relic";
 
-        [Tooltip("Display name shown in reward pick UI.")]
-        public string relicName;
-
-        [Tooltip("Short description of what this relic does.")]
         [TextArea(2, 4)]
-        public string description;
+        public string description = "";
 
-        [Header("Rarity")]
-        [Tooltip("Affects weighted selection in reward pools.")]
         public RelicRarity rarity = RelicRarity.Common;
 
+        [Header("Display")]
+        [Tooltip("Accent color shown on the relic card icon area.")]
+        public Color cardColor = Color.white;
+
         [Header("Effect")]
-        [Tooltip("Which gameplay system this relic modifies.")]
         public RelicEffect effect;
 
-        [Tooltip("Numeric modifier. Interpretation depends on effect type.")]
-        public float floatValue;
-
-        [Tooltip("Integer modifier for effects that need whole numbers (HP, damage).")]
+        [Tooltip("Integer value for effects that use whole numbers (HP, damage reduction).")]
         public int intValue;
 
-        [Header("Visuals")]
-        [Tooltip("Icon shown in reward pick and relic inventory. Optional for prototype.")]
-        public Sprite icon;
-
-        [Tooltip("Color tint for the relic card in the reward UI.")]
-        public Color cardColor = new Color(0.3f, 0.3f, 0.4f);
-    }
-
-    /// <summary>
-    /// Relic rarity tier. Affects reward pool weighting.
-    /// </summary>
-    public enum RelicRarity
-    {
-        Common,
-        Uncommon,
-        Rare
+        [Tooltip("Float value for effects that use decimals (timing ms, multiplier rates).")]
+        public float floatValue;
     }
 }

@@ -617,6 +617,8 @@ namespace RhythmRogue.Map
         private static string GetNodeTitle(MapNode node)
         {
             if (node.Type == NodeType.Rest) return "Rest";
+            if (node.Type == NodeType.Elite && node.EnemyData != null)
+                return $"Elite {node.EnemyData.enemyName}";
             if (node.EnemyData != null) return node.EnemyData.enemyName;
             return node.Type.ToString();
         }
@@ -626,11 +628,16 @@ namespace RhythmRogue.Map
             return node.Type switch
             {
                 NodeType.Enemy => node.EnemyData != null ? $"HP: {node.EnemyData.maxHP}" : "Battle",
+                NodeType.Elite => node.EnemyData != null
+                    ? $"ELITE — HP: ~{Mathf.RoundToInt(node.EnemyData.maxHP * 1.75f)}  |  Harder patterns"
+                    : "Elite Battle",
                 NodeType.Rest => "Heal 30% HP",
                 NodeType.Boss => node.EnemyData != null ? $"BOSS — HP: {node.EnemyData.maxHP}" : "Boss Battle",
                 _ => ""
             };
         }
+        
+    
 
         private MapNode FindNode(int id)
         {

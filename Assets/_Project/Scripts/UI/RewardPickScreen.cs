@@ -20,6 +20,8 @@ namespace RhythmRogue.UI
     /// seed + encounter index so the same seed always offers the
     /// same choices at the same point in a run.
     /// 
+    /// Elite victories offer more options (configurable).
+    /// 
     /// Fully keyboard/gamepad navigable.
     /// Code-generated UI, sized for 384×216.
     /// 
@@ -37,8 +39,11 @@ namespace RhythmRogue.UI
         [SerializeField] private RelicPool _relicPool;
 
         [Header("Options")]
-        [Tooltip("Number of relic options to offer.")]
+        [Tooltip("Number of relic options to offer for normal battles.")]
         [SerializeField] private int _optionCount = 3;
+
+        [Tooltip("Number of relic options to offer after elite battles.")]
+        [SerializeField] private int _eliteOptionCount = 3;
 
         // =================================================================
         // STATE
@@ -98,7 +103,12 @@ namespace RhythmRogue.UI
                 rng = new SeededRandom(System.Environment.TickCount);
             }
 
-            _options = _relicPool.PickOptions(rng, _optionCount, _runState.ActiveRelics);
+            // Elite victories offer more options
+            int count = _runState.LastBattleWasElite
+                ? Mathf.Max(_optionCount, _eliteOptionCount)
+                : _optionCount;
+
+            _options = _relicPool.PickOptions(rng, count, _runState.ActiveRelics);
         }
 
         // =================================================================
@@ -181,12 +191,15 @@ namespace RhythmRogue.UI
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
             // Title
+            string titleColor = _runState.LastBattleWasElite ? "#C850F2" : "#FFD900";
+            string titlePrefix = _runState.LastBattleWasElite ? "ELITE " : "";
+
             _titleText = MakeText(_canvasRT, "Title",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -16), new Vector2(300, 16),
                 9, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0f));
             _titleText.fontStyle = FontStyle.Bold;
-            _titleText.text = "CHOOSE A RELIC";
+            _titleText.text = $"{titlePrefix}CHOOSE A RELIC";
 
             // Subtitle
             Text sub = MakeText(_canvasRT, "Subtitle",
@@ -204,7 +217,6 @@ namespace RhythmRogue.UI
                     7, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f));
                 noRelics.text = "No relics available";
 
-                // Auto-return to map after delay
                 StartCoroutine(TransitionAfterDelay(1.5f));
                 return;
             }
@@ -236,7 +248,6 @@ namespace RhythmRogue.UI
                 foreach (var btn in _optionButtons)
                     UISelectableStyle.Apply(btn);
 
-                // Focus middle card (or first if only 2)
                 int focusIdx = _optionButtons.Count > 2 ? 1 : 0;
                 _focusSetter.SetDefault(_optionButtons[focusIdx].gameObject);
             }
@@ -286,20 +297,18 @@ namespace RhythmRogue.UI
 
             // Rarity label
             string rarityStr = relic.rarity.ToString().ToUpper();
-            Color rarityColor = borderColor;
 
             Text rarityText = MakeText(cardRT, "Rarity",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -6), new Vector2(cardW - 8, 8),
-                4, TextAnchor.MiddleCenter, rarityColor);
+                4, TextAnchor.MiddleCenter, borderColor);
             rarityText.text = rarityStr;
 
             // Icon area (placeholder colored square)
-            Color iconColor = relic.cardColor;
             MakePanel(cardRT, "IconBG",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -28), new Vector2(30, 30),
-                iconColor);
+                relic.cardColor);
 
             // Relic name
             Text nameText = MakeText(cardRT, "Name",

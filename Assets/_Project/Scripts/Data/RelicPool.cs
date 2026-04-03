@@ -5,88 +5,94 @@ using RhythmRogue.Util.Random;
 namespace RhythmRogue.Data
 {
     /// <summary>
-    /// Collection of all available relics for reward generation.
+    /// Pool of all available relics for reward selection.
     /// 
-    /// The reward pick screen uses this to select 2-3 options
-    /// weighted by rarity. Rarity weights are configurable.
+    /// Holds every relic in the game and provides weighted random
+    /// picking that excludes already-owned relics. Rarity determines
+    /// base weight: Common = 50, Uncommon = 30, Rare = 15.
     /// 
-    /// Create one asset: Assets → Create → RhythmRogue → RelicPool
-    /// Then drag all your RelicData assets into the Relics list.
+    /// Create via: Assets → Create → RhythmRogue → Data → Relic Pool
     /// </summary>
-    [CreateAssetMenu(fileName = "RelicPool", menuName = "RhythmRogue/RelicPool")]
+    [CreateAssetMenu(fileName = "RelicPool", menuName = "RhythmRogue/Data/Relic Pool")]
     public class RelicPool : ScriptableObject
     {
-        [Header("Available Relics")]
-        [Tooltip("All relics that can appear in reward picks.")]
-        public List<RelicData> relics = new();
-
-        [Header("Rarity Weights")]
-        [Tooltip("Selection weight for Common relics.")]
-        public float commonWeight = 60f;
-        [Tooltip("Selection weight for Uncommon relics.")]
-        public float uncommonWeight = 30f;
-        [Tooltip("Selection weight for Rare relics.")]
-        public float rareWeight = 10f;
+        [Tooltip("All relics available in the game. Order doesn't matter — selection is weighted by rarity.")]
+        [SerializeField] private List<RelicData> _allRelics = new();
 
         /// <summary>
-        /// Pick N unique relics from the pool using the provided RNG.
-        /// Excludes relics the player already holds.
+        /// All relics in the pool (read-only).
         /// </summary>
-        /// <param name="rng">Seeded random for deterministic picks.</param>
-        /// <param name="count">How many relics to offer (typically 3).</param>
-        /// <param name="alreadyOwned">Relics the player already has (excluded).</param>
-        /// <returns>List of unique relic options.</returns>
-        public List<RelicData> PickOptions(ISeededRandom rng, int count,
-            IReadOnlyList<RelicData> alreadyOwned = null)
-        {
-            // Build available pool (exclude owned)
-            var available = new List<RelicData>();
+        public IReadOnlyList<RelicData> AllRelics => _allRelics;
 
-            foreach (var relic in relics)
+        /// <summary>
+        /// Pick a set of unique relic options, excluding relics the player already owns.
+        /// 
+        /// Uses rarity-based weighting:
+        ///   Common   = 50 weight
+        ///   Uncommon = 30 weight
+        ///   Rare     = 15 weight
+        /// </summary>
+        /// <param name="rng">Seeded random for deterministic selection.</param>
+        /// <param name="count">Number of options to offer (typically 2-3).</param>
+        /// <param name="owned">Relics the player already has (excluded from results).</param>
+        /// <returns>List of unique relic options. May be shorter than count if pool is exhausted.</returns>
+        public List<RelicData> PickOptions(ISeededRandom rng, int count, IReadOnlyList<RelicData> owned)
+        {
+            // Build eligible pool (exclude owned relics)
+            var eligible = new List<RelicData>();
+
+            foreach (var relic in _allRelics)
             {
                 if (relic == null) continue;
+                if (owned != null && Contains(owned, relic)) continue;
 
-                bool owned = false;
-                if (alreadyOwned != null)
-                {
-                    foreach (var o in alreadyOwned)
-                    {
-                        if (o != null && o.relicId == relic.relicId)
-                        {
-                            owned = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (!owned)
-                    available.Add(relic);
+                eligible.Add(relic);
             }
 
-            if (available.Count == 0)
+            if (eligible.Count == 0)
                 return new List<RelicData>();
 
             // Clamp count to available
-            int pickCount = Mathf.Min(count, available.Count);
+            int pickCount = Mathf.Min(count, eligible.Count);
 
-            // Build weighted table
+            // Build weighted table from eligible relics
             var builder = WeightedTable<RelicData>.Build();
 
-            foreach (var relic in available)
+            foreach (var relic in eligible)
             {
-                float weight = relic.rarity switch
-                {
-                    RelicRarity.Common => commonWeight,
-                    RelicRarity.Uncommon => uncommonWeight,
-                    RelicRarity.Rare => rareWeight,
-                    _ => commonWeight
-                };
-
+                float weight = GetRarityWeight(relic.rarity);
                 builder.Add(relic, weight);
             }
 
-            var table = builder.Done();
+            IWeightedSelector<RelicData> table = builder.Done();
             return table.PickUnique(rng, pickCount);
+        }
+
+        /// <summary>
+        /// Get the base selection weight for a rarity tier.
+        /// </summary>
+        private static float GetRarityWeight(RelicRarity rarity)
+        {
+            return rarity switch
+            {
+                RelicRarity.Common => 50f,
+                RelicRarity.Uncommon => 30f,
+                RelicRarity.Rare => 15f,
+                _ => 50f
+            };
+        }
+
+        /// <summary>
+        /// Check if a relic is in a collection (by reference equality).
+        /// Avoids LINQ to keep allocation-free.
+        /// </summary>
+        private static bool Contains(IReadOnlyList<RelicData> list, RelicData relic)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] == relic) return true;
+            }
+            return false;
         }
     }
 }

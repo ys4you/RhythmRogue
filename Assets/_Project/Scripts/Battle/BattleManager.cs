@@ -1,6 +1,7 @@
 using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
+using RhythmRogue.Map;
 using RhythmRogue.Util.FSM;
 using RhythmRogue.Util;
 using RhythmRogue.Util.Random;
@@ -20,8 +21,13 @@ namespace RhythmRogue.Battle
     ///   - Legacy: single JSON chart loaded via ChartLoader (original system)
     ///   - Assembled: dual highway charts built from PatternLibrary via ChartAssembler
     /// 
-    /// Toggle via _useLegacyChart in Inspector. Both modes use the same
-    /// Conductor, hit detection, combo, and damage systems.
+    /// Elite scaling: when the selected node is NodeType.Elite, applies
+    /// EliteConfig modifiers to HP, BPM, and pattern difficulty at init time.
+    /// The base EnemyData is never mutated.
+    /// 
+    /// Relic modifiers: at battle start, aggregates all active relics into
+    /// a RelicModifiers struct and distributes numeric bonuses to each
+    /// gameplay system. No system knows about individual relics.
     /// </summary>
     public class BattleManager : MonoBehaviour
     {
@@ -49,6 +55,13 @@ namespace RhythmRogue.Battle
 
         [Tooltip("The enemy's auto-playing highway (left side).")]
         [SerializeField] private EnemyHighway _enemyHighway;
+
+        [Header("Elite Scaling")]
+        [Tooltip("Elite encounter config. Applied when node type is Elite.")]
+        [SerializeField] private EliteConfig _eliteConfig;
+
+        [Header("Relic Effects")]
+        [SerializeField] private RelicEffectHandler _relicEffectHandler;
 
         [Header("Intro")]
         [Tooltip("Seconds of countdown before the song starts.")]
@@ -88,6 +101,7 @@ namespace RhythmRogue.Battle
         private BattleChart _battleChart;         // Assembled mode
         private float _phaseTimer;
         private bool _battleEnded;
+        private bool _isElite;
 
         /// <summary>Results from the last battle. Read by summary screen.</summary>
         public static BattleStats LastBattleStats { get; private set; }
@@ -100,6 +114,9 @@ namespace RhythmRogue.Battle
 
         /// <summary>The current enemy being fought. Read by BattleUI.</summary>
         public EnemyData CurrentEnemy => _currentEnemy;
+
+        /// <summary>Whether this is an elite encounter. Read by BattleUI.</summary>
+        public bool IsElite => _isElite;
 
         /// <summary>Fired when the battle is fully complete (after result overlay).</summary>
         public event System.Action<bool> OnBattleCompleted;
@@ -115,6 +132,7 @@ namespace RhythmRogue.Battle
 
             // Resolve enemy data
             _currentEnemy = (_runState?.SelectedNode?.EnemyData) ?? _defaultEnemy;
+            _isElite = _runState?.SelectedNode?.Type == NodeType.Elite;
 
             if (_currentEnemy == null)
             {
@@ -171,9 +189,6 @@ namespace RhythmRogue.Battle
         // CHART LOADING
         // =================================================================
 
-        /// <summary>
-        /// Legacy path: load a single chart from a JSON TextAsset.
-        /// </summary>
         private void LoadLegacyChart()
         {
             TextAsset chartAsset = _runState?.SelectedChart ?? _defaultChart;
@@ -193,10 +208,6 @@ namespace RhythmRogue.Battle
             }
         }
 
-        /// <summary>
-        /// New path: assemble a dual-highway chart from the pattern library
-        /// using the run seed for deterministic generation.
-        /// </summary>
         private void AssembleChart()
         {
             ChartTemplate template = _currentEnemy.chartTemplate ?? _defaultTemplate;
@@ -214,7 +225,6 @@ namespace RhythmRogue.Battle
                 return;
             }
 
-            // Get seeded random from the run seed (deterministic per encounter)
             ISeededRandom chartRng;
             if (_runState?.RunSeed != null)
             {
@@ -222,18 +232,24 @@ namespace RhythmRogue.Battle
             }
             else
             {
-                // Standalone testing fallback — fixed seed
                 chartRng = new SeededRandom(42);
                 GameLog.Warn("[BattleManager] No RunSeed available, using fallback seed 42.");
             }
 
-            // BPM: use the legacy chart BPM if available, otherwise a sensible default
             float baseBPM = (_defaultChart != null)
                 ? ChartLoader.Load(_defaultChart)?.BPM ?? 135f
                 : 135f;
-            float effectiveBPM = baseBPM * _currentEnemy.bpmModifier;
 
-            _battleChart = ChartAssembler.Assemble(template, library, chartRng, effectiveBPM);
+            float bpmModifier = _currentEnemy.bpmModifier;
+            if (_isElite && _eliteConfig != null)
+                bpmModifier = _eliteConfig.ScaleBPMModifier(bpmModifier);
+
+            float effectiveBPM = baseBPM * bpmModifier;
+
+            float targetDurationBeats = CalculateTargetBeats(effectiveBPM);
+
+            _battleChart = ChartAssembler.Assemble(
+                template, library, chartRng, effectiveBPM, targetDurationBeats);
 
             if (_battleChart == null)
             {
@@ -242,13 +258,34 @@ namespace RhythmRogue.Battle
             }
         }
 
+        private float CalculateTargetBeats(float bpm)
+        {
+            if (_conductor == null) return 0f;
+
+            AudioSource audioSource = _conductor.GetComponent<AudioSource>();
+            if (audioSource == null || audioSource.clip == null) return 0f;
+
+            float clipLengthSeconds = audioSource.clip.length;
+            float secPerBeat = 60f / bpm;
+            float targetBeats = clipLengthSeconds / secPerBeat;
+
+            GameLog.Info($"[BattleManager] Audio clip: {clipLengthSeconds:F1}s → {targetBeats:F0} beats at {bpm} BPM");
+
+            return targetBeats;
+        }
+
         // =================================================================
         // INITIALIZATION
         // =================================================================
 
         private void InitializeBattle()
         {
-            _enemyHealth.InitForBattle(_currentEnemy.maxHP);
+            // Apply elite HP scaling
+            int enemyHP = _currentEnemy.maxHP;
+            if (_isElite && _eliteConfig != null)
+                enemyHP = _eliteConfig.ScaleHP(enemyHP);
+
+            _enemyHealth.InitForBattle(enemyHP);
 
             _enemyHealth.Health.OnDeath += OnEnemyDied;
             _playerHealth.Health.OnDeath += OnPlayerDied;
@@ -274,15 +311,31 @@ namespace RhythmRogue.Battle
             _comboSystem.ResetAll();
             _accuracyTracker.Reset();
 
+            // --- Relic modifiers ---
+            RelicModifiers mods = RelicEffectAggregator.Aggregate(_runState?.ActiveRelics);
+
+            _judgmentSystem.ApplyRelicModifiers(mods.BonusPerfectWindowMs);
+            _comboSystem.ApplyRelicModifiers(mods.ComboRateBoost, mods.ComboCapBoost);
+            _damagePipeline.ApplyRelicModifiers(mods.BonusPerfectDamage, mods.MissDamageReduction);
+
+            if (_relicEffectHandler != null)
+                _relicEffectHandler.Initialize(mods);
+
+            if (mods.HasAnyEffect)
+                GameLog.Info($"[BattleManager] Relic modifiers active: {mods}");
+
+            // --- Logging ---
+            string eliteTag = _isElite ? " [ELITE]" : "";
+
             if (_useLegacyChart)
             {
-                GameLog.Info($"[BattleManager] Battle initialized (legacy): {_currentEnemy.enemyName} " +
-                          $"({_currentEnemy.maxHP} HP) at {_currentChart.BPM * _currentEnemy.bpmModifier} BPM");
+                GameLog.Info($"[BattleManager] Battle initialized (legacy){eliteTag}: {_currentEnemy.enemyName} " +
+                          $"({enemyHP} HP) at {_currentChart.BPM * _currentEnemy.bpmModifier} BPM");
             }
             else
             {
-                GameLog.Info($"[BattleManager] Battle initialized (assembled): {_currentEnemy.enemyName} " +
-                          $"({_currentEnemy.maxHP} HP) at {_battleChart.BPM} BPM, " +
+                GameLog.Info($"[BattleManager] Battle initialized (assembled){eliteTag}: {_currentEnemy.enemyName} " +
+                          $"({enemyHP} HP) at {_battleChart.BPM} BPM, " +
                           $"{_battleChart.PlayerNoteCount} player notes, " +
                           $"{_battleChart.EnemyNoteCount} enemy notes");
             }
@@ -302,7 +355,8 @@ namespace RhythmRogue.Battle
                 {
                     _phaseTimer = _introDelay;
                     _battleEnded = false;
-                    GameLog.Info($"[BattleManager] INTRO — {_currentEnemy.enemyName} appears!");
+                    string eliteTag = _isElite ? " [ELITE]" : "";
+                    GameLog.Info($"[BattleManager] INTRO{eliteTag} — {_currentEnemy.enemyName} appears!");
                 },
                 update: () =>
                 {
@@ -321,7 +375,11 @@ namespace RhythmRogue.Battle
 
                     if (_useLegacyChart)
                     {
-                        effectiveBPM = _currentChart.BPM * _currentEnemy.bpmModifier;
+                        float bpmMod = _currentEnemy.bpmModifier;
+                        if (_isElite && _eliteConfig != null)
+                            bpmMod = _eliteConfig.ScaleBPMModifier(bpmMod);
+
+                        effectiveBPM = _currentChart.BPM * bpmMod;
                         offset = _currentChart.Offset;
                     }
                     else

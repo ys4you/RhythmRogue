@@ -1570,6 +1570,8 @@ MonoBehaviour:
   _defaultLibrary: {fileID: 11400000, guid: a89327d24bc5c50469ca1ca70c04598a, type: 2}
   _defaultTemplate: {fileID: 11400000, guid: 8332afb12e3cceb48a5f964b89620c25, type: 2}
   _enemyHighway: {fileID: 1671159282}
+  _eliteConfig: {fileID: 0}
+  _relicEffectHandler: {fileID: 0}
   _introDelay: 2
   _endDelay: 2
   _highway: {fileID: 312867617}
@@ -1598,6 +1600,51 @@ MonoBehaviour:
   _battleManager: {fileID: 1177386016}
   _comboSystem: {fileID: 1147190660}
   _enemyHealth: {fileID: 1009257967}
+--- !u!1 &1188628589
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1188628591}
+  - component: {fileID: 1188628590}
+  m_Layer: 0
+  m_Name: RelicEffectHandler
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1188628590
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1188628589}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd8aa5eab99dfd246a22307945546ca4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _comboSystem: {fileID: 1147190660}
+--- !u!4 &1188628591
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1188628589}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.46941897, y: -0.6528345, z: -0.049976286}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1307788740
 GameObject:
   m_ObjectHideFlags: 0
@@ -2247,6 +2294,7 @@ SceneRoots:
   - {fileID: 1524838608}
   - {fileID: 1307788741}
   - {fileID: 434597298}
+  - {fileID: 1188628591}
   - {fileID: 1848496892}
   - {fileID: 1101065309}
   - {fileID: 1009257968}

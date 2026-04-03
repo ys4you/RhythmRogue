@@ -72,6 +72,21 @@ namespace RhythmRogue.Battle
         public void Heal(int amount) => Health.Heal(amount);
 
         /// <summary>
+        /// Permanently increase max HP and heal for the same amount.
+        /// Used by relics with the MaxHPBoost effect.
+        /// 
+        /// Example: player at 80/100, picks +20 max HP relic → 100/120.
+        /// </summary>
+        public void IncreaseMaxHP(int amount)
+        {
+            if (amount <= 0 || Health == null) return;
+
+            int newMax = Health.MaxHP + amount;
+            Health.SetMaxHP(newMax, fillToMax: false);
+            Health.Heal(amount);
+        }
+
+        /// <summary>
         /// Reset HP to full for a new run.
         /// Call from run manager when starting a fresh run.
         /// </summary>

@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using UnityEngine;
+using RhythmRogue.Data;
 using RhythmRogue.Map;
 using RhythmRogue.Util;
 using RhythmRogue.Util.Random;
@@ -49,27 +51,30 @@ namespace RhythmRogue.Core
 
         /// <summary>
         /// The chart asset to play in the next battle (set before battle scene load).
-        /// Replaces the old static BattleConfig.ChartAsset.
         /// </summary>
         [System.NonSerialized] public TextAsset SelectedChart;
 
         /// <summary>
         /// The seeded random context for this run. Created in StartNewRun
-        /// from the seed code. All procedural systems (map gen, chart assembly,
-        /// enemy selection, rewards) fork from this.
+        /// from the seed code. All procedural systems fork from this.
         /// </summary>
         [System.NonSerialized] public IRunSeed RunSeed;
+
+        /// <summary>Relics collected during this run.</summary>
+        [System.NonSerialized] public List<RelicData> ActiveRelics = new();
+
+        /// <summary>
+        /// Whether the last completed battle was an elite encounter.
+        /// Read by RewardPickScreen to offer better rewards.
+        /// </summary>
+        [System.NonSerialized] public bool LastBattleWasElite;
 
         // =================================================================
         // METHODS
         // =================================================================
 
-        /// <summary>
-        /// Reset all run data for a new run.
-        /// </summary>
         public void StartNewRun(string seed = null)
         {
-            // Generate or use provided seed
             var encoder = new SeedEncoder();
 
             if (string.IsNullOrWhiteSpace(seed))
@@ -86,7 +91,6 @@ namespace RhythmRogue.Core
                 }
             }
 
-            // Create the run seed for deterministic procedural generation
             RunSeed = new RhythmRogue.Util.Random.RunSeed(Seed, encoder);
 
             IsRunActive = true;
@@ -100,33 +104,23 @@ namespace RhythmRogue.Core
             MapData = null;
             SelectedNode = null;
             SelectedChart = null;
+            ActiveRelics = new List<RelicData>();
+            LastBattleWasElite = false;
 
             GameLog.Info($"[RunState] New run started. Seed: {Seed}");
         }
 
-        /// <summary>
-        /// Record battle results. Called after a battle ends.
-        /// </summary>
         public void RecordBattleResult(bool won, int score, float accuracy, int maxCombo)
         {
-            if (won)
-                BattlesWon++;
-
+            if (won) BattlesWon++;
             TotalScore += score;
-
-            if (accuracy > BestAccuracy)
-                BestAccuracy = accuracy;
-
-            if (maxCombo > MaxCombo)
-                MaxCombo = maxCombo;
+            if (accuracy > BestAccuracy) BestAccuracy = accuracy;
+            if (maxCombo > MaxCombo) MaxCombo = maxCombo;
 
             GameLog.Info($"[RunState] Battle recorded: {(won ? "WIN" : "LOSS")} " +
                       $"Score+{score} Acc:{accuracy:P0} Combo:{maxCombo}");
         }
 
-        /// <summary>
-        /// Complete the currently selected node on the map.
-        /// </summary>
         public void CompleteSelectedNode()
         {
             if (MapData == null || SelectedNode == null)
@@ -141,14 +135,10 @@ namespace RhythmRogue.Core
             SelectedChart = null;
         }
 
-        /// <summary>
-        /// Mark the run as ended (victory or defeat).
-        /// </summary>
         public void EndRun(bool victory)
         {
             WasVictory = victory;
             IsRunActive = false;
-
             GameLog.Info($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} " +
                       $"Battles:{BattlesWon} Score:{TotalScore}");
         }

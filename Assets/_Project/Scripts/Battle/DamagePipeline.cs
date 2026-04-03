@@ -8,11 +8,9 @@ namespace RhythmRogue.Battle
     /// <summary>
     /// Connects judgment, combo, and health into a unified damage pipeline.
     /// 
-    /// REFACTORED (PROTO-025):
-    ///   Before: 5 serialized ints for damage values inline.
-    ///   After:  1 DamageConfig ScriptableObject reference.
-    ///   Why:    Designers tune damage in the SO asset, not per-scene.
-    ///           Enemy-specific damage overrides become trivial (assign different SO).
+    /// Relic bonuses:
+    ///   - BonusPerfectDamage: flat damage added to Perfect hits (before multiplier)
+    ///   - ReduceMissDamage: flat reduction to miss damage (minimum 1)
     /// </summary>
     [DisallowMultipleComponent]
     public class DamagePipeline : MonoBehaviour
@@ -45,6 +43,10 @@ namespace RhythmRogue.Battle
         // =================================================================
 
         private PlayerHealth _playerHealth;
+
+        // Relic bonuses — applied at battle start
+        private float _relicBonusPerfectDmg;
+        private int _relicMissDmgReduction;
 
         // =================================================================
         // LIFECYCLE
@@ -80,6 +82,37 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
+        // RELIC MODIFIERS
+        // =================================================================
+
+        /// <summary>
+        /// Apply relic bonuses to the damage pipeline.
+        /// Called by BattleManager at battle start.
+        /// </summary>
+        /// <param name="bonusPerfectDmg">
+        /// Flat bonus damage added to Perfect hits before combo multiplier.
+        /// </param>
+        /// <param name="missDmgReduction">
+        /// Flat damage reduction on Miss. Final miss damage is
+        /// max(1, baseMissDamage - reduction).
+        /// </param>
+        public void ApplyRelicModifiers(float bonusPerfectDmg, int missDmgReduction)
+        {
+            _relicBonusPerfectDmg = bonusPerfectDmg;
+            _relicMissDmgReduction = missDmgReduction;
+
+            if (bonusPerfectDmg > 0f || missDmgReduction > 0)
+                GameLog.Info($"[DamagePipeline] Relic bonus: PerfDmg+{bonusPerfectDmg}, MissRed-{missDmgReduction}");
+        }
+
+        /// <summary>Clear relic bonuses.</summary>
+        public void ClearRelicModifiers()
+        {
+            _relicBonusPerfectDmg = 0f;
+            _relicMissDmgReduction = 0;
+        }
+
+        // =================================================================
         // JUDGMENT DAMAGE
         // =================================================================
 
@@ -95,10 +128,13 @@ namespace RhythmRogue.Battle
         {
             if (_playerHealth == null || !_playerHealth.IsAlive || _config == null) return;
 
-            _playerHealth.TakeDamage(_config.missDamage);
+            // Apply miss damage with relic reduction (minimum 1)
+            int missDamage = Mathf.Max(1, _config.missDamage - _relicMissDmgReduction);
+
+            _playerHealth.TakeDamage(missDamage);
 
             OnDamageDealt?.Invoke(new DamageResult(
-                amount: _config.missDamage,
+                amount: missDamage,
                 judgment: Judgment.Miss,
                 isPlayerDamage: true,
                 multiplier: 1f,
@@ -110,6 +146,11 @@ namespace RhythmRogue.Battle
             if (_enemyHealth == null || !_enemyHealth.IsAlive || _config == null) return;
 
             int baseDamage = _config.GetEnemyDamage((int)result.Judgment);
+
+            // Apply relic bonus on Perfect hits
+            if (result.Judgment == Judgment.Perfect && _relicBonusPerfectDmg > 0f)
+                baseDamage += Mathf.RoundToInt(_relicBonusPerfectDmg);
+
             float multiplier = _comboSystem != null ? _comboSystem.Multiplier : 1f;
             int finalDamage = Mathf.Max(1, Mathf.RoundToInt(baseDamage * multiplier));
 

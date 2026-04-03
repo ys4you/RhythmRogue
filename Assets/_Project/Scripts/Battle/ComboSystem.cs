@@ -9,11 +9,9 @@ namespace RhythmRogue.Battle
     /// <summary>
     /// Tracks consecutive non-Miss hits and calculates a combo multiplier.
     /// 
-    /// REFACTORED (PROTO-025):
-    ///   Before: serialized rate, cap, milestones array inline.
-    ///   After:  1 ComboConfig ScriptableObject reference.
-    ///   Why:    Designers tune combo scaling in the SO asset.
-    ///           Relics swap the config reference (e.g. "Combo Crown" = higher cap).
+    /// Relic bonuses are applied additively on top of the ComboConfig values:
+    ///   - ComboRateBoost: extra multiplier gain per hit
+    ///   - ComboCapBoost: raises the multiplier ceiling
     /// </summary>
     [DisallowMultipleComponent]
     public class ComboSystem : MonoBehaviour
@@ -30,6 +28,17 @@ namespace RhythmRogue.Battle
         [SerializeField] private JudgmentSystem _judgmentSystem;
 
         // =================================================================
+        // CONSTANTS
+        // =================================================================
+
+        /// <summary>
+        /// Default multiplier cap from the GDD. Used as the base for
+        /// relic cap boost calculations. If ComboConfig uses a different
+        /// cap, update this or expose the cap from ComboConfig.
+        /// </summary>
+        private const float DefaultMultiplierCap = 3f;
+
+        // =================================================================
         // STATE
         // =================================================================
 
@@ -37,6 +46,10 @@ namespace RhythmRogue.Battle
         private float _currentMultiplier = 1f;
         private int _lastMilestoneIndex = -1;
         private IEventBus _eventBus;
+
+        // Relic bonuses — applied at battle start
+        private float _relicRateBoost;
+        private float _relicCapBoost;
 
         // =================================================================
         // PUBLIC PROPERTIES
@@ -89,6 +102,38 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
+        // RELIC MODIFIERS
+        // =================================================================
+
+        /// <summary>
+        /// Apply relic bonuses to combo scaling.
+        /// Called by BattleManager at battle start.
+        /// </summary>
+        /// <param name="rateBoost">
+        /// Additional multiplier gain per hit. E.g. 0.05 means
+        /// +0.05/hit on top of the config's base rate.
+        /// </param>
+        /// <param name="capBoost">
+        /// Additional multiplier cap. E.g. 2.0 means the cap raises
+        /// from 3.0x to 5.0x.
+        /// </param>
+        public void ApplyRelicModifiers(float rateBoost, float capBoost)
+        {
+            _relicRateBoost = rateBoost;
+            _relicCapBoost = capBoost;
+
+            if (rateBoost > 0f || capBoost > 0f)
+                GameLog.Info($"[ComboSystem] Relic bonus: Rate+{rateBoost}/hit, Cap+{capBoost}");
+        }
+
+        /// <summary>Clear relic bonuses.</summary>
+        public void ClearRelicModifiers()
+        {
+            _relicRateBoost = 0f;
+            _relicCapBoost = 0f;
+        }
+
+        // =================================================================
         // CORE LOGIC
         // =================================================================
 
@@ -103,9 +148,19 @@ namespace RhythmRogue.Battle
         private void IncrementCombo()
         {
             _currentCombo++;
+
+            // Base multiplier from config
             _currentMultiplier = _config != null
                 ? _config.GetMultiplier(_currentCombo)
-                : Mathf.Min(1f + _currentCombo * 0.1f, 3f);
+                : Mathf.Min(1f + _currentCombo * 0.1f, DefaultMultiplierCap);
+
+            // Relic: additional multiplier per combo hit
+            if (_relicRateBoost > 0f)
+                _currentMultiplier += _currentCombo * _relicRateBoost;
+
+            // Relic: enforce boosted cap
+            float effectiveCap = DefaultMultiplierCap + _relicCapBoost;
+            _currentMultiplier = Mathf.Min(_currentMultiplier, effectiveCap);
 
             if (_currentCombo > MaxCombo)
                 MaxCombo = _currentCombo;
@@ -166,6 +221,7 @@ namespace RhythmRogue.Battle
             _lastMilestoneIndex = -1;
             MaxCombo = 0;
             TotalResets = 0;
+            ClearRelicModifiers();
         }
 
         /// <summary>Swap config at runtime (for relics).</summary>

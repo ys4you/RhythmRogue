@@ -3,36 +3,40 @@ namespace RhythmRogue.Data
     /// <summary>
     /// Identifies which gameplay system a relic modifies.
     /// 
-    /// Each effect maps to a specific config value that gets
-    /// adjusted when the relic is active. The RelicApplier reads
-    /// these at battle start to configure the gameplay systems.
+    /// Each effect maps to a specific system:
+    /// - Hit detection reads WiderPerfectWindow
+    /// - DamagePipeline reads BonusPerfectDamage, ReduceMissDamage
+    /// - ComboSystem reads ComboRateBoost, ComboCapBoost, HealOnComboMilestone
+    /// - PlayerHealth reads MaxHPBoost
+    /// - Economy reads CurrencyMultiplier
     /// 
-    /// Add new entries as you create new relic designs.
+    /// The consuming system is responsible for querying active relics
+    /// and applying the effect. Relics themselves carry no logic.
     /// </summary>
     public enum RelicEffect
     {
-        /// <summary>Widens the Perfect timing window by FloatValue ms.</summary>
+        /// <summary>Widens the Perfect timing window by floatValue ms.</summary>
         WiderPerfectWindow,
 
-        /// <summary>Adds FloatValue flat bonus damage on Perfect hits.</summary>
+        /// <summary>Adds floatValue bonus damage on Perfect hits.</summary>
         BonusPerfectDamage,
 
-        /// <summary>Increases combo multiplier rate by FloatValue per hit (default +0.1).</summary>
+        /// <summary>Increases combo multiplier rate by floatValue per hit.</summary>
         ComboRateBoost,
 
-        /// <summary>Raises the combo multiplier cap by FloatValue (default cap 3.0).</summary>
+        /// <summary>Raises combo multiplier cap by floatValue.</summary>
         ComboCapBoost,
 
-        /// <summary>Heals IntValue HP every time combo reaches a milestone (50, 100, etc).</summary>
+        /// <summary>Heals intValue HP at combo milestones.</summary>
         HealOnComboMilestone,
 
-        /// <summary>Reduces miss damage by IntValue.</summary>
+        /// <summary>Reduces miss damage taken by intValue.</summary>
         ReduceMissDamage,
 
-        /// <summary>Increases max HP by IntValue (applied once on pickup).</summary>
+        /// <summary>Increases max HP by intValue (applied immediately on pickup).</summary>
         MaxHPBoost,
 
-        /// <summary>Multiplies all Beats currency earned by FloatValue.</summary>
+        /// <summary>Multiplies currency earned by (1 + floatValue).</summary>
         CurrencyMultiplier
     }
 }

@@ -1,22 +1,21 @@
 using UnityEngine;
 using RhythmRogue.Core;
+using RhythmRogue.Map;
 using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
     /// <summary>
-    /// Handles the battle → map/summary transition.
+    /// Handles the battle → next scene transition.
     /// 
     /// Listens for battle completion, records results in RunState,
     /// and triggers the appropriate scene transition.
     /// 
     /// Flow:
-    ///   Win (normal enemy) → complete node → go to map
-    ///   Win (boss)         → complete node → end run (victory) → go to summary
-    ///   Lose               → end run (defeat) → go to summary
-    /// 
-    /// Boss detection uses RunState.SelectedNode.EnemyData.IsBoss so there
-    /// is no dependency on static BattleConfig state.
+    ///   Win (normal enemy) → complete node → reward pick → map
+    ///   Win (elite enemy)  → complete node → reward pick (better options) → map
+    ///   Win (boss)         → complete node → end run (victory) → summary
+    ///   Lose               → end run (defeat) → summary
     /// </summary>
     public class BattleResultHandler : MonoBehaviour
     {
@@ -68,9 +67,11 @@ namespace RhythmRogue.Battle
 
                 if (victory)
                 {
-                    // Read boss status from RunState before completing the node clears SelectedNode
+                    // Read node info before completing (which nulls SelectedNode)
                     bool wasBoss = _runState.SelectedNode?.EnemyData?.IsBoss ?? false;
+                    bool wasElite = _runState.SelectedNode?.Type == NodeType.Elite;
 
+                    _runState.LastBattleWasElite = wasElite;
                     _runState.CompleteSelectedNode();
 
                     if (wasBoss)
@@ -80,7 +81,7 @@ namespace RhythmRogue.Battle
                     }
                     else
                     {
-                        TransitionToMap();
+                        TransitionToReward();
                     }
                 }
                 else
@@ -93,6 +94,17 @@ namespace RhythmRogue.Battle
             {
                 GameLog.Info($"[BattleResultHandler] No RunState. Result: {(victory ? "WIN" : "LOSS")}");
             }
+        }
+
+        private void TransitionToReward()
+        {
+            GameLog.Info("[BattleResultHandler] → RewardScene");
+
+            var tm = SceneTransitionManager.Instance;
+            if (tm != null)
+                tm.GoTo("RewardScene");
+            else
+                UnityEngine.SceneManagement.SceneManager.LoadScene("RewardScene");
         }
 
         private void TransitionToMap()

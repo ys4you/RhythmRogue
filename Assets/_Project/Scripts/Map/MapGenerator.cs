@@ -50,8 +50,8 @@ namespace RhythmRogue.Map
         private static readonly LayerConfig[] PrototypeLayers =
         {
             // Layer 0: first encounters — safe, no elites or rest
-            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0.0f, EliteChance = 1f },
             new() { MinNodes = 2, MaxNodes = 2, RestChance = 0f,  EliteChance = 0f },
+            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0.0f, EliteChance = 1f },
             new() { MinNodes = 2, MaxNodes = 3, RestChance = 0.3f, EliteChance = 0.2f },
             new() { MinNodes = 2, MaxNodes = 2, RestChance = 0.4f, EliteChance = 0.35f },
             // Boss layer is added separately — always 1 node

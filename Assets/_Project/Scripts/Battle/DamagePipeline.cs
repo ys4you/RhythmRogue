@@ -18,6 +18,8 @@ namespace RhythmRogue.Battle
         // =================================================================
         // INSPECTOR
         // =================================================================
+        [Header("Debug")]
+        [SerializeField] private bool _godMode = false;
 
         [Header("Config")]
         [Tooltip("Damage configuration. Create via Assets → Create → RhythmRogue → DamageConfig.")]
@@ -131,7 +133,8 @@ namespace RhythmRogue.Battle
             // Apply miss damage with relic reduction (minimum 1)
             int missDamage = Mathf.Max(1, _config.missDamage - _relicMissDmgReduction);
 
-            _playerHealth.TakeDamage(missDamage);
+            if (!_godMode)
+                _playerHealth.TakeDamage(missDamage);
 
             OnDamageDealt?.Invoke(new DamageResult(
                 amount: missDamage,

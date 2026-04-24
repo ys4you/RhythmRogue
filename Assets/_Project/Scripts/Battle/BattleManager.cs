@@ -11,23 +11,16 @@ namespace RhythmRogue.Battle
     /// <summary>
     /// Orchestrates the full battle lifecycle.
     /// 
-    /// Uses StateMachine&lt;BattlePhase&gt; from Util to manage phases:
-    ///   Intro → Playing → Won or Lost
+    /// Chart modes (auto-detected, priority order):
+    ///   1. Legacy: _useLegacyChart toggle -> single JSON chart
+    ///   2. Beat map: EnemyData has SongBeatMap -> hand-crafted markers
+    ///   3. Hybrid: AudioClip + PatternLibrary -> human patterns placed by algorithm
+    ///   4. Algorithmic: AudioClip only -> pure marker-driven fallback
     /// 
-    /// On Awake, reads RunState.SelectedNode for enemy/chart data.
-    /// Falls back to serialized defaults for testing without scene transitions.
-    /// 
-    /// Supports two chart modes:
-    ///   - Legacy: single JSON chart loaded via ChartLoader (original system)
-    ///   - Assembled: dual highway charts built from PatternLibrary via ChartAssembler
-    /// 
-    /// Elite scaling: when the selected node is NodeType.Elite, applies
-    /// EliteConfig modifiers to HP, BPM, and pattern difficulty at init time.
-    /// The base EnemyData is never mutated.
-    /// 
-    /// Relic modifiers: at battle start, aggregates all active relics into
-    /// a RelicModifiers struct and distributes numeric bonuses to each
-    /// gameplay system. No system knows about individual relics.
+    /// The hybrid path (3) is the primary path for the roguelike:
+    /// audio analysis detects section energy, hand-crafted patterns are
+    /// selected by density match, and the run seed controls which pattern
+    /// is picked. Same song, different chart every seed.
     /// </summary>
     public class BattleManager : MonoBehaviour
     {
@@ -39,19 +32,16 @@ namespace RhythmRogue.Battle
         [SerializeField] private RunState _runState;
 
         [Header("Chart Mode")]
-        [Tooltip("True = load from JSON TextAsset (original system). False = assemble from patterns (dual highway).")]
+        [Tooltip("True = force legacy JSON chart mode. False = auto-detect from EnemyData.")]
         [SerializeField] private bool _useLegacyChart = false;
 
         [Header("Legacy Defaults (used if _useLegacyChart is true)")]
         [SerializeField] private EnemyData _defaultEnemy;
         [SerializeField] private TextAsset _defaultChart;
 
-        [Header("Chart System (used if _useLegacyChart is false)")]
+        [Header("Chart System")]
         [Tooltip("Fallback pattern library if enemy has none assigned.")]
         [SerializeField] private PatternLibrary _defaultLibrary;
-
-        [Tooltip("Fallback chart template if enemy has none assigned.")]
-        [SerializeField] private ChartTemplate _defaultTemplate;
 
         [Tooltip("The enemy's auto-playing highway (left side).")]
         [SerializeField] private EnemyHighway _enemyHighway;
@@ -97,28 +87,20 @@ namespace RhythmRogue.Battle
         private PlayerHealth _playerHealth;
 
         private EnemyData _currentEnemy;
-        private LoadedChart _currentChart;       // Legacy mode
-        private BattleChart _battleChart;         // Assembled mode
+        private LoadedChart _currentChart;
+        private BattleChart _battleChart;
         private float _phaseTimer;
         private bool _battleEnded;
         private bool _isElite;
+        private bool _useBeatMap;
 
-        /// <summary>Results from the last battle. Read by summary screen.</summary>
         public static BattleStats LastBattleStats { get; private set; }
 
-        /// <summary>Current battle phase for debug/UI.</summary>
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
-
-        /// <summary>Whether the battle is paused.</summary>
         public bool IsPaused => _conductor != null && _conductor.IsPaused;
-
-        /// <summary>The current enemy being fought. Read by BattleUI.</summary>
         public EnemyData CurrentEnemy => _currentEnemy;
-
-        /// <summary>Whether this is an elite encounter. Read by BattleUI.</summary>
         public bool IsElite => _isElite;
 
-        /// <summary>Fired when the battle is fully complete (after result overlay).</summary>
         public event System.Action<bool> OnBattleCompleted;
 
         // =================================================================
@@ -130,7 +112,6 @@ namespace RhythmRogue.Battle
             _conductor = Conductor.Instance;
             _playerHealth = PlayerHealth.Instance;
 
-            // Resolve enemy data
             _currentEnemy = (_runState?.SelectedNode?.EnemyData) ?? _defaultEnemy;
             _isElite = _runState?.SelectedNode?.Type == NodeType.Elite;
 
@@ -140,13 +121,27 @@ namespace RhythmRogue.Battle
                 return;
             }
 
+            // Chart mode priority:
+            // 1. Legacy toggle -> JSON chart
+            // 2. Enemy has SongBeatMap -> hand-crafted marker-driven
+            // 3. AudioClip available -> hybrid (human patterns + audio analysis)
+            // 4. No audio -> error
             if (_useLegacyChart)
             {
                 LoadLegacyChart();
             }
+            else if (_currentEnemy.songBeatMap != null)
+            {
+                AssembleFromBeatMap();
+            }
+            else if (HasAudioClip())
+            {
+                AssembleFromAudioAnalysis();
+            }
             else
             {
-                AssembleChart();
+                GameLog.Error("[BattleManager] No chart source available! " +
+                              "Enemy needs a SongBeatMap, or the Conductor needs an AudioClip.");
             }
 
             SetupFSM();
@@ -186,7 +181,7 @@ namespace RhythmRogue.Battle
         private void OnReceptorRelease(int lane) => _highway.SetReceptorPressed(lane, false);
 
         // =================================================================
-        // CHART LOADING
+        // CHART LOADING - LEGACY (JSON)
         // =================================================================
 
         private void LoadLegacyChart()
@@ -202,40 +197,60 @@ namespace RhythmRogue.Battle
             _currentChart = ChartLoader.Load(chartAsset);
 
             if (_currentChart == null)
-            {
                 GameLog.Error("[BattleManager] Failed to load chart.");
-                return;
-            }
         }
 
-        private void AssembleChart()
+        // =================================================================
+        // CHART LOADING - MARKER-DRIVEN (hand-crafted SongBeatMap)
+        // =================================================================
+
+        private void AssembleFromBeatMap()
         {
-            ChartTemplate template = _currentEnemy.chartTemplate ?? _defaultTemplate;
-            PatternLibrary library = _currentEnemy.patternLibrary ?? _defaultLibrary;
+            SongBeatMap beatMap = _currentEnemy.songBeatMap;
+            _useBeatMap = true;
 
-            if (template == null)
-            {
-                GameLog.Error("[BattleManager] No chart template! Assign one on EnemyData or set a default.");
-                return;
-            }
+            ISeededRandom chartRng = GetChartRng();
 
-            if (library == null)
-            {
-                GameLog.Error("[BattleManager] No pattern library! Assign one on EnemyData or set a default.");
-                return;
-            }
+            float difficulty = _currentEnemy.markerDifficulty;
+            if (_isElite && _eliteConfig != null)
+                difficulty = Mathf.Clamp01(difficulty + _eliteConfig.difficultyBoost * 0.1f);
 
-            ISeededRandom chartRng;
-            if (_runState?.RunSeed != null)
-            {
-                chartRng = _runState.RunSeed.GetRandom(RandomDomain.Charts, _runState.SelectedNode?.Id ?? 0);
-            }
-            else
-            {
-                chartRng = new SeededRandom(42);
-                GameLog.Warn("[BattleManager] No RunSeed available, using fallback seed 42.");
-            }
+            float bpmModifier = _currentEnemy.bpmModifier;
+            if (_isElite && _eliteConfig != null)
+                bpmModifier = _eliteConfig.ScaleBPMModifier(bpmModifier);
 
+            float effectiveBPM = beatMap.bpm * bpmModifier;
+
+            _battleChart = MarkerDrivenAssembler.Assemble(beatMap, chartRng, difficulty, effectiveBPM);
+
+            if (_battleChart == null)
+                GameLog.Error("[BattleManager] MarkerDrivenAssembler returned null.");
+        }
+
+        // =================================================================
+        // CHART LOADING - HYBRID (audio analysis + human patterns)
+        // =================================================================
+
+        private bool HasAudioClip()
+        {
+            if (_conductor == null) return false;
+            AudioSource source = _conductor.GetComponent<AudioSource>();
+            return source != null && source.clip != null;
+        }
+
+        /// <summary>
+        /// Hybrid path: analyze the AudioClip, then pick hand-crafted patterns
+        /// from the PatternLibrary based on what the analysis detected.
+        /// If no PatternLibrary exists, falls back to pure algorithmic.
+        /// </summary>
+        private void AssembleFromAudioAnalysis()
+        {
+            AudioSource source = _conductor.GetComponent<AudioSource>();
+            AudioClip clip = source.clip;
+
+            ISeededRandom chartRng = GetChartRng();
+
+            // Calculate effective BPM
             float baseBPM = (_defaultChart != null)
                 ? ChartLoader.Load(_defaultChart)?.BPM ?? 135f
                 : 135f;
@@ -246,32 +261,74 @@ namespace RhythmRogue.Battle
 
             float effectiveBPM = baseBPM * bpmModifier;
 
-            float targetDurationBeats = CalculateTargetBeats(effectiveBPM);
+            // Calculate difficulty
+            float difficulty = _currentEnemy.markerDifficulty;
+            if (_isElite && _eliteConfig != null)
+                difficulty = Mathf.Clamp01(difficulty + _eliteConfig.difficultyBoost * 0.1f);
 
-            _battleChart = ChartAssembler.Assemble(
-                template, library, chartRng, effectiveBPM, targetDurationBeats);
+            float sensitivity = Mathf.Lerp(0.3f, 0.8f, difficulty);
+
+            // Run onset detection on the audio
+            var analysis = RuntimeBeatAnalyzer.Analyze(clip, effectiveBPM, sensitivity);
+
+            if (!analysis.Success || analysis.Markers.Count == 0)
+            {
+                GameLog.Error("[BattleManager] Runtime analysis produced no markers. " +
+                              "Cannot generate chart for this audio.");
+                return;
+            }
+
+            // HYBRID PATH: if we have a pattern library, use human-crafted patterns
+            // placed at algorithmically-detected positions
+            PatternLibrary library = _currentEnemy.patternLibrary ?? _defaultLibrary;
+
+            if (library != null && library.patterns.Count > 0)
+            {
+                _battleChart = HybridAssembler.Assemble(
+                    analysis, library, chartRng, difficulty,
+                    effectiveBPM, analysis.Markers);
+
+                if (_battleChart != null)
+                {
+                    _useBeatMap = true;
+                    return;
+                }
+
+                GameLog.Warn("[BattleManager] Hybrid assembly failed. Falling back to marker-driven.");
+            }
+
+            // FALLBACK: pure algorithmic (no pattern library available)
+            _battleChart = MarkerDrivenAssembler.Assemble(
+                analysis.Markers,
+                analysis.Sections,
+                leadInBeats: 4f,
+                tailBeats: 2f,
+                totalBeats: analysis.TotalBeats,
+                chartRng,
+                difficulty,
+                effectiveBPM,
+                sourceName: clip.name);
 
             if (_battleChart == null)
             {
-                GameLog.Error("[BattleManager] ChartAssembler returned null.");
+                GameLog.Error("[BattleManager] All chart assembly paths failed.");
                 return;
             }
+
+            _useBeatMap = true;
         }
 
-        private float CalculateTargetBeats(float bpm)
+        // =================================================================
+        // CHART HELPERS
+        // =================================================================
+
+        private ISeededRandom GetChartRng()
         {
-            if (_conductor == null) return 0f;
+            if (_runState?.RunSeed != null)
+                return _runState.RunSeed.GetRandom(RandomDomain.Charts, _runState.SelectedNode?.Id ?? 0);
 
-            AudioSource audioSource = _conductor.GetComponent<AudioSource>();
-            if (audioSource == null || audioSource.clip == null) return 0f;
-
-            float clipLengthSeconds = audioSource.clip.length;
-            float secPerBeat = 60f / bpm;
-            float targetBeats = clipLengthSeconds / secPerBeat;
-
-            GameLog.Info($"[BattleManager] Audio clip: {clipLengthSeconds:F1}s → {targetBeats:F0} beats at {bpm} BPM");
-
-            return targetBeats;
+            GameLog.Warn("[BattleManager] No RunSeed available, using fallback seed 42.");
+            return new SeededRandom(42);
         }
 
         // =================================================================
@@ -280,7 +337,6 @@ namespace RhythmRogue.Battle
 
         private void InitializeBattle()
         {
-            // Apply elite HP scaling
             int enemyHP = _currentEnemy.maxHP;
             if (_isElite && _eliteConfig != null)
                 enemyHP = _eliteConfig.ScaleHP(enemyHP);
@@ -293,7 +349,6 @@ namespace RhythmRogue.Battle
             if (_enemyRenderer != null && _currentEnemy.sprite != null)
                 _enemyRenderer.sprite = _currentEnemy.sprite;
 
-            // Feed notes to highways based on chart mode
             if (_useLegacyChart)
             {
                 _highway.LoadChart(_currentChart);
@@ -326,15 +381,19 @@ namespace RhythmRogue.Battle
 
             // --- Logging ---
             string eliteTag = _isElite ? " [ELITE]" : "";
+            string chartMode = _useLegacyChart ? "legacy"
+                : _useBeatMap && _currentEnemy.songBeatMap != null ? "beat-map"
+                : _useBeatMap ? "hybrid"
+                : "unknown";
 
             if (_useLegacyChart)
             {
-                GameLog.Info($"[BattleManager] Battle initialized (legacy){eliteTag}: {_currentEnemy.enemyName} " +
+                GameLog.Info($"[BattleManager] Battle initialized ({chartMode}){eliteTag}: {_currentEnemy.enemyName} " +
                           $"({enemyHP} HP) at {_currentChart.BPM * _currentEnemy.bpmModifier} BPM");
             }
             else
             {
-                GameLog.Info($"[BattleManager] Battle initialized (assembled){eliteTag}: {_currentEnemy.enemyName} " +
+                GameLog.Info($"[BattleManager] Battle initialized ({chartMode}){eliteTag}: {_currentEnemy.enemyName} " +
                           $"({enemyHP} HP) at {_battleChart.BPM} BPM, " +
                           $"{_battleChart.PlayerNoteCount} player notes, " +
                           $"{_battleChart.EnemyNoteCount} enemy notes");
@@ -356,7 +415,7 @@ namespace RhythmRogue.Battle
                     _phaseTimer = _introDelay;
                     _battleEnded = false;
                     string eliteTag = _isElite ? " [ELITE]" : "";
-                    GameLog.Info($"[BattleManager] INTRO{eliteTag} — {_currentEnemy.enemyName} appears!");
+                    GameLog.Info($"[BattleManager] INTRO{eliteTag} - {_currentEnemy.enemyName} appears!");
                 },
                 update: () =>
                 {
@@ -385,12 +444,14 @@ namespace RhythmRogue.Battle
                     else
                     {
                         effectiveBPM = _battleChart.BPM;
-                        offset = 0f;
+                        offset = _useBeatMap && _currentEnemy.songBeatMap != null
+                            ? _currentEnemy.songBeatMap.audioOffsetSeconds
+                            : 0f;
                     }
 
                     _conductor.OnSongFinished += OnSongEnded;
                     _conductor.Play(effectiveBPM, offset);
-                    GameLog.Info("[BattleManager] PLAYING — song started!");
+                    GameLog.Info("[BattleManager] PLAYING - song started!");
                 },
                 exit: _ =>
                 {
@@ -462,7 +523,7 @@ namespace RhythmRogue.Battle
 
             if (_enemyHealth.IsAlive)
             {
-                GameLog.Info("[BattleManager] Song ended — enemy survived!");
+                GameLog.Info("[BattleManager] Song ended - enemy survived!");
                 EndBattle(false);
             }
         }
@@ -506,7 +567,7 @@ namespace RhythmRogue.Battle
                 _enemyHealth.Health.OnDeath -= OnEnemyDied;
             _playerHealth.Health.OnDeath -= OnPlayerDied;
 
-            GameLog.Info("[BattleManager] Battle complete — ready for scene transition.");
+            GameLog.Info("[BattleManager] Battle complete - ready for scene transition.");
 
             OnBattleCompleted?.Invoke(LastBattleStats.Victory);
         }

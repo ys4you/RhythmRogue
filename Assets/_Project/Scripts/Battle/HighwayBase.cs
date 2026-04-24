@@ -13,10 +13,7 @@ namespace RhythmRogue.Battle
     ///   - Note spawning from pool, scrolling by beat position, despawning
     ///   - Lane X positions and note scale read directly from receptor transforms
     ///     so what you see in the scene is exactly what you get at runtime
-    /// 
-    /// Subclasses only implement what's different:
-    ///   - NoteHighway: player input feedback, miss detection, legacy chart support
-    ///   - EnemyHighway: auto-hit flash, no input, no judgment
+    ///   - Scroll speed scaled by player's ScrollSpeedSetting preference
     /// </summary>
     public abstract class HighwayBase : MonoBehaviour
     {
@@ -29,7 +26,7 @@ namespace RhythmRogue.Battle
         [SerializeField] protected float _receptorY = -3f;
 
         [Header("Scrolling")]
-        [Tooltip("World units per beat. Controls visual scroll speed.")]
+        [Tooltip("World units per beat. Base scroll speed before player multiplier.")]
         [SerializeField] protected float _beatHeight = 2f;
 
         [Tooltip("How many beats ahead to spawn notes.")]
@@ -44,10 +41,10 @@ namespace RhythmRogue.Battle
         [Header("Lane Colors")]
         [SerializeField] protected Color[] _laneColors =
         {
-            new Color(1f, 0.3f, 0.3f),   // Left  — red
-            new Color(0.3f, 0.8f, 1f),    // Down  — cyan
-            new Color(0.3f, 1f, 0.3f),    // Up    — green
-            new Color(1f, 1f, 0.3f)       // Right — yellow
+            new Color(1f, 0.3f, 0.3f),   // Left  - red
+            new Color(0.3f, 0.8f, 1f),    // Down  - cyan
+            new Color(0.3f, 1f, 0.3f),    // Up    - green
+            new Color(1f, 1f, 0.3f)       // Right - yellow
         };
 
         [Header("References")]
@@ -62,14 +59,14 @@ namespace RhythmRogue.Battle
         [SerializeField] protected Sprite _receptorPressedSprite;
 
         [Header("Auto-Generation Fallback")]
-        [Tooltip("Lane X positions — only used if receptors are NOT pre-placed.")]
+        [Tooltip("Lane X positions - only used if receptors are NOT pre-placed.")]
         [SerializeField] protected float[] _fallbackLanePositions = { -1.5f, -0.5f, 0.5f, 1.5f };
 
-        [Tooltip("Note/receptor scale — only used if receptors are NOT pre-placed.")]
+        [Tooltip("Note/receptor scale - only used if receptors are NOT pre-placed.")]
         [SerializeField] protected float _fallbackScale = 0.3f;
 
         // =================================================================
-        // RUNTIME — derived from receptors at Awake
+        // RUNTIME - derived from receptors at Awake
         // =================================================================
 
         /// <summary>World X per lane, read from receptor transforms.</summary>
@@ -82,7 +79,17 @@ namespace RhythmRogue.Battle
         protected Conductor _conductor;
 
         // =================================================================
-        // PUBLIC READ-ONLY — for HitFeedback, ReceptorAnimator, etc.
+        // SCROLL SPEED
+        // =================================================================
+
+        /// <summary>
+        /// Base beat height scaled by the player's scroll speed preference.
+        /// Use this instead of raw _beatHeight for all visual positioning.
+        /// </summary>
+        protected float EffectiveBeatHeight => _beatHeight * ScrollSpeedSetting.Multiplier;
+
+        // =================================================================
+        // PUBLIC READ-ONLY - for HitFeedback, ReceptorAnimator, etc.
         // =================================================================
 
         /// <summary>World X per lane (read-only). Use to position feedback.</summary>
@@ -167,7 +174,7 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Read lane X, receptor Y, and note scale directly from receptor transforms.
-        /// This is the source of truth — scene placement = runtime behavior.
+        /// This is the source of truth - scene placement = runtime behavior.
         /// </summary>
         private void ReadLaneDataFromReceptors()
         {
@@ -196,17 +203,18 @@ namespace RhythmRogue.Battle
         protected virtual string GetReceptorPrefix() => "Receptor";
 
         // =================================================================
-        // SHARED — note positioning
+        // SHARED - note positioning
         // =================================================================
 
         /// <summary>
         /// Position a note in world space based on beat distance from current beat.
-        /// Lane X comes from the receptor transforms — always correct.
+        /// Lane X comes from the receptor transforms - always correct.
+        /// Uses EffectiveBeatHeight (base * player scroll speed multiplier).
         /// </summary>
         protected void PositionNote(NoteView note, float currentBeat)
         {
             float distanceInBeats = note.Data.BeatPosition - currentBeat;
-            float worldY = _receptorY + (distanceInBeats * _beatHeight);
+            float worldY = _receptorY + (distanceInBeats * EffectiveBeatHeight);
 
             int lane = Mathf.Clamp(note.Data.Lane, 0, _laneX.Length - 1);
             float worldX = _laneX[lane];
@@ -217,6 +225,7 @@ namespace RhythmRogue.Battle
         /// <summary>
         /// Spawn a NoteView from the pool, set it up, scale it, and position it.
         /// Returns the view for subclasses to track.
+        /// Uses EffectiveBeatHeight for hold note rendering.
         /// </summary>
         protected NoteView SpawnNoteView(NoteData noteData, int noteIndex, float currentBeat)
         {
@@ -225,7 +234,7 @@ namespace RhythmRogue.Battle
             int lane = Mathf.Clamp(noteData.Lane, 0, _laneColors.Length - 1);
             Color color = _laneColors[lane];
 
-            view.Setup(noteData, noteIndex, color, _beatHeight, _downscroll);
+            view.Setup(noteData, noteIndex, color, EffectiveBeatHeight, _downscroll);
             view.transform.localScale = Vector3.one * _noteScale;
             PositionNote(view, currentBeat);
 

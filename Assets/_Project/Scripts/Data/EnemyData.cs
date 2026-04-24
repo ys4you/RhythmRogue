@@ -7,20 +7,15 @@ namespace RhythmRogue.Data
     /// ScriptableObject defining an enemy's data for battle.
     /// 
     /// Created via Assets > Create > RhythmRogue > EnemyData.
-    /// Place in Assets/ScriptableObjects/Enemies/.
     /// 
-    /// The battle controller loads an EnemyData to configure:
-    ///   - EnemyHealth (maxHP)
-    ///   - Conductor (BPM x bpmModifier)
-    ///   - Chart system (hybrid or marker-driven)
-    ///   - Battle UI (sprite, name, description)
-    ///   - Modifiers (applied at battle start)
+    /// Chart generation priority (auto-detected by BattleManager):
+    ///   1. songBeatMap assigned -> ShapeAssembler uses beat map markers
+    ///   2. AudioClip available -> RuntimeBeatAnalyzer -> ShapeAssembler
+    ///   3. Legacy JSON fallback
     /// 
-    /// Chart mode priority (auto-detected by BattleManager):
-    ///   1. songBeatMap assigned -> marker-driven assembly
-    ///   2. AudioClip + patternLibrary -> hybrid assembly
-    ///   3. AudioClip only -> pure algorithmic fallback
-    ///   4. Legacy JSON fallback
+    /// Both paths use the ShapeLibrary for lane placement.
+    /// The seed controls which shapes are selected per phrase,
+    /// so the same song produces different charts per run.
     /// 
     /// GDD section 6 base values:
     ///   Standard enemy: 100 HP, no modifiers
@@ -31,17 +26,18 @@ namespace RhythmRogue.Data
     public class EnemyData : ScriptableObject
     {
         [Header("Chart")]
-        [Tooltip("Pattern library for hybrid chart assembly. " +
-                 "Human-crafted patterns placed algorithmically based on audio analysis.")]
-        public PatternLibrary patternLibrary;
+        [Tooltip("Shape library for lane placement. The assembler picks shapes " +
+                 "from this library based on difficulty and seed. If null, " +
+                 "BattleManager uses the default library.")]
+        public ShapeLibrary shapeLibrary;
 
-        [Header("Marker-Driven Chart (optional)")]
-        [Tooltip("Beat map for this enemy's song. If assigned, marker-driven assembly " +
-                 "is used instead of hybrid. Takes priority over audio analysis.")]
+        [Tooltip("Beat map for this enemy's song. If assigned, the assembler " +
+                 "uses these hand-authored timing markers instead of auto-detecting " +
+                 "from audio. This produces the best results for curated songs.")]
         public SongBeatMap songBeatMap;
 
-        [Tooltip("Base difficulty for charts (0.0 = easy, 1.0 = hardest). " +
-                 "Controls which markers become notes and which patterns are available. " +
+        [Tooltip("Base difficulty (0.0 = easy, 1.0 = hardest). " +
+                 "Controls how many markers become notes and which shapes are available. " +
                  "Elite scaling adds on top.")]
         [Range(0f, 1f)]
         public float markerDifficulty = 0.5f;
@@ -61,10 +57,6 @@ namespace RhythmRogue.Data
         [Tooltip("Multiplier applied to the song's base BPM. 1.0 = no change, 1.2 = 20% faster.")]
         [Range(0.5f, 2.0f)]
         public float bpmModifier = 1.0f;
-
-        [Tooltip("Difficulty tier for pattern selection. 1 = easy, 5 = hardest.")]
-        [Range(1, 5)]
-        public int chartDifficulty = 1;
 
         [Header("Visuals")]
         [Tooltip("Enemy sprite displayed during battle.")]

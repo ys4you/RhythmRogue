@@ -901,8 +901,8 @@ MonoBehaviour:
   _runState: {fileID: 11400000, guid: fd05c793c93cd014e9de44853e693de3, type: 2}
   _useLegacyChart: 0
   _defaultEnemy: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
-  _defaultChart: {fileID: 4900000, guid: d115e938fc061524cb34f6d6a03b6b30, type: 3}
-  _defaultLibrary: {fileID: 11400000, guid: a89327d24bc5c50469ca1ca70c04598a, type: 2}
+  _defaultChart: {fileID: 0}
+  _defaultShapeLibrary: {fileID: 11400000, guid: 19725b64b1f7a8c4d9aff9f6a543172a, type: 2}
   _enemyHighway: {fileID: 1671159282}
   _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
   _relicEffectHandler: {fileID: 1188628590}
@@ -1293,12 +1293,24 @@ PrefabInstance:
       value: Note_highway
       objectReference: {fileID: 0}
     - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 3.64
+      value: 5.75
       objectReference: {fileID: 0}
     - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.75
+      value: -3.5
       objectReference: {fileID: 0}
     - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
       propertyPath: m_LocalPosition.z
@@ -1331,6 +1343,10 @@ PrefabInstance:
     - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4400132785385456285, guid: 353041e05960c9240903c4e1687b663a, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7509701747963032061, guid: 353041e05960c9240903c4e1687b663a, type: 3}
       propertyPath: _notePool
@@ -1358,12 +1374,24 @@ PrefabInstance:
       value: enemy_highway
       objectReference: {fileID: 0}
     - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 1.75
+      value: -0.5
       objectReference: {fileID: 0}
     - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.75
+      value: -3.5
       objectReference: {fileID: 0}
     - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
       propertyPath: m_LocalPosition.z
@@ -1396,6 +1424,10 @@ PrefabInstance:
     - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421793967896155531, guid: 42c391627d89c334cb291b6c802d3904, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

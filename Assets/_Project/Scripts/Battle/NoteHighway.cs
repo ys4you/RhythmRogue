@@ -15,6 +15,7 @@ namespace RhythmRogue.Battle
     ///   - Miss detection (fires OnNoteMissedEvent when notes pass the despawn window)
     ///   - Dual chart source: LoadChart (legacy JSON) or LoadNotes (pattern assembler)
     ///   - ActiveNotes list exposed for hit detection by NoteMatcher/JudgmentSystem
+    ///   - Hold note pinning: held notes stay at the receptor while the tail shrinks
     /// </summary>
     public class NoteHighway : HighwayBase
     {
@@ -79,7 +80,7 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // PUBLIC — chart loading (legacy)
+        // PUBLIC - chart loading (legacy)
         // =================================================================
 
         public void LoadChart(LoadedChart chart)
@@ -97,11 +98,11 @@ namespace RhythmRogue.Battle
             _useAssembledNotes = false;
             _nextSpawnIndex = 0;
 
-            GameLog.Info($"[NoteHighway] Chart loaded: {chart.SongName} — {chart.NoteCount} notes");
+            GameLog.Info($"[NoteHighway] Chart loaded: {chart.SongName} - {chart.NoteCount} notes");
         }
 
         // =================================================================
-        // PUBLIC — chart loading (pattern assembler)
+        // PUBLIC - chart loading (pattern assembler)
         // =================================================================
 
         public void LoadNotes(IReadOnlyList<StampedNote> stampedNotes)
@@ -144,7 +145,7 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // PUBLIC — receptor feedback (called by input system)
+        // PUBLIC - receptor feedback (called by input system)
         // =================================================================
 
         public void SetReceptorPressed(int lane, bool pressed)
@@ -208,13 +209,21 @@ namespace RhythmRogue.Battle
         {
             foreach (NoteView note in _activeNotes)
             {
-                PositionNote(note, currentBeat);
-
-                if (note.Data.Type == NoteType.Hold && note.IsBeingHeld)
+                if (note.IsBeingHeld)
                 {
+                    // Pin the head at the receptor position while held.
+                    // The head stays on the hit line, the tail shrinks toward it.
+                    int lane = Mathf.Clamp(note.Data.Lane, 0, _laneX.Length - 1);
+                    note.transform.position = new Vector3(_laneX[lane], _receptorY, 0f);
+
                     float remaining = note.Data.EndBeatPosition - currentBeat;
                     remaining = Mathf.Max(0f, remaining);
-                    note.UpdateHoldBody(remaining, _beatHeight);
+                    note.UpdateHoldBody(remaining, EffectiveBeatHeight);
+                }
+                else
+                {
+                    // Normal scrolling for unheld notes
+                    PositionNote(note, currentBeat);
                 }
             }
         }
@@ -230,11 +239,22 @@ namespace RhythmRogue.Battle
 
             foreach (NoteView note in _activeNotes)
             {
+                // Never despawn a note that is actively being held
                 if (note.IsBeingHeld) continue;
 
-                float relevantBeat = note.Data.Type == NoteType.Hold
-                    ? note.Data.EndBeatPosition
-                    : note.Data.BeatPosition;
+                float relevantBeat;
+
+                if (note.Data.Type == NoteType.Hold)
+                {
+                    // Hold notes despawn based on their END beat,
+                    // not the head beat. This keeps them alive for
+                    // the full hold duration even if missed.
+                    relevantBeat = note.Data.EndBeatPosition;
+                }
+                else
+                {
+                    relevantBeat = note.Data.BeatPosition;
+                }
 
                 if (relevantBeat < despawnBeat)
                 {

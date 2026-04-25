@@ -21,6 +21,8 @@ namespace RhythmRogue.Battle
     /// Separate from JudgmentSystem to respect SRP — judgment evaluates,
     /// this class accumulates.
     /// </summary>
+    [DisallowMultipleComponent]
+
     public class AccuracyTracker : MonoBehaviour
     {
         [Header("References")]

@@ -34,6 +34,7 @@ namespace RhythmRogue.Battle
     /// - I: Focused events for tick and finish.
     /// - D: Depends on IConductor and InputHandler abstractions.
     /// </summary>
+    [DisallowMultipleComponent]
     public class HoldTracker : MonoBehaviour
     {
         // =================================================================

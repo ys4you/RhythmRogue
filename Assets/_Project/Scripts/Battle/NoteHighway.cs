@@ -17,6 +17,8 @@ namespace RhythmRogue.Battle
     ///   - ActiveNotes list exposed for hit detection by NoteMatcher/JudgmentSystem
     ///   - Hold note pinning: held notes stay at the receptor while the tail shrinks
     /// </summary>
+    [DisallowMultipleComponent]
+
     public class NoteHighway : HighwayBase
     {
         // =================================================================

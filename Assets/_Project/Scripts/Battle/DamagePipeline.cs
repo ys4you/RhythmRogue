@@ -18,11 +18,15 @@ namespace RhythmRogue.Battle
         // =================================================================
         // INSPECTOR
         // =================================================================
-        [Header("Debug")]
+
+#if UNITY_EDITOR
+        [Header("Debug (editor only)")]
+        [Tooltip("Disables player damage from misses. Cannot accidentally ship enabled.")]
         [SerializeField] private bool _godMode = false;
+#endif
 
         [Header("Config")]
-        [Tooltip("Damage configuration. Create via Assets → Create → RhythmRogue → DamageConfig.")]
+        [Tooltip("Damage configuration. Create via Assets > Create > RhythmRogue > DamageConfig.")]
         [SerializeField] private DamageConfig _config;
 
         [Header("References")]
@@ -46,7 +50,7 @@ namespace RhythmRogue.Battle
 
         private PlayerHealth _playerHealth;
 
-        // Relic bonuses — applied at battle start
+        // Relic bonuses - applied at battle start
         private float _relicBonusPerfectDmg;
         private int _relicMissDmgReduction;
 
@@ -91,13 +95,6 @@ namespace RhythmRogue.Battle
         /// Apply relic bonuses to the damage pipeline.
         /// Called by BattleManager at battle start.
         /// </summary>
-        /// <param name="bonusPerfectDmg">
-        /// Flat bonus damage added to Perfect hits before combo multiplier.
-        /// </param>
-        /// <param name="missDmgReduction">
-        /// Flat damage reduction on Miss. Final miss damage is
-        /// max(1, baseMissDamage - reduction).
-        /// </param>
         public void ApplyRelicModifiers(float bonusPerfectDmg, int missDmgReduction)
         {
             _relicBonusPerfectDmg = bonusPerfectDmg;
@@ -130,10 +127,11 @@ namespace RhythmRogue.Battle
         {
             if (_playerHealth == null || !_playerHealth.IsAlive || _config == null) return;
 
-            // Apply miss damage with relic reduction (minimum 1)
             int missDamage = Mathf.Max(1, _config.missDamage - _relicMissDmgReduction);
 
+#if UNITY_EDITOR
             if (!_godMode)
+#endif
                 _playerHealth.TakeDamage(missDamage);
 
             OnDamageDealt?.Invoke(new DamageResult(
@@ -150,7 +148,6 @@ namespace RhythmRogue.Battle
 
             int baseDamage = _config.GetEnemyDamage((int)result.Judgment);
 
-            // Apply relic bonus on Perfect hits
             if (result.Judgment == Judgment.Perfect && _relicBonusPerfectDmg > 0f)
                 baseDamage += Mathf.RoundToInt(_relicBonusPerfectDmg);
 
@@ -189,7 +186,7 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // PUBLIC — runtime config swap (for relics/enemies)
+        // PUBLIC - runtime config swap (for relics/enemies)
         // =================================================================
 
         /// <summary>Swap damage config at runtime.</summary>

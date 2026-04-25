@@ -9,15 +9,22 @@ namespace RhythmRogue.Battle
     /// <summary>
     /// Chart generation pipeline: timing markers + phrase grouping + shape mapping.
     /// 
-    ///   Diff  MinGap  Thresh  MaxPhrase  ~Player Notes
-    ///   0.00  1.0b    0.35    4          ~50
-    ///   0.25  0.81b   0.27    6          ~70
-    ///   0.50  0.63b   0.19    7          ~90
-    ///   0.75  0.44b   0.10    8          ~110
-    ///   1.00  0.25b   0.02    10         ~130
+    /// Pipeline:
+    ///   1. Filter markers by difficulty (intensity threshold + min gap)
+    ///   2. Group filtered markers into phrases (clusters of nearby notes)
+    ///   3. Pick a LaneShape per phrase (seed-controlled, family-aware)
+    ///   4. Map shape lanes onto marker timings one-to-one
+    /// 
+    /// All curves are linear (Mathf.Lerp). Tuned through playtesting.
+    /// 
+    /// Not thread-safe: uses static mutable buffers for zero-allocation
+    /// queries. This is intentional for Unity's single-threaded model.
+    /// Do not call from background threads or Jobs.
     /// </summary>
     public static class ShapeAssembler
     {
+        // Static buffers reused across calls to avoid GC allocations.
+        // Safe in Unity's main-thread-only execution model.
         private static readonly List<LaneShape> _queryBuffer = new(32);
         private static readonly List<float> _scoreBuffer = new(32);
 
@@ -74,24 +81,21 @@ namespace RhythmRogue.Battle
         private const float MaxLaneDistance = 3f;
 
         // =================================================================
-        // DIFFICULTY CURVES (sqrt for perceptual linearity)
+        // DIFFICULTY CURVES
         //
-        // sqrt(0.25) = 0.50
-        // sqrt(0.50) = 0.71
-        // sqrt(0.75) = 0.87
-        // sqrt(1.00) = 1.00
+        // All linear via Mathf.Lerp(easyEnd, hardEnd, difficulty).
         //
-        // This makes early difficulty steps (0 to 0.5) cover more
-        // parameter range, so each step feels meaningfully different.
+        //   Diff  MinGap  Thresh  MaxPhrase  PhraseGap
+        //   0.00  1.00b   0.35    4          1.50b
+        //   0.25  0.81b   0.27    6          1.19b
+        //   0.50  0.63b   0.19    7          0.88b
+        //   0.75  0.44b   0.10    8          0.56b
+        //   1.00  0.25b   0.02    10         0.25b
         // =================================================================
 
         /// <summary>
         /// Minimum beat gap between notes.
-        /// 0.00 = 1.0 beats (~50 notes)
-        /// 0.25 = 0.81 beats (~70 notes)
-        /// 0.50 = 0.63 beats (~90 notes)
-        /// 0.75 = 0.44 beats (~110 notes)
-        /// 1.00 = 0.25 beats (~130 notes, sixteenth notes max)
+        /// 0.0 = 1.0 beats (sparse), 1.0 = 0.25 beats (sixteenth notes).
         /// </summary>
         private static float GetMinGap(float difficulty)
         {
@@ -100,11 +104,7 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Intensity threshold for marker filtering.
-        /// 0.00 = 0.35
-        /// 0.25 = 0.27
-        /// 0.50 = 0.19
-        /// 0.75 = 0.10
-        /// 1.00 = 0.02 (everything)
+        /// 0.0 = 0.35 (strong hits only), 1.0 = 0.02 (nearly everything).
         /// </summary>
         private static float GetIntensityThreshold(float difficulty)
         {
@@ -113,9 +113,7 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Max notes per phrase before forced split.
-        /// 0.0 = 4
-        /// 0.50 = 7
-        /// 1.0 = 10
+        /// 0.0 = 4, 1.0 = 10.
         /// </summary>
         private static int GetMaxPhraseLength(float difficulty)
         {
@@ -124,9 +122,7 @@ namespace RhythmRogue.Battle
 
         /// <summary>
         /// Beat gap that starts a new phrase.
-        /// 0.0 = 1.5 beats
-        /// 0.50 = 0.8 beats
-        /// 1.0 = 0.25 beats
+        /// 0.0 = 1.5 beats (aggressive splitting), 1.0 = 0.25 beats (tight grouping).
         /// </summary>
         private static float GetPhraseGap(float difficulty)
         {

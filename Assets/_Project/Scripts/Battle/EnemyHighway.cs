@@ -15,6 +15,8 @@ namespace RhythmRogue.Battle
     ///   - No player input, no hit detection, no judgment
     ///   - Notes are purely visual/musical feedback
     /// </summary>
+    [DisallowMultipleComponent]
+
     public class EnemyHighway : HighwayBase
     {
         // =================================================================

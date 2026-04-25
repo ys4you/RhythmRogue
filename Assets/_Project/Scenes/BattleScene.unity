@@ -864,6 +864,7 @@ GameObject:
   - component: {fileID: 1177386015}
   - component: {fileID: 1177386016}
   - component: {fileID: 1177386017}
+  - component: {fileID: 1177386018}
   m_Layer: 0
   m_Name: Battle_manager
   m_TagString: Untagged
@@ -899,18 +900,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _runState: {fileID: 11400000, guid: fd05c793c93cd014e9de44853e693de3, type: 2}
-  _useLegacyChart: 0
+  _chartProvider: {fileID: 1177386018}
   _defaultEnemy: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
-  _defaultChart: {fileID: 0}
-  _defaultShapeLibrary: {fileID: 11400000, guid: 19725b64b1f7a8c4d9aff9f6a543172a, type: 2}
+  _highway: {fileID: 312867617}
   _enemyHighway: {fileID: 1671159282}
   _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
   _relicEffectHandler: {fileID: 1188628590}
   _introDelay: 2
   _endDelay: 2
-  _highway: {fileID: 312867617}
   _inputHandler: {fileID: 1599671247}
-  _noteMatcher: {fileID: 994168257}
   _holdTracker: {fileID: 994168258}
   _judgmentSystem: {fileID: 425582198}
   _comboSystem: {fileID: 1147190660}
@@ -934,6 +932,22 @@ MonoBehaviour:
   _battleManager: {fileID: 1177386016}
   _comboSystem: {fileID: 1147190660}
   _enemyHealth: {fileID: 1009257967}
+--- !u!114 &1177386018
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1177386013}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1686450a9a5df584c90fadff7304e5d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _useLegacyChart: 0
+  _defaultChart: {fileID: 0}
+  _defaultShapeLibrary: {fileID: 11400000, guid: 19725b64b1f7a8c4d9aff9f6a543172a, type: 2}
+  _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
 --- !u!1 &1188628589
 GameObject:
   m_ObjectHideFlags: 0

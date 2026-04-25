@@ -19,6 +19,7 @@ namespace RhythmRogue.Battle
     /// when the hold is completed. This prevents the despawn logic
     /// from removing the note while the player is still holding.
     /// </summary>
+    [DisallowMultipleComponent]
     public class NoteMatcher : MonoBehaviour
     {
         // =================================================================

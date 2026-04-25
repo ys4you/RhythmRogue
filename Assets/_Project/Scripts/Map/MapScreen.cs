@@ -3,6 +3,7 @@ using RhythmRogue.Core;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
 using RhythmRogue.Util;
+using RhythmRogue.Util.Random;
 
 namespace RhythmRogue.Map
 {
@@ -14,10 +15,8 @@ namespace RhythmRogue.Map
     ///   - If no map, generate a new one (new run)
     /// 
     /// On node confirm:
-    ///   - Enemy/Boss: stores node + chart in RunState, transitions to BattleScene
+    ///   - Enemy/Boss: stores node in RunState, transitions to BattleScene
     ///   - Rest: transitions to RestScene
-    /// 
-    /// No longer sets BattleConfig — all cross-scene data lives in RunState.
     /// </summary>
     public class MapScreen : MonoBehaviour
     {
@@ -59,7 +58,8 @@ namespace RhythmRogue.Map
 
                 ph.ResetForNewRun();
 
-                _runState.MapData = MapGenerator.Generate(_runState.Seed, _slimeData, _bossData);
+                ISeededRandom mapRng = _runState.RunSeed.GetRandom(RandomDomain.Map);
+                _runState.MapData = MapGenerator.Generate(mapRng, _runState.Seed, _slimeData, _bossData);
             }
 
             _mapUI.BuildMap(_runState.MapData);
@@ -94,7 +94,7 @@ namespace RhythmRogue.Map
 
                 case NodeType.Event:
                 case NodeType.Shop:
-                    GameLog.Info($"[MapScreen] {node.Type} not implemented — skipping.");
+                    GameLog.Info($"[MapScreen] {node.Type} not implemented - skipping.");
                     _runState.SelectedNode = node;
                     _runState.CompleteSelectedNode();
                     _mapUI.UpdateVisuals();
@@ -104,11 +104,10 @@ namespace RhythmRogue.Map
 
         private void StartBattle(MapNode node)
         {
-            // Store everything BattleScene needs in RunState
             _runState.SelectedNode = node;
             _runState.SelectedChart = _defaultChart;
 
-            GameLog.Info($"[MapScreen] → Battle: {node.EnemyData?.enemyName ?? "Unknown"}");
+            GameLog.Info($"[MapScreen] Battle: {node.EnemyData?.enemyName ?? "Unknown"}");
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)
@@ -121,7 +120,7 @@ namespace RhythmRogue.Map
         {
             _runState.SelectedNode = node;
 
-            GameLog.Info("[MapScreen] → RestScene");
+            GameLog.Info("[MapScreen] RestScene");
 
             var tm = SceneTransitionManager.Instance;
             if (tm != null)

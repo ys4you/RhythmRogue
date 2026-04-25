@@ -2,6 +2,7 @@ using UnityEngine;
 using RhythmRogue.Data;
 using RhythmRogue.Map;
 using RhythmRogue.Util;
+using RhythmRogue.Util.Random;
 
 namespace RhythmRogue.Tests
 {
@@ -10,9 +11,9 @@ namespace RhythmRogue.Tests
     /// Verifies determinism, connectivity, and accessibility.
     /// 
     /// CONTROLS:
-    ///   [Space] — Generate with random seed
-    ///   [S]     — Generate same seed again (verify determinism)
-    ///   [1-4]   — Select an accessible node
+    ///   [Space] - Generate with random seed
+    ///   [S]     - Generate same seed again (verify determinism)
+    ///   [1-4]   - Select an accessible node
     /// </summary>
     public class MapTest : MonoBehaviour
     {
@@ -65,7 +66,8 @@ namespace RhythmRogue.Tests
 
         private void Generate(string seed)
         {
-            _map = MapGenerator.Generate(seed, _slimeData, _bossData);
+            ISeededRandom rng = new SeededRandom(seed.GetHashCode());
+            _map = MapGenerator.Generate(rng, seed, _slimeData, _bossData);
             PrintMap();
         }
 
@@ -87,10 +89,9 @@ namespace RhythmRogue.Tests
             _map.CompleteNode(node);
             PrintAccessible();
 
-            // Check for boss reached
             if (node.Type == NodeType.Boss)
             {
-                GameLog.Info("<color=magenta>  BOSS REACHED — run would end here!</color>");
+                GameLog.Info("<color=magenta>  BOSS REACHED - run would end here!</color>");
             }
         }
 
@@ -108,7 +109,7 @@ namespace RhythmRogue.Tests
                 {
                     string conns = "";
                     foreach (var c in node.Connections)
-                        conns += $"→{c.Id} ";
+                        conns += $">{c.Id} ";
 
                     layerStr += $"[{node.Id}:{node.Type}" +
                                 (node.EnemyData != null ? $"({node.EnemyData.enemyName})" : "") +

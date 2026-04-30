@@ -9,20 +9,12 @@ using RhythmRogue.Util.Random;
 namespace RhythmRogue.Battle
 {
     /// <summary>
-    /// Orchestrates the full battle lifecycle via a state machine:
-    /// Intro -> Playing -> Won/Lost.
-    /// 
-    /// Chart resolution is delegated to <see cref="ChartProvider"/>.
-    /// Battle initialization (health, relics, highways) happens in Start.
-    /// Win/lose conditions are checked via health events and song end.
+    /// Orchestrates battle lifecycle: Intro -> Playing -> Won/Lost.
+    /// Chart resolution delegated to ChartProvider. Pause to PauseMenu.
     /// </summary>
     [DisallowMultipleComponent]
     public class BattleManager : MonoBehaviour
     {
-        // =================================================================
-        // INSPECTOR
-        // =================================================================
-
         [Header("Run State")]
         [SerializeField] private RunState _runState;
 
@@ -35,8 +27,6 @@ namespace RhythmRogue.Battle
         [SerializeField] private EnemyHighway _enemyHighway;
 
         [Header("Elite Scaling")]
-        [Tooltip("Elite encounter config for HP scaling. Chart-side elite " +
-                 "scaling (difficulty, BPM) is handled by ChartProvider.")]
         [SerializeField] private EliteConfig _eliteConfig;
 
         [Header("Relic Effects")]
@@ -60,15 +50,11 @@ namespace RhythmRogue.Battle
 
         [Header("UI")]
         [SerializeField] private BattleUI _battleUI;
-
-        // =================================================================
-        // STATE
-        // =================================================================
+        [SerializeField] private PauseMenu _pauseMenu;
 
         private StateMachine<BattlePhase> _fsm;
         private Conductor _conductor;
         private PlayerHealth _playerHealth;
-
         private EnemyData _currentEnemy;
         private ChartProvider.ChartResult _chart;
         private float _phaseTimer;
@@ -76,17 +62,11 @@ namespace RhythmRogue.Battle
         private bool _isElite;
 
         public static BattleStats LastBattleStats { get; private set; }
-
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
         public bool IsPaused => _conductor != null && _conductor.IsPaused;
         public EnemyData CurrentEnemy => _currentEnemy;
         public bool IsElite => _isElite;
-
         public event System.Action<bool> OnBattleCompleted;
-
-        // =================================================================
-        // LIFECYCLE
-        // =================================================================
 
         private void Awake()
         {
@@ -103,8 +83,7 @@ namespace RhythmRogue.Battle
             }
 
             ISeededRandom rng = GetChartRng();
-            _chart = _chartProvider.Resolve(
-                _currentEnemy, _isElite, rng, _runState?.SelectedChart);
+            _chart = _chartProvider.Resolve(_currentEnemy, _isElite, rng, _runState?.SelectedChart);
 
             if (!_chart.Success)
                 GameLog.Error("[BattleManager] Chart resolution failed.");
@@ -125,6 +104,11 @@ namespace RhythmRogue.Battle
                 _inputHandler.OnLanePressed += OnReceptorPress;
                 _inputHandler.OnLaneReleased += OnReceptorRelease;
             }
+            if (_pauseMenu != null)
+            {
+                _pauseMenu.OnResumeRequested += ResumeBattle;
+                _pauseMenu.OnQuitRequested += QuitToMenu;
+            }
         }
 
         private void OnDisable()
@@ -133,6 +117,11 @@ namespace RhythmRogue.Battle
             {
                 _inputHandler.OnLanePressed -= OnReceptorPress;
                 _inputHandler.OnLaneReleased -= OnReceptorRelease;
+            }
+            if (_pauseMenu != null)
+            {
+                _pauseMenu.OnResumeRequested -= ResumeBattle;
+                _pauseMenu.OnQuitRequested -= QuitToMenu;
             }
         }
 
@@ -144,10 +133,6 @@ namespace RhythmRogue.Battle
 
         private void OnReceptorPress(int lane) => _highway.SetReceptorPressed(lane, true);
         private void OnReceptorRelease(int lane) => _highway.SetReceptorPressed(lane, false);
-
-        // =================================================================
-        // INITIALIZATION
-        // =================================================================
 
         private void InitializeBattle()
         {
@@ -169,7 +154,6 @@ namespace RhythmRogue.Battle
             else if (_chart.BattleChart != null)
             {
                 _highway.LoadNotes(_chart.BattleChart.AllPlayerNotes);
-
                 if (_enemyHighway != null)
                     _enemyHighway.LoadNotes(_chart.BattleChart.AllEnemyNotes);
             }
@@ -191,21 +175,10 @@ namespace RhythmRogue.Battle
 
             string eliteTag = _isElite ? " [ELITE]" : "";
             if (_chart.IsLegacy)
-            {
-                GameLog.Info($"[BattleManager] Initialized (legacy){eliteTag}: " +
-                          $"{_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM");
-            }
+                GameLog.Info($"[BattleManager] Initialized (legacy){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM");
             else
-            {
-                GameLog.Info($"[BattleManager] Initialized ({_chart.Mode}){eliteTag}: " +
-                          $"{_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM, " +
-                          $"{_chart.BattleChart.PlayerNoteCount}P + {_chart.BattleChart.EnemyNoteCount}E notes");
-            }
+                GameLog.Info($"[BattleManager] Initialized ({_chart.Mode}){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM, {_chart.BattleChart.PlayerNoteCount}P + {_chart.BattleChart.EnemyNoteCount}E notes");
         }
-
-        // =================================================================
-        // CHART RNG
-        // =================================================================
 
         private ISeededRandom GetChartRng()
         {
@@ -215,10 +188,6 @@ namespace RhythmRogue.Battle
             GameLog.Warn("[BattleManager] No RunSeed available, using fallback seed 42.");
             return new SeededRandom(42);
         }
-
-        // =================================================================
-        // FSM
-        // =================================================================
 
         private void SetupFSM()
         {
@@ -252,13 +221,10 @@ namespace RhythmRogue.Battle
                 exit: _ =>
                 {
                     _conductor.OnSongFinished -= OnSongEnded;
-                    if (_conductor.IsPlaying)
-                        _conductor.Stop();
+                    if (_conductor.IsPlaying) _conductor.Stop();
                     _highway.ClearAllNotes();
                     _holdTracker.ClearAll();
-
-                    if (!_chart.IsLegacy && _enemyHighway != null)
-                        _enemyHighway.Clear();
+                    if (!_chart.IsLegacy && _enemyHighway != null) _enemyHighway.Clear();
                 }
             ));
 
@@ -271,12 +237,7 @@ namespace RhythmRogue.Battle
                     _battleUI?.ShowResult(true);
                     GameLog.Info("<color=green>[BattleManager] VICTORY!</color>");
                 },
-                update: () =>
-                {
-                    _phaseTimer -= Time.deltaTime;
-                    if (_phaseTimer <= 0f)
-                        OnBattleComplete();
-                }
+                update: () => { _phaseTimer -= Time.deltaTime; if (_phaseTimer <= 0f) OnBattleComplete(); }
             ));
 
             _fsm.AddState(new LambdaState<BattlePhase>(
@@ -288,30 +249,47 @@ namespace RhythmRogue.Battle
                     _battleUI?.ShowResult(false);
                     GameLog.Info("<color=red>[BattleManager] DEFEATED!</color>");
                 },
-                update: () =>
-                {
-                    _phaseTimer -= Time.deltaTime;
-                    if (_phaseTimer <= 0f)
-                        OnBattleComplete();
-                }
+                update: () => { _phaseTimer -= Time.deltaTime; if (_phaseTimer <= 0f) OnBattleComplete(); }
             ));
         }
 
-        // =================================================================
-        // WIN/LOSE
-        // =================================================================
-
-        private void OnEnemyDied()
+        private void HandlePauseInput()
         {
-            if (_battleEnded) return;
-            EndBattle(true);
+            if (!Input.GetKeyDown(KeyCode.Escape)) return;
+            if (_fsm.CurrentStateKey != BattlePhase.Playing) return;
+
+            if (_conductor.IsPaused) ResumeBattle();
+            else PauseBattle();
         }
 
-        private void OnPlayerDied()
+        private void PauseBattle()
         {
-            if (_battleEnded) return;
-            EndBattle(false);
+            _conductor.Pause();
+            if (_pauseMenu != null) _pauseMenu.Show();
+            GameLog.Info("[BattleManager] PAUSED");
         }
+
+        private void ResumeBattle()
+        {
+            if (_pauseMenu != null) _pauseMenu.Hide();
+            _conductor.Resume();
+            GameLog.Info("[BattleManager] RESUMED");
+        }
+
+        private void QuitToMenu()
+        {
+            if (_pauseMenu != null) _pauseMenu.Hide();
+            _conductor.Resume();
+            _conductor.Stop();
+            GameLog.Info("[BattleManager] Quit to menu.");
+
+            var tm = SceneTransitionManager.Instance;
+            if (tm != null) tm.GoTo("MainMenuScene");
+            else UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.MAIN_MENU_SCENE);
+        }
+
+        private void OnEnemyDied() { if (!_battleEnded) EndBattle(true); }
+        private void OnPlayerDied() { if (!_battleEnded) EndBattle(false); }
 
         private void OnSongEnded()
         {
@@ -329,10 +307,6 @@ namespace RhythmRogue.Battle
             _fsm.TransitionTo(victory ? BattlePhase.Won : BattlePhase.Lost);
         }
 
-        // =================================================================
-        // STATS
-        // =================================================================
-
         private void CollectStats(bool victory)
         {
             LastBattleStats = new BattleStats
@@ -344,9 +318,7 @@ namespace RhythmRogue.Battle
                 ComboResets = _comboSystem.TotalResets,
                 Accuracy = _accuracyTracker.Accuracy,
                 TotalNotes = _accuracyTracker.TotalNotes,
-                NotesHit = _accuracyTracker.PerfectCount +
-                           _accuracyTracker.GoodCount +
-                           _accuracyTracker.BadCount,
+                NotesHit = _accuracyTracker.PerfectCount + _accuracyTracker.GoodCount + _accuracyTracker.BadCount,
                 EnemyName = _currentEnemy.enemyName,
                 WasBoss = _currentEnemy.IsBoss
             };
@@ -354,49 +326,16 @@ namespace RhythmRogue.Battle
 
         private void OnBattleComplete()
         {
-            if (_enemyHealth.Health != null)
-                _enemyHealth.Health.OnDeath -= OnEnemyDied;
+            if (_enemyHealth.Health != null) _enemyHealth.Health.OnDeath -= OnEnemyDied;
             _playerHealth.Health.OnDeath -= OnPlayerDied;
-
             GameLog.Info("[BattleManager] Battle complete - ready for scene transition.");
             OnBattleCompleted?.Invoke(LastBattleStats.Victory);
         }
 
-        // =================================================================
-        // PAUSE
-        // =================================================================
-
-        private void HandlePauseInput()
-        {
-            if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                if (_fsm.CurrentStateKey != BattlePhase.Playing)
-                    return;
-
-                if (_conductor.IsPaused)
-                {
-                    _conductor.Resume();
-                    GameLog.Info("[BattleManager] RESUMED");
-                }
-                else
-                {
-                    _conductor.Pause();
-                    GameLog.Info("[BattleManager] PAUSED");
-                }
-            }
-        }
-
-        // =================================================================
-        // CLEANUP
-        // =================================================================
-
         private void OnDestroy()
         {
-            if (_enemyHealth != null && _enemyHealth.Health != null)
-                _enemyHealth.Health.OnDeath -= OnEnemyDied;
-
-            if (_playerHealth != null && _playerHealth.Health != null)
-                _playerHealth.Health.OnDeath -= OnPlayerDied;
+            if (_enemyHealth != null && _enemyHealth.Health != null) _enemyHealth.Health.OnDeath -= OnEnemyDied;
+            if (_playerHealth != null && _playerHealth.Health != null) _playerHealth.Health.OnDeath -= OnPlayerDied;
         }
     }
 }

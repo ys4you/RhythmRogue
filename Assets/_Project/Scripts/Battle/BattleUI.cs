@@ -13,20 +13,11 @@ namespace RhythmRogue.Battle
     ///   - Score counter (top-right)
     ///   - Victory/Defeated overlay on battle end
     /// 
-    /// Event-driven — subscribes to health, combo, damage, and battle
-    /// manager events. No Update polling for values.
-    /// 
-    /// Enemy display data is sourced from BattleManager.CurrentEnemy,
-    /// with a serialized fallback for standalone testing.
-    /// 
-    /// Sized for 384×216 reference resolution.
+    /// UI reference resolution: 1920x1080 for crisp text rendering.
+    /// The Pixel Perfect Camera handles gameplay at 384x216 separately.
     /// </summary>
     public class BattleUI : MonoBehaviour
     {
-        // =================================================================
-        // REFERENCES
-        // =================================================================
-
         [Header("Systems")]
         [SerializeField] private BattleManager _battleManager;
         [SerializeField] private ComboSystem _comboSystem;
@@ -34,41 +25,30 @@ namespace RhythmRogue.Battle
         [SerializeField] private EnemyHealth _enemyHealth;
 
         [Header("Enemy Info")]
-        [Tooltip("Fallback enemy data used when no RunState selection exists (standalone testing).")]
         [SerializeField] private Data.EnemyData _fallbackEnemyData;
-
-        // =================================================================
-        // GENERATED UI REFERENCES
-        // =================================================================
 
         private Canvas _canvas;
 
-        // Player HP
         private Image _playerHPFill;
         private Image _playerHPGhost;
         private Text _playerHPText;
 
-        // Enemy HP
         private Image _enemyHPFill;
         private Image _enemyHPGhost;
         private Text _enemyNameText;
         private Text _bossLabel;
 
-        // Combo
         private Text _comboText;
         private Text _multiplierText;
         private RectTransform _comboRect;
 
-        // Score
         private Text _scoreText;
         private int _currentScore;
         private int _displayScore;
 
-        // Result overlay
         private Text _resultText;
         private Image _resultBG;
 
-        // Lerp targets
         private float _playerHPTarget = 1f;
         private float _playerHPDisplay = 1f;
         private float _playerGhostTarget = 1f;
@@ -76,16 +56,11 @@ namespace RhythmRogue.Battle
         private float _enemyHPDisplay = 1f;
         private float _enemyGhostTarget = 1f;
 
-        // Animation
         private float _comboPopScale = 1f;
         private float _playerFlash;
         private float _enemyFlash;
 
         private PlayerHealth _playerHealth;
-
-        // =================================================================
-        // LIFECYCLE
-        // =================================================================
 
         private void Awake()
         {
@@ -115,7 +90,6 @@ namespace RhythmRogue.Battle
 
         private void Start()
         {
-            // Subscribe to enemy health AFTER BattleManager.Start initializes it
             if (_enemyHealth != null && _enemyHealth.Health != null)
             {
                 _enemyHealth.Health.OnHPChanged += OnEnemyHPChanged;
@@ -127,7 +101,6 @@ namespace RhythmRogue.Battle
             SetCombo(0, 1f);
             SetScore(0);
 
-            // Prefer enemy data from BattleManager (sourced from RunState), fall back to inspector asset
             var enemyData = _battleManager?.CurrentEnemy ?? _fallbackEnemyData;
             if (enemyData != null)
             {
@@ -174,7 +147,6 @@ namespace RhythmRogue.Battle
 
         private void LateUpdate()
         {
-            // Smooth HP bar lerps
             _playerHPDisplay = Mathf.Lerp(_playerHPDisplay, _playerHPTarget, Time.deltaTime * 8f);
             _playerHPFill.fillAmount = _playerHPDisplay;
             _playerGhostTarget = Mathf.Lerp(_playerGhostTarget, _playerHPTarget, Time.deltaTime * 3f);
@@ -214,10 +186,6 @@ namespace RhythmRogue.Battle
             }
         }
 
-        // =================================================================
-        // EVENT HANDLERS
-        // =================================================================
-
         private void OnPlayerDamaged(int amount, int current) => _playerFlash = 1f;
         private void OnPlayerHealed(int amount, int current) { }
         private void OnPlayerHPChanged(int current, int max) => UpdatePlayerHP();
@@ -244,10 +212,6 @@ namespace RhythmRogue.Battle
             if (!result.IsPlayerDamage)
                 _currentScore += result.Amount;
         }
-
-        // =================================================================
-        // UI UPDATES
-        // =================================================================
 
         private void UpdatePlayerHP()
         {
@@ -278,10 +242,6 @@ namespace RhythmRogue.Battle
             _displayScore = score;
             _scoreText.text = score.ToString();
         }
-
-        // =================================================================
-        // RESULT OVERLAY
-        // =================================================================
 
         public void ShowResult(bool victory)
         {
@@ -316,7 +276,7 @@ namespace RhythmRogue.Battle
         }
 
         // =================================================================
-        // UI CREATION
+        // UI CREATION (1920x1080)
         // =================================================================
 
         private void CreateUI()
@@ -329,61 +289,59 @@ namespace RhythmRogue.Battle
 
             var scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(384, 216);
+            scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
 
             canvasGO.AddComponent<GraphicRaycaster>();
-
             RectTransform canvasRT = canvasGO.GetComponent<RectTransform>();
 
             // --- ENEMY HP BAR (top center) ---
             _enemyNameText = CreateText(canvasRT, "EnemyName", "Enemy",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -2), new Vector2(120, 10), 7, TextAnchor.MiddleCenter);
+                new Vector2(0, -12), new Vector2(600, 50), 32, TextAnchor.MiddleCenter);
 
             _bossLabel = CreateText(canvasRT, "BossLabel", "",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -2), new Vector2(50, 10), 7, TextAnchor.MiddleRight);
+                new Vector2(-325, -12), new Vector2(250, 50), 32, TextAnchor.MiddleRight);
             _bossLabel.fontStyle = FontStyle.Bold;
             _bossLabel.color = new Color(1f, 0.2f, 0.2f);
-            _bossLabel.rectTransform.anchoredPosition = new Vector2(-65, -2);
             _bossLabel.gameObject.SetActive(false);
 
             CreateHPBar(canvasRT, "EnemyHP",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -12), new Vector2(120, 6),
+                new Vector2(0, -60), new Vector2(600, 30),
                 Color.red, out _enemyHPFill, out _enemyHPGhost);
 
             // --- PLAYER HP BAR (bottom-left) ---
             _playerHPText = CreateText(canvasRT, "PlayerHPText", "100/100",
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(4, 16), new Vector2(60, 10), 6, TextAnchor.MiddleLeft);
+                new Vector2(20, 80), new Vector2(300, 50), 26, TextAnchor.MiddleLeft);
 
             CreateHPBar(canvasRT, "PlayerHP",
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(4, 6), new Vector2(80, 5),
+                new Vector2(20, 30), new Vector2(400, 25),
                 Color.green, out _playerHPFill, out _playerHPGhost);
 
             // --- COMBO (right side, middle) ---
             GameObject comboGroup = CreatePanel(canvasRT, "ComboGroup",
                 new Vector2(1, 0.4f), new Vector2(1, 0.4f), new Vector2(1, 0.4f),
-                new Vector2(-8, 0), new Vector2(40, 24), new Color(0, 0, 0, 0));
+                new Vector2(-40, 0), new Vector2(200, 120), new Color(0, 0, 0, 0));
             _comboRect = comboGroup.GetComponent<RectTransform>();
 
             _comboText = CreateText(_comboRect, "ComboNum", "",
                 new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -1), new Vector2(40, 14), 10, TextAnchor.MiddleCenter);
+                new Vector2(0, -5), new Vector2(200, 70), 48, TextAnchor.MiddleCenter);
             _comboText.fontStyle = FontStyle.Bold;
 
             _multiplierText = CreateText(_comboRect, "MultText", "",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, 1), new Vector2(40, 10), 6, TextAnchor.MiddleCenter);
+                new Vector2(0, 5), new Vector2(200, 50), 26, TextAnchor.MiddleCenter);
             _multiplierText.color = new Color(1f, 0.85f, 0f);
 
             // --- SCORE (top-right) ---
             _scoreText = CreateText(canvasRT, "Score", "0",
                 new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-4, -3), new Vector2(60, 10), 7, TextAnchor.MiddleRight);
+                new Vector2(-20, -15), new Vector2(300, 50), 32, TextAnchor.MiddleRight);
 
             // --- RESULT OVERLAY ---
             GameObject resultBGObj = CreatePanel(canvasRT, "ResultBG",
@@ -396,7 +354,7 @@ namespace RhythmRogue.Battle
 
             _resultText = CreateText(resultBGRT, "ResultText", "",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(200, 30), 14, TextAnchor.MiddleCenter);
+                Vector2.zero, new Vector2(1000, 150), 72, TextAnchor.MiddleCenter);
             _resultText.fontStyle = FontStyle.Bold;
 
             resultBGObj.SetActive(false);
@@ -418,8 +376,8 @@ namespace RhythmRogue.Battle
             ghost.type = Image.Type.Filled;
             ghost.fillMethod = Image.FillMethod.Horizontal;
             ghost.fillAmount = 1f;
-            ghostObj.GetComponent<RectTransform>().offsetMin = Vector2.one;
-            ghostObj.GetComponent<RectTransform>().offsetMax = -Vector2.one;
+            ghostObj.GetComponent<RectTransform>().offsetMin = new Vector2(2, 2);
+            ghostObj.GetComponent<RectTransform>().offsetMax = new Vector2(-2, -2);
 
             GameObject fillObj = CreatePanel(bgRT, name + "_Fill",
                 new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f),
@@ -428,8 +386,8 @@ namespace RhythmRogue.Battle
             fill.type = Image.Type.Filled;
             fill.fillMethod = Image.FillMethod.Horizontal;
             fill.fillAmount = 1f;
-            fillObj.GetComponent<RectTransform>().offsetMin = Vector2.one;
-            fillObj.GetComponent<RectTransform>().offsetMax = -Vector2.one;
+            fillObj.GetComponent<RectTransform>().offsetMin = new Vector2(2, 2);
+            fillObj.GetComponent<RectTransform>().offsetMax = new Vector2(-2, -2);
         }
 
         private static GameObject CreatePanel(RectTransform parent, string name,

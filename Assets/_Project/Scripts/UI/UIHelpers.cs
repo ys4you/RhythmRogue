@@ -5,31 +5,14 @@ using RhythmRogue.UI.Navigation;
 namespace RhythmRogue.UI
 {
     /// <summary>
-    /// Shared UI utility methods used across all screens.
-    /// 
-    /// Consolidates code that was previously copy-pasted into
-    /// BattleUI, RestScreen, MapUI, MainMenuScreen, and SummaryScreen.
-    /// 
-    /// All methods are static — no instance needed. This is a pure
-    /// utility class, not a MonoBehaviour.
+    /// Shared UI utilities. Fonts: m5x7 (body, size &lt;36) and m6x11plus (titles, size 36+).
+    /// Reference resolution: 1920x1080. Pixel Perfect Camera at 384x216 for gameplay.
     /// </summary>
     public static class UIHelpers
     {
-        // =================================================================
-        // REFERENCE RESOLUTION — consistent across all screens
-        // =================================================================
+        public const float ReferenceWidth = 1920f;
+        public const float ReferenceHeight = 1080f;
 
-        public const float ReferenceWidth = 384f;
-        public const float ReferenceHeight = 216f;
-
-        // =================================================================
-        // COLORS
-        // =================================================================
-
-        /// <summary>
-        /// HP bar color based on percentage. Used by BattleUI, RestScreen, MapUI.
-        /// Green (>50%) → Yellow (>25%) → Red (≤25%).
-        /// </summary>
         public static Color HPColor(float pct)
         {
             if (pct > 0.5f) return Color.Lerp(Color.yellow, Color.green, (pct - 0.5f) * 2f);
@@ -37,228 +20,121 @@ namespace RhythmRogue.UI
             return Color.red;
         }
 
-        // =================================================================
-        // CANVAS CREATION
-        // =================================================================
-
-        /// <summary>
-        /// Create a standard screen-space overlay Canvas with 384×216 scaler.
-        /// Includes GraphicRaycaster. Uses InputSystemUIInputModule via
-        /// UIEventSystemProvider if no EventSystem exists.
-        /// </summary>
-        /// <param name="parent">Parent transform for the Canvas GameObject.</param>
-        /// <param name="name">Canvas GameObject name.</param>
-        /// <param name="sortingOrder">Canvas sorting order.</param>
-        /// <param name="ensureEventSystem">Create EventSystem if missing.</param>
-        /// <returns>The Canvas's RectTransform.</returns>
-        public static RectTransform CreateCanvas(Transform parent, string name,
-            int sortingOrder = 50, bool ensureEventSystem = true)
+        public static RectTransform CreateCanvas(Transform parent, string name, int sortingOrder = 50, bool ensureEventSystem = true)
         {
-            GameObject canvasGO = new GameObject(name);
-            canvasGO.transform.SetParent(parent);
-
-            Canvas canvas = canvasGO.AddComponent<Canvas>();
+            var go = new GameObject(name);
+            go.transform.SetParent(parent);
+            var canvas = go.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = sortingOrder;
-
-            var scaler = canvasGO.AddComponent<CanvasScaler>();
+            var scaler = go.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(ReferenceWidth, ReferenceHeight);
             scaler.matchWidthOrHeight = 0.5f;
-
-            canvasGO.AddComponent<GraphicRaycaster>();
-
-            if (ensureEventSystem)
-                UIEventSystemProvider.EnsureEventSystem();
-
-            return canvasGO.GetComponent<RectTransform>();
+            go.AddComponent<GraphicRaycaster>();
+            if (ensureEventSystem) UIEventSystemProvider.EnsureEventSystem();
+            return go.GetComponent<RectTransform>();
         }
 
-        // =================================================================
-        // ELEMENT CREATION
-        // =================================================================
-
-        /// <summary>
-        /// Create a colored panel (Image on a RectTransform).
-        /// </summary>
-        public static GameObject MakePanel(RectTransform parent, string name,
-            Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
-            Vector2 pos, Vector2 size, Color color)
+        public static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
         {
-            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Image));
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Image));
             obj.transform.SetParent(parent, false);
-
-            RectTransform rt = obj.GetComponent<RectTransform>();
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
             obj.GetComponent<Image>().color = color;
             return obj;
         }
 
-        /// <summary>
-        /// Create a Text element with standard configuration.
-        /// Uses system Arial font. Post-prototype: replace with cached TMP font.
-        /// </summary>
-        public static Text MakeText(RectTransform parent, string name,
-            Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
-            Vector2 pos, Vector2 size,
-            int fontSize, TextAnchor alignment, Color color)
+        public static Text MakeText(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor alignment, Color color)
         {
-            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Text));
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Text));
             obj.transform.SetParent(parent, false);
-
-            RectTransform rt = obj.GetComponent<RectTransform>();
-            rt.anchorMin = anchorMin;
-            rt.anchorMax = anchorMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-
-            Text t = obj.GetComponent<Text>();
-            t.text = "";
-            t.fontSize = fontSize;
-            t.font = GetDefaultFont(fontSize);
-            t.alignment = alignment;
-            t.color = color;
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
+            var t = obj.GetComponent<Text>();
+            t.fontSize = fontSize; t.font = GetDefaultFont(fontSize);
+            t.alignment = alignment; t.color = color;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             t.supportRichText = true;
-
             return t;
         }
 
-        /// <summary>
-        /// Create a Button with a colored background and centered label.
-        /// </summary>
-        public static Button MakeButton(RectTransform parent, string name, string label,
-            Vector2 anchor, Vector2 pos, Vector2 size, Color bgColor,
-            int fontSize = 6)
+        public static Button MakeButton(RectTransform parent, string name, string label, Vector2 anchor, Vector2 pos, Vector2 size, Color bgColor, int fontSize = 28)
         {
-            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
             obj.transform.SetParent(parent, false);
-
-            RectTransform rt = obj.GetComponent<RectTransform>();
-            rt.anchorMin = anchor;
-            rt.anchorMax = anchor;
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
             obj.GetComponent<Image>().color = bgColor;
 
-            // Label
-            Text txt = MakeText(rt, "Text",
-                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                Vector2.zero, Vector2.zero,
-                fontSize, TextAnchor.MiddleCenter, Color.white);
+            var txt = MakeText(rt, "Text", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, fontSize, TextAnchor.MiddleCenter, Color.white);
             txt.rectTransform.offsetMin = Vector2.zero;
             txt.rectTransform.offsetMax = Vector2.zero;
             txt.fontStyle = FontStyle.Bold;
             txt.text = label;
-
             return obj.GetComponent<Button>();
         }
 
-        // =================================================================
-        // SLIDER CREATION
-        // =================================================================
-
-        /// <summary>
-        /// Create a minimal slider using Unity UI primitives. No prefab needed.
-        /// </summary>
-        public static Slider MakeSlider(RectTransform parent, string name,
-            Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
-            Vector2 pos, Vector2 size,
-            float min = 0f, float max = 1f, float value = 0.5f)
+        public static Slider MakeSlider(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, float min = 0f, float max = 1f, float value = 0.5f)
         {
-            // Root
-            GameObject root = new GameObject(name, typeof(RectTransform), typeof(Slider));
+            var root = new GameObject(name, typeof(RectTransform), typeof(Slider));
             root.transform.SetParent(parent, false);
+            var rootRT = root.GetComponent<RectTransform>();
+            rootRT.anchorMin = ancMin; rootRT.anchorMax = ancMax; rootRT.pivot = pivot;
+            rootRT.anchoredPosition = pos; rootRT.sizeDelta = size;
 
-            RectTransform rootRT = root.GetComponent<RectTransform>();
-            rootRT.anchorMin = anchorMin;
-            rootRT.anchorMax = anchorMax;
-            rootRT.pivot = pivot;
-            rootRT.anchoredPosition = pos;
-            rootRT.sizeDelta = size;
-
-            // Background
-            GameObject bg = new GameObject("Background", typeof(RectTransform), typeof(Image));
-            bg.transform.SetParent(root.transform, false);
-            RectTransform bgRT = bg.GetComponent<RectTransform>();
-            bgRT.anchorMin = Vector2.zero;
-            bgRT.anchorMax = Vector2.one;
-            bgRT.offsetMin = Vector2.zero;
-            bgRT.offsetMax = Vector2.zero;
+            var bg = new GameObject("Background", typeof(RectTransform), typeof(Image)); bg.transform.SetParent(root.transform, false);
+            var bgRT = bg.GetComponent<RectTransform>(); bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one; bgRT.offsetMin = bgRT.offsetMax = Vector2.zero;
             bg.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.25f);
 
-            // Fill area
-            GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
-            fillArea.transform.SetParent(root.transform, false);
-            RectTransform fillAreaRT = fillArea.GetComponent<RectTransform>();
-            fillAreaRT.anchorMin = Vector2.zero;
-            fillAreaRT.anchorMax = Vector2.one;
-            fillAreaRT.offsetMin = Vector2.zero;
-            fillAreaRT.offsetMax = Vector2.zero;
+            var fillArea = new GameObject("Fill Area", typeof(RectTransform)); fillArea.transform.SetParent(root.transform, false);
+            var faRT = fillArea.GetComponent<RectTransform>(); faRT.anchorMin = Vector2.zero; faRT.anchorMax = Vector2.one; faRT.offsetMin = faRT.offsetMax = Vector2.zero;
 
-            // Fill
-            GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-            fill.transform.SetParent(fillArea.transform, false);
-            RectTransform fillRT = fill.GetComponent<RectTransform>();
-            fillRT.anchorMin = Vector2.zero;
-            fillRT.anchorMax = Vector2.one;
-            fillRT.offsetMin = Vector2.zero;
-            fillRT.offsetMax = Vector2.zero;
+            var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image)); fill.transform.SetParent(fillArea.transform, false);
+            var fillRT = fill.GetComponent<RectTransform>(); fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one; fillRT.offsetMin = fillRT.offsetMax = Vector2.zero;
             fill.GetComponent<Image>().color = new Color(0.4f, 0.5f, 0.7f);
 
-            // Handle area
-            GameObject handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
-            handleArea.transform.SetParent(root.transform, false);
-            RectTransform handleAreaRT = handleArea.GetComponent<RectTransform>();
-            handleAreaRT.anchorMin = Vector2.zero;
-            handleAreaRT.anchorMax = Vector2.one;
-            handleAreaRT.offsetMin = Vector2.zero;
-            handleAreaRT.offsetMax = Vector2.zero;
+            var handleArea = new GameObject("Handle Slide Area", typeof(RectTransform)); handleArea.transform.SetParent(root.transform, false);
+            var haRT = handleArea.GetComponent<RectTransform>(); haRT.anchorMin = Vector2.zero; haRT.anchorMax = Vector2.one; haRT.offsetMin = haRT.offsetMax = Vector2.zero;
 
-            // Handle
-            GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
-            handle.transform.SetParent(handleArea.transform, false);
-            RectTransform handleRT = handle.GetComponent<RectTransform>();
-            handleRT.sizeDelta = new Vector2(6, size.y + 2);
+            var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image)); handle.transform.SetParent(handleArea.transform, false);
+            handle.GetComponent<RectTransform>().sizeDelta = new Vector2(30, size.y + 10);
             handle.GetComponent<Image>().color = Color.white;
 
-            // Wire slider
-            Slider slider = root.GetComponent<Slider>();
-            slider.fillRect = fillRT;
-            slider.handleRect = handleRT;
+            var slider = root.GetComponent<Slider>();
+            slider.fillRect = fillRT; slider.handleRect = handle.GetComponent<RectTransform>();
             slider.targetGraphic = handle.GetComponent<Image>();
-            slider.minValue = min;
-            slider.maxValue = max;
-            slider.value = value;
-
+            slider.minValue = min; slider.maxValue = max; slider.value = value;
             return slider;
         }
 
-        // =================================================================
-        // FONT — cached to avoid per-element allocation
-        // =================================================================
+        // Font system: sizes 36+ get m6x11plus (titles), smaller get m5x7 (body)
+        private static Font _bodyFont, _titleFont, _fallback;
 
-        private static Font _cachedFont;
+        public static Font GetDefaultFont(int size = 24) => size >= 36 ? GetTitleFont() : GetBodyFont();
 
-        /// <summary>
-        /// Get (or create once) the default system font.
-        /// Post-prototype: replace with a TMP font asset reference.
-        /// </summary>
-        public static Font GetDefaultFont(int size = 12)
+        public static Font GetBodyFont()
         {
-            if (_cachedFont == null)
-                _cachedFont = Font.CreateDynamicFontFromOSFont("Arial", size);
+            if (_bodyFont == null) _bodyFont = Resources.Load<Font>("Fonts/m5x7");
+            return _bodyFont != null ? _bodyFont : GetFallbackFont();
+        }
 
-            return _cachedFont;
+        public static Font GetTitleFont()
+        {
+            if (_titleFont == null) _titleFont = Resources.Load<Font>("Fonts/m6x11plus");
+            return _titleFont != null ? _titleFont : GetFallbackFont();
+        }
+
+        private static Font GetFallbackFont()
+        {
+            if (_fallback == null) _fallback = Font.CreateDynamicFontFromOSFont("Arial", 24);
+            return _fallback;
         }
     }
 }

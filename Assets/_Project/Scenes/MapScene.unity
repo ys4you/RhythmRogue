@@ -149,9 +149,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c60f85b25de6ccf4a9bf15b03b66d008, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _mapPadding: 30
-  _mapPaddingBottom: 24
-  _mapPaddingTop: 16
+  _mapPadding: 200
+  _mapPaddingBottom: 160
+  _mapPaddingTop: 120
   _nodeSize: 20
   _bossNodeSize: 26
 --- !u!114 &712571397

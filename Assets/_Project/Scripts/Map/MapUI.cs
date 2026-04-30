@@ -7,15 +7,12 @@ using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.Map
 {
-    /// <summary>
-    /// Renders the run map as a Canvas UI. 1920x1080 reference resolution.
-    /// </summary>
     public class MapUI : MonoBehaviour
     {
         [Header("Map Area")]
-        [SerializeField] private float _mapPadding = 150f;
-        [SerializeField] private float _mapPaddingBottom = 120f;
-        [SerializeField] private float _mapPaddingTop = 80f;
+        [SerializeField] private float _mapPadding = 200f;
+        [SerializeField] private float _mapPaddingBottom = 160f;
+        [SerializeField] private float _mapPaddingTop = 120f;
 
         [Header("Node Sizes")]
         [SerializeField] private float _nodeSize = 100f;
@@ -49,15 +46,9 @@ namespace RhythmRogue.Map
         public void BuildMap(MapData mapData)
         {
             _mapData = mapData;
-            ClearMap();
-            CreateCanvas();
-            CreateHUD();
-            CreateLines();
-            CreateNodes();
-            CreatePlayerMarker();
-            CreateInfoPanel();
-            SetupNavigationComponents();
-            UpdateVisuals();
+            ClearMap(); CreateCanvas(); CreateHUD(); CreateLines();
+            CreateNodes(); CreatePlayerMarker(); CreateInfoPanel();
+            SetupNavigationComponents(); UpdateVisuals();
         }
 
         public void UpdateVisuals()
@@ -68,11 +59,9 @@ namespace RhythmRogue.Map
                 var node = FindNode(kvp.Key);
                 if (node != null) UpdateNodeVisual(node, kvp.Value);
             }
-            UpdatePlayerMarker();
-            UpdateHUD();
+            UpdatePlayerMarker(); UpdateHUD();
             if (_infoPanel != null) _infoPanel.SetActive(false);
-            _selectedNode = null;
-            RebuildNavigation();
+            _selectedNode = null; RebuildNavigation();
         }
 
         private void SetupNavigationComponents()
@@ -99,7 +88,7 @@ namespace RhythmRogue.Map
 
         private void CreateCanvas()
         {
-            GameObject canvasGO = new GameObject("MapCanvas");
+            var canvasGO = new GameObject("MapCanvas");
             canvasGO.transform.SetParent(transform);
             _canvas = canvasGO.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -115,11 +104,13 @@ namespace RhythmRogue.Map
 
         private void CreateHUD()
         {
+            // Offset inward to stay inside CRT bezel
             _seedText = MakeText(_canvasRT, "SeedText", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(20, -15), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, new Color(0.6f, 0.6f, 0.6f));
+                new Vector2(50, -50), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, new Color(0.6f, 0.6f, 0.6f));
             _seedText.text = $"Seed: {_mapData.Seed}";
+
             _hpText = MakeText(_canvasRT, "HPText", new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(20, 20), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, Color.white);
+                new Vector2(50, 50), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, Color.white);
         }
 
         private void UpdateHUD()
@@ -145,11 +136,11 @@ namespace RhythmRogue.Map
 
         private void CreateLine(Vector2 from, Vector2 to, bool completed)
         {
-            GameObject lineGO = new GameObject("Line", typeof(RectTransform), typeof(Image));
+            var lineGO = new GameObject("Line", typeof(RectTransform), typeof(Image));
             lineGO.transform.SetParent(_canvasRT, false);
             lineGO.transform.SetAsFirstSibling();
             lineGO.GetComponent<Image>().color = completed ? LineCompletedColor : LineColor;
-            RectTransform rt = lineGO.GetComponent<RectTransform>();
+            var rt = lineGO.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0, 0.5f);
             Vector2 diff = to - from;
@@ -168,33 +159,29 @@ namespace RhythmRogue.Map
         private NodeVisual CreateNodeVisual(MapNode node)
         {
             float size = node.Type == NodeType.Boss ? _bossNodeSize : _nodeSize;
-            GameObject rootGO = new GameObject($"Node_{node.Id}", typeof(RectTransform), typeof(Image), typeof(Button));
+            var rootGO = new GameObject($"Node_{node.Id}", typeof(RectTransform), typeof(Image), typeof(Button));
             rootGO.transform.SetParent(_canvasRT, false);
-            RectTransform rt = rootGO.GetComponent<RectTransform>();
+            var rt = rootGO.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = NodeToCanvas(node.Position);
             rt.sizeDelta = new Vector2(size, size);
-            Image bg = rootGO.GetComponent<Image>();
-            bg.color = GetNodeColor(node);
+            Image bg = rootGO.GetComponent<Image>(); bg.color = GetNodeColor(node);
             Button btn = rootGO.GetComponent<Button>();
-            int nodeId = node.Id;
-            btn.onClick.AddListener(() => OnNodeClicked(nodeId));
+            int nodeId = node.Id; btn.onClick.AddListener(() => OnNodeClicked(nodeId));
 
             Text label = MakeText(rt, "Label", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, new Vector2(size + 20, size),
                 node.Type == NodeType.Boss ? 36 : 30, TextAnchor.MiddleCenter, Color.white);
-            label.text = GetNodeIcon(node.Type);
-            label.fontStyle = FontStyle.Bold;
+            label.text = GetNodeIcon(node.Type); label.fontStyle = FontStyle.Bold;
 
-            GameObject glowGO = new GameObject("Glow", typeof(RectTransform), typeof(Image));
+            var glowGO = new GameObject("Glow", typeof(RectTransform), typeof(Image));
             glowGO.transform.SetParent(rootGO.transform, false);
-            RectTransform glowRT = glowGO.GetComponent<RectTransform>();
+            var glowRT = glowGO.GetComponent<RectTransform>();
             glowRT.anchorMin = Vector2.zero; glowRT.anchorMax = Vector2.one;
             glowRT.offsetMin = new Vector2(-10, -10); glowRT.offsetMax = new Vector2(10, 10);
             glowRT.SetAsFirstSibling();
-            Image glow = glowGO.GetComponent<Image>();
-            glow.color = new Color(0, 0, 0, 0);
+            Image glow = glowGO.GetComponent<Image>(); glow.color = new Color(0, 0, 0, 0);
 
             Text check = MakeText(rt, "Check", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
                 new Vector2(10, 10), new Vector2(50, 50), 26, TextAnchor.MiddleCenter, Color.white);
@@ -212,9 +199,9 @@ namespace RhythmRogue.Map
 
         private void CreatePlayerMarker()
         {
-            GameObject markerGO = new GameObject("PlayerMarker", typeof(RectTransform), typeof(Image));
+            var markerGO = new GameObject("PlayerMarker", typeof(RectTransform), typeof(Image));
             markerGO.transform.SetParent(_canvasRT, false);
-            RectTransform rt = markerGO.GetComponent<RectTransform>();
+            var rt = markerGO.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(30, 30);
@@ -243,10 +230,10 @@ namespace RhythmRogue.Map
         {
             _infoPanel = new GameObject("InfoPanel", typeof(RectTransform), typeof(Image));
             _infoPanel.transform.SetParent(_canvasRT, false);
-            RectTransform rt = _infoPanel.GetComponent<RectTransform>();
+            var rt = _infoPanel.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0);
             rt.pivot = new Vector2(0.5f, 0);
-            rt.anchoredPosition = new Vector2(0, 80);
+            rt.anchoredPosition = new Vector2(0, 100);
             rt.sizeDelta = new Vector2(700, 180);
             _infoPanel.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
 
@@ -257,9 +244,9 @@ namespace RhythmRogue.Map
             _infoSub = MakeText(rt, "Sub", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
                 new Vector2(0, -75), new Vector2(650, 50), 22, TextAnchor.MiddleCenter, new Color(0.7f, 0.7f, 0.7f));
 
-            GameObject btnGO = new GameObject("ConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
+            var btnGO = new GameObject("ConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
             btnGO.transform.SetParent(rt, false);
-            RectTransform btnRT = btnGO.GetComponent<RectTransform>();
+            var btnRT = btnGO.GetComponent<RectTransform>();
             btnRT.anchorMin = btnRT.anchorMax = new Vector2(0.5f, 0);
             btnRT.pivot = new Vector2(0.5f, 0);
             btnRT.anchoredPosition = new Vector2(0, 10);
@@ -290,16 +277,14 @@ namespace RhythmRogue.Map
                 if (n != null && n.IsAccessible && !n.IsCompleted)
                     kvp.Value.Glow.color = (n.Id == nodeId) ? Color.white : AccessibleGlow;
             }
-            if (_nodeVisuals.TryGetValue(nodeId, out var vis))
-                MapNavigationBuilder.WireInfoPanel(vis.Button, _confirmButton);
+            if (_nodeVisuals.TryGetValue(nodeId, out var vis)) MapNavigationBuilder.WireInfoPanel(vis.Button, _confirmButton);
             _cancelHandler.Push(() => CloseInfoPanel(nodeId));
             _focusSetter.FocusOn(_confirmButton.gameObject);
         }
 
         private void CloseInfoPanel(int nodeIdToRestore)
         {
-            _infoPanel.SetActive(false);
-            _selectedNode = null;
+            _infoPanel.SetActive(false); _selectedNode = null;
             foreach (var kvp in _nodeVisuals)
             {
                 var n = FindNode(kvp.Key);
@@ -367,14 +352,14 @@ namespace RhythmRogue.Map
         private static Text MakeText(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot,
             Vector2 pos, Vector2 size, int fontSize, TextAnchor align, Color color)
         {
-            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Text));
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Text));
             obj.transform.SetParent(parent, false);
-            RectTransform rt = obj.GetComponent<RectTransform>();
+            var rt = obj.GetComponent<RectTransform>();
             rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
             rt.anchoredPosition = pos; rt.sizeDelta = size;
-            Text t = obj.GetComponent<Text>();
-            t.font = UIHelpers.GetDefaultFont(fontSize);
-            t.fontSize = fontSize; t.alignment = align; t.color = color;
+            var t = obj.GetComponent<Text>();
+            t.font = UIHelpers.GetDefaultFont(fontSize); t.fontSize = fontSize;
+            t.alignment = align; t.color = color;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             t.supportRichText = true;

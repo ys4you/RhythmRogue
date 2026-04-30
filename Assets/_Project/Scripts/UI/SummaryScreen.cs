@@ -7,9 +7,6 @@ using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.UI
 {
-    /// <summary>
-    /// Run summary screen. 1920x1080 reference resolution.
-    /// </summary>
     public class SummaryScreen : MonoBehaviour
     {
         [Header("References")]
@@ -35,8 +32,7 @@ namespace RhythmRogue.UI
 
         private void Start()
         {
-            GatherStats();
-            CreateUI();
+            GatherStats(); CreateUI();
             _focusSetter = gameObject.AddComponent<UIFocusSetter>();
             _cancelHandler = gameObject.AddComponent<UICancelHandler>();
             _cancelHandler.SetBaseAction(OnMenu);
@@ -47,16 +43,12 @@ namespace RhythmRogue.UI
         {
             if (_runState != null)
             {
-                _isVictory = _runState.WasVictory;
-                _battlesWon = _runState.BattlesWon;
-                _totalScore = _runState.TotalScore;
-                _maxCombo = _runState.MaxCombo;
-                _bestAccuracy = _runState.BestAccuracy;
-                _seed = _runState.Seed ?? "???";
+                _isVictory = _runState.WasVictory; _battlesWon = _runState.BattlesWon;
+                _totalScore = _runState.TotalScore; _maxCombo = _runState.MaxCombo;
+                _bestAccuracy = _runState.BestAccuracy; _seed = _runState.Seed ?? "???";
                 if (_runState.MapData != null)
                 {
-                    _totalNodes = _runState.MapData.AllNodes.Count;
-                    _nodesCompleted = 0;
+                    _totalNodes = _runState.MapData.AllNodes.Count; _nodesCompleted = 0;
                     foreach (var n in _runState.MapData.AllNodes) if (n.IsCompleted) _nodesCompleted++;
                 }
             }
@@ -87,13 +79,10 @@ namespace RhythmRogue.UI
             yield return new WaitForSecondsRealtime(0.2f);
             yield return FadeText(_seedText, 0.3f);
             yield return new WaitForSecondsRealtime(0.3f);
-            _newRunBtn.gameObject.SetActive(true);
-            _retryBtn.gameObject.SetActive(true);
-            _menuBtn.gameObject.SetActive(true);
+            _newRunBtn.gameObject.SetActive(true); _retryBtn.gameObject.SetActive(true); _menuBtn.gameObject.SetActive(true);
             UINavigationHelper.WireHorizontal(_newRunBtn, _retryBtn, _menuBtn);
             UISelectableStyle.Apply(_newRunBtn); UISelectableStyle.Apply(_retryBtn); UISelectableStyle.Apply(_menuBtn);
-            _focusSetter.SetDefault(_newRunBtn.gameObject);
-            _focusSetter.ApplyFocus();
+            _focusSetter.SetDefault(_newRunBtn.gameObject); _focusSetter.ApplyFocus();
         }
 
         private IEnumerator FadeText(Text text, float duration)
@@ -135,7 +124,7 @@ namespace RhythmRogue.UI
 
         private void CreateUI()
         {
-            GameObject canvasGO = new GameObject("SummaryCanvas");
+            var canvasGO = new GameObject("SummaryCanvas");
             canvasGO.transform.SetParent(transform);
             _canvas = canvasGO.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -173,11 +162,17 @@ namespace RhythmRogue.UI
             for (int i = 0; i < labels.Length; i++)
             {
                 float y = startY - i * rowH;
-                _statLabels[i] = MakeText(_canvasRT, $"SL_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                    new Vector2(-200, y), new Vector2(600, 55), 26, TextAnchor.MiddleRight, new Color(0.7f, 0.7f, 0.7f, 0f));
+
+                // Label: pivot at right edge, so anchoredPosition.x = right edge position
+                _statLabels[i] = MakeTextPivoted(_canvasRT, $"SL_{i}",
+                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(1f, 1f),
+                    new Vector2(-20, y), new Vector2(400, 55), 26, TextAnchor.MiddleRight, new Color(0.7f, 0.7f, 0.7f, 0f));
                 _statLabels[i].text = labels[i];
-                _statValues[i] = MakeText(_canvasRT, $"SV_{i}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                    new Vector2(200, y), new Vector2(400, 55), 26, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0f));
+
+                // Value: pivot at left edge, so anchoredPosition.x = left edge position
+                _statValues[i] = MakeTextPivoted(_canvasRT, $"SV_{i}",
+                    new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 1f),
+                    new Vector2(20, y), new Vector2(400, 55), 26, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0f));
                 _statValues[i].fontStyle = FontStyle.Bold;
                 _statValues[i].text = "0";
             }
@@ -203,11 +198,15 @@ namespace RhythmRogue.UI
             var rt = obj.GetComponent<RectTransform>();
             rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
             rt.anchoredPosition = pos; rt.sizeDelta = size;
-            obj.GetComponent<Image>().color = color;
-            return obj;
+            obj.GetComponent<Image>().color = color; return obj;
         }
 
         private static Text MakeText(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor align, Color color)
+        {
+            return MakeTextPivoted(parent, name, ancMin, ancMax, pivot, pos, size, fontSize, align, color);
+        }
+
+        private static Text MakeTextPivoted(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor align, Color color)
         {
             var obj = new GameObject(name, typeof(RectTransform), typeof(Text));
             obj.transform.SetParent(parent, false);

@@ -34,14 +34,16 @@ namespace RhythmRogue.Map
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
 
-        private static readonly Color EnemyColor = new(0.8f, 0.3f, 0.3f);
-        private static readonly Color RestColor = new(0.3f, 0.8f, 0.4f);
-        private static readonly Color BossColor = new(0.9f, 0.2f, 0.2f);
-        private static readonly Color LockedColor = new(0.25f, 0.25f, 0.25f);
-        private static readonly Color CompletedColor = new(0.4f, 0.4f, 0.4f);
-        private static readonly Color AccessibleGlow = new(1f, 1f, 0.6f);
-        private static readonly Color LineColor = new(0.4f, 0.4f, 0.4f, 0.6f);
-        private static readonly Color LineCompletedColor = new(0.7f, 0.7f, 0.7f, 0.8f);
+        // Node colors from warm palette
+        private static Color EnemyColor => UIHelpers.RustOrange;
+        private static Color RestColor => UIHelpers.WarmGold;
+        private static Color BossColor => UIHelpers.RustOrange;
+        private static Color EliteColor => UIHelpers.BgLight;
+        private static Color ShopColor => UIHelpers.AmberOrange;
+        private static Color EventColor => UIHelpers.BgLight;
+        private static Color LockedColor => UIHelpers.BgSurface;
+        private static Color CompletedColor => UIHelpers.Shadow;
+        private static Color AccessibleGlow => UIHelpers.WarmGold;
 
         public void BuildMap(MapData mapData)
         {
@@ -104,13 +106,12 @@ namespace RhythmRogue.Map
 
         private void CreateHUD()
         {
-            // Offset inward to stay inside CRT bezel
             _seedText = MakeText(_canvasRT, "SeedText", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(50, -50), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, new Color(0.6f, 0.6f, 0.6f));
+                new Vector2(50, -50), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, UIHelpers.Shadow);
             _seedText.text = $"Seed: {_mapData.Seed}";
 
             _hpText = MakeText(_canvasRT, "HPText", new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(50, 50), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, Color.white);
+                new Vector2(50, 50), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
         }
 
         private void UpdateHUD()
@@ -119,8 +120,9 @@ namespace RhythmRogue.Map
             if (ph != null && _hpText != null)
             {
                 float pct = ph.HPPercent;
-                string color = pct > 0.5f ? "lime" : pct > 0.25f ? "yellow" : "red";
-                _hpText.text = $"HP: <color={color}>{ph.CurrentHP}/{ph.MaxHP}</color>";
+                Color c = UIHelpers.HPColor(pct);
+                string hex = ColorUtility.ToHtmlStringRGB(c);
+                _hpText.text = $"HP: <color=#{hex}>{ph.CurrentHP}/{ph.MaxHP}</color>";
             }
         }
 
@@ -139,7 +141,10 @@ namespace RhythmRogue.Map
             var lineGO = new GameObject("Line", typeof(RectTransform), typeof(Image));
             lineGO.transform.SetParent(_canvasRT, false);
             lineGO.transform.SetAsFirstSibling();
-            lineGO.GetComponent<Image>().color = completed ? LineCompletedColor : LineColor;
+            Color lineColor = completed
+                ? new Color(UIHelpers.AmberOrange.r, UIHelpers.AmberOrange.g, UIHelpers.AmberOrange.b, 0.8f)
+                : new Color(UIHelpers.Shadow.r, UIHelpers.Shadow.g, UIHelpers.Shadow.b, 0.6f);
+            lineGO.GetComponent<Image>().color = lineColor;
             var rt = lineGO.GetComponent<RectTransform>();
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0, 0.5f);
@@ -172,7 +177,7 @@ namespace RhythmRogue.Map
 
             Text label = MakeText(rt, "Label", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
                 Vector2.zero, new Vector2(size + 20, size),
-                node.Type == NodeType.Boss ? 36 : 30, TextAnchor.MiddleCenter, Color.white);
+                node.Type == NodeType.Boss ? 36 : 30, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             label.text = GetNodeIcon(node.Type); label.fontStyle = FontStyle.Bold;
 
             var glowGO = new GameObject("Glow", typeof(RectTransform), typeof(Image));
@@ -184,7 +189,7 @@ namespace RhythmRogue.Map
             Image glow = glowGO.GetComponent<Image>(); glow.color = new Color(0, 0, 0, 0);
 
             Text check = MakeText(rt, "Check", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(10, 10), new Vector2(50, 50), 26, TextAnchor.MiddleCenter, Color.white);
+                new Vector2(10, 10), new Vector2(50, 50), 26, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             check.text = "";
 
             return new NodeVisual { Root = rootGO, Background = bg, Label = label, Glow = glow, Checkmark = check, Button = btn };
@@ -192,9 +197,9 @@ namespace RhythmRogue.Map
 
         private void UpdateNodeVisual(MapNode node, NodeVisual vis)
         {
-            if (node.IsCompleted) { vis.Background.color = CompletedColor; vis.Glow.color = new Color(0,0,0,0); vis.Checkmark.text = "✓"; vis.Button.interactable = false; }
+            if (node.IsCompleted) { vis.Background.color = CompletedColor; vis.Glow.color = new Color(0, 0, 0, 0); vis.Checkmark.text = "✓"; vis.Button.interactable = false; }
             else if (node.IsAccessible) { vis.Background.color = GetNodeColor(node); vis.Glow.color = AccessibleGlow; vis.Checkmark.text = ""; vis.Button.interactable = true; }
-            else { vis.Background.color = LockedColor; vis.Glow.color = new Color(0,0,0,0); vis.Checkmark.text = ""; vis.Button.interactable = false; }
+            else { vis.Background.color = LockedColor; vis.Glow.color = new Color(0, 0, 0, 0); vis.Checkmark.text = ""; vis.Button.interactable = false; }
         }
 
         private void CreatePlayerMarker()
@@ -206,7 +211,7 @@ namespace RhythmRogue.Map
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(30, 30);
             _playerMarker = markerGO.GetComponent<Image>();
-            _playerMarker.color = new Color(0.3f, 0.8f, 1f);
+            _playerMarker.color = UIHelpers.WarmGold;
             UpdatePlayerMarker();
         }
 
@@ -235,14 +240,14 @@ namespace RhythmRogue.Map
             rt.pivot = new Vector2(0.5f, 0);
             rt.anchoredPosition = new Vector2(0, 100);
             rt.sizeDelta = new Vector2(700, 180);
-            _infoPanel.GetComponent<Image>().color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
+            _infoPanel.GetComponent<Image>().color = new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.95f);
 
             _infoTitle = MakeText(rt, "Title", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -20), new Vector2(650, 60), 32, TextAnchor.MiddleCenter, Color.white);
+                new Vector2(0, -20), new Vector2(650, 60), 32, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             _infoTitle.fontStyle = FontStyle.Bold;
 
             _infoSub = MakeText(rt, "Sub", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -75), new Vector2(650, 50), 22, TextAnchor.MiddleCenter, new Color(0.7f, 0.7f, 0.7f));
+                new Vector2(0, -75), new Vector2(650, 50), 22, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
 
             var btnGO = new GameObject("ConfirmBtn", typeof(RectTransform), typeof(Image), typeof(Button));
             btnGO.transform.SetParent(rt, false);
@@ -251,10 +256,10 @@ namespace RhythmRogue.Map
             btnRT.pivot = new Vector2(0.5f, 0);
             btnRT.anchoredPosition = new Vector2(0, 10);
             btnRT.sizeDelta = new Vector2(250, 60);
-            btnGO.GetComponent<Image>().color = new Color(0.2f, 0.5f, 0.2f);
+            btnGO.GetComponent<Image>().color = UIHelpers.RustOrange;
 
             Text btnText = MakeText(btnRT, "BtnText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(250, 60), 26, TextAnchor.MiddleCenter, Color.white);
+                Vector2.zero, new Vector2(250, 60), 26, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             btnText.text = "Enter";
 
             _confirmButton = btnGO.GetComponent<Button>();
@@ -275,7 +280,7 @@ namespace RhythmRogue.Map
             {
                 var n = FindNode(kvp.Key);
                 if (n != null && n.IsAccessible && !n.IsCompleted)
-                    kvp.Value.Glow.color = (n.Id == nodeId) ? Color.white : AccessibleGlow;
+                    kvp.Value.Glow.color = (n.Id == nodeId) ? UIHelpers.OffWhite : AccessibleGlow;
             }
             if (_nodeVisuals.TryGetValue(nodeId, out var vis)) MapNavigationBuilder.WireInfoPanel(vis.Button, _confirmButton);
             _cancelHandler.Push(() => CloseInfoPanel(nodeId));
@@ -314,8 +319,13 @@ namespace RhythmRogue.Map
 
         private static Color GetNodeColor(MapNode node) => node.Type switch
         {
-            NodeType.Enemy => EnemyColor, NodeType.Rest => RestColor, NodeType.Boss => BossColor,
-            NodeType.Elite => new Color(0.7f, 0.3f, 0.7f), NodeType.Shop => new Color(0.3f, 0.5f, 0.8f), _ => EnemyColor
+            NodeType.Enemy => EnemyColor,
+            NodeType.Rest => RestColor,
+            NodeType.Boss => BossColor,
+            NodeType.Elite => EliteColor,
+            NodeType.Shop => ShopColor,
+            NodeType.Event => EventColor,
+            _ => EnemyColor
         };
 
         private static string GetNodeIcon(NodeType type) => type switch

@@ -1,286 +1,133 @@
 using System;
 using UnityEngine;
 using UnityEngine.UI;
-using RhythmRogue.Data;
 using RhythmRogue.UI;
+using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.Battle
 {
-    /// <summary>
-    /// In-battle pause menu. Code-generated UI at 1920x1080
-    /// reference resolution for crisp text rendering.
-    /// </summary>
-    [DisallowMultipleComponent]
     public class PauseMenu : MonoBehaviour
     {
         public event Action OnResumeRequested;
         public event Action OnQuitRequested;
 
         private Canvas _canvas;
-        private GameObject _root;
-        private Slider _scrollSpeedSlider;
-        private Text _scrollSpeedValue;
-        private bool _isVisible;
+        private RectTransform _canvasRT;
+        private GameObject _panel;
+        private Button _resumeBtn, _quitBtn;
+        private UIFocusSetter _focusSetter;
+        private UICancelHandler _cancelHandler;
 
-        public bool IsVisible => _isVisible;
-
-        private void Awake()
-        {
-            CreateUI();
-            _root.SetActive(false);
-        }
+        private void Awake() { CreateUI(); Hide(); }
 
         public void Show()
         {
-            _isVisible = true;
-            _root.SetActive(true);
-            _scrollSpeedSlider.SetValueWithoutNotify(ScrollSpeedSetting.Multiplier);
-            _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString;
+            _panel.SetActive(true);
+            _focusSetter.FocusOn(_resumeBtn.gameObject);
         }
 
-        public void Hide()
-        {
-            _isVisible = false;
-            _root.SetActive(false);
-        }
+        public void Hide() { _panel.SetActive(false); }
 
-        // =================================================================
-        // UI CREATION (1920x1080)
-        // =================================================================
+        private void OnResume() => OnResumeRequested?.Invoke();
+        private void OnQuit() => OnQuitRequested?.Invoke();
 
         private void CreateUI()
         {
-            GameObject canvasGO = new GameObject("PauseCanvas");
+            var canvasGO = new GameObject("PauseCanvas");
             canvasGO.transform.SetParent(transform);
-
             _canvas = canvasGO.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             _canvas.sortingOrder = 200;
-
             var scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
-
             canvasGO.AddComponent<GraphicRaycaster>();
-            RectTransform canvasRT = canvasGO.GetComponent<RectTransform>();
+            _canvasRT = canvasGO.GetComponent<RectTransform>();
+            UIEventSystemProvider.EnsureEventSystem();
 
-            _root = MakePanel(canvasRT, "PauseRoot",
-                Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f),
-                Vector2.zero, Vector2.zero,
-                new Color(0f, 0f, 0f, 0.75f));
-            RectTransform rootRT = _root.GetComponent<RectTransform>();
-            rootRT.offsetMin = Vector2.zero;
-            rootRT.offsetMax = Vector2.zero;
+            // Dim overlay over the battle
+            _panel = MakePanel(_canvasRT, "PausePanel", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(UIHelpers.BgDeep.r, UIHelpers.BgDeep.g, UIHelpers.BgDeep.b, 0.85f));
+            _panel.GetComponent<RectTransform>().offsetMin = Vector2.zero;
+            _panel.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            GameObject card = MakePanel(rootRT, "Card",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(800, 600),
-                new Color(0.1f, 0.1f, 0.15f, 0.95f));
-            RectTransform cardRT = card.GetComponent<RectTransform>();
+            var panelRT = _panel.GetComponent<RectTransform>();
 
-            Text title = MakeText(cardRT, "Title",
-                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -50), new Vector2(700, 70),
-                42, TextAnchor.MiddleCenter, Color.white);
+            // Card behind the buttons
+            MakePanel(panelRT, "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(700, 500), UIHelpers.BgSurface);
+
+            var title = MakeText(panelRT, "Title", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 150), new Vector2(600, 100), 60, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             title.fontStyle = FontStyle.Bold;
             title.text = "PAUSED";
 
-            // Scroll speed
-            float rowY = -150f;
+            float btnW = 400f, btnH = 80f, btnGap = 20f;
+            _resumeBtn = MakeButton(panelRT, "ResumeBtn", "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, 20), new Vector2(btnW, btnH), UIHelpers.RustOrange);
+            _resumeBtn.onClick.AddListener(OnResume);
 
-            MakeText(cardRT, "ScrollLabel",
-                new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(50, rowY), new Vector2(300, 50),
-                24, TextAnchor.MiddleLeft, new Color(0.7f, 0.7f, 0.7f)).text = "Scroll Speed";
+            _quitBtn = MakeButton(panelRT, "QuitBtn", "Quit to Menu", new Vector2(0.5f, 0.5f), new Vector2(0, 20 - btnH - btnGap), new Vector2(btnW, btnH), UIHelpers.Shadow);
+            _quitBtn.onClick.AddListener(OnQuit);
 
-            _scrollSpeedValue = MakeText(cardRT, "ScrollValue",
-                new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-50, rowY), new Vector2(150, 50),
-                24, TextAnchor.MiddleRight, Color.white);
-            _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString;
+            // Tip text
+            var tip = MakeText(panelRT, "Tip", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -200), new Vector2(800, 50), 20, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
+            tip.text = "Press Escape to resume";
 
-            GameObject sliderGO = CreateSliderGO(cardRT, "ScrollSlider",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, rowY - 50), new Vector2(600, 40));
+            // Navigation
+            UINavigationHelper.WireVerticalNoWrap(_resumeBtn, _quitBtn);
+            UISelectableStyle.Apply(_resumeBtn); UISelectableStyle.Apply(_quitBtn);
 
-            _scrollSpeedSlider = sliderGO.GetComponent<Slider>();
-            _scrollSpeedSlider.minValue = 0.5f;
-            _scrollSpeedSlider.maxValue = 3.0f;
-            _scrollSpeedSlider.value = ScrollSpeedSetting.Multiplier;
-            _scrollSpeedSlider.onValueChanged.AddListener(OnScrollSpeedChanged);
+            _focusSetter = gameObject.AddComponent<UIFocusSetter>();
+            _focusSetter.SetDefault(_resumeBtn.gameObject);
 
-            // Audio offset display
-            float offsetY = rowY - 130f;
-            float savedOffset = PlayerPrefs.GetFloat("audioOffset", 0f);
-
-            MakeText(cardRT, "OffsetLabel",
-                new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(50, offsetY), new Vector2(300, 50),
-                24, TextAnchor.MiddleLeft, new Color(0.7f, 0.7f, 0.7f)).text = "Audio Offset";
-
-            MakeText(cardRT, "OffsetValue",
-                new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-50, offsetY), new Vector2(200, 50),
-                24, TextAnchor.MiddleRight, new Color(0.5f, 0.5f, 0.5f)).text = $"{savedOffset:+0;-0;0} ms";
-
-            // Buttons
-            float btnW = 400f;
-            float btnH = 70f;
-            float btnY = -400f;
-
-            GameObject resumeGO = MakePanel(cardRT, "ResumeBtn",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 0.5f),
-                new Vector2(0, btnY), new Vector2(btnW, btnH),
-                new Color(0.2f, 0.45f, 0.2f));
-            Button resumeBtn = resumeGO.AddComponent<Button>();
-            resumeBtn.onClick.AddListener(() => OnResumeRequested?.Invoke());
-
-            Text resumeText = MakeText(resumeGO.GetComponent<RectTransform>(), "Text",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(btnW, btnH),
-                28, TextAnchor.MiddleCenter, Color.white);
-            resumeText.fontStyle = FontStyle.Bold;
-            resumeText.text = "Resume";
-
-            float quitY = btnY - 90f;
-
-            GameObject quitGO = MakePanel(cardRT, "QuitBtn",
-                new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 0.5f),
-                new Vector2(0, quitY), new Vector2(btnW, btnH),
-                new Color(0.4f, 0.2f, 0.2f));
-            Button quitBtn = quitGO.AddComponent<Button>();
-            quitBtn.onClick.AddListener(() => OnQuitRequested?.Invoke());
-
-            Text quitText = MakeText(quitGO.GetComponent<RectTransform>(), "Text",
-                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(btnW, btnH),
-                28, TextAnchor.MiddleCenter, Color.white);
-            quitText.fontStyle = FontStyle.Bold;
-            quitText.text = "Quit to Menu";
+            _cancelHandler = gameObject.AddComponent<UICancelHandler>();
+            _cancelHandler.SetBaseAction(OnResume);
         }
 
-        private void OnScrollSpeedChanged(float value)
+        private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
         {
-            float rounded = Mathf.Round(value * 10f) / 10f;
-            ScrollSpeedSetting.Multiplier = rounded;
-            _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString;
-        }
-
-        // =================================================================
-        // UI HELPERS
-        // =================================================================
-
-        private static GameObject MakePanel(RectTransform parent, string name,
-            Vector2 ancMin, Vector2 ancMax, Vector2 pivot,
-            Vector2 pos, Vector2 size, Color color)
-        {
-            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Image));
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Image));
             obj.transform.SetParent(parent, false);
-
-            RectTransform rt = obj.GetComponent<RectTransform>();
-            rt.anchorMin = ancMin;
-            rt.anchorMax = ancMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
             obj.GetComponent<Image>().color = color;
             return obj;
         }
 
-        private static Text MakeText(RectTransform parent, string name,
-            Vector2 ancMin, Vector2 ancMax, Vector2 pivot,
-            Vector2 pos, Vector2 size,
-            int fontSize, TextAnchor align, Color color)
+        private static Text MakeText(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor align, Color color)
         {
-            GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Text));
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Text));
             obj.transform.SetParent(parent, false);
-
-            RectTransform rt = obj.GetComponent<RectTransform>();
-            rt.anchorMin = ancMin;
-            rt.anchorMax = ancMax;
-            rt.pivot = pivot;
-            rt.anchoredPosition = pos;
-            rt.sizeDelta = size;
-
-            Text t = obj.GetComponent<Text>();
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
+            var t = obj.GetComponent<Text>();
             t.font = UIHelpers.GetDefaultFont(fontSize);
-            t.fontSize = fontSize;
-            t.alignment = align;
-            t.color = color;
+            t.fontSize = fontSize; t.alignment = align; t.color = color;
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
-
             return t;
         }
 
-        private static GameObject CreateSliderGO(RectTransform parent, string name,
-            Vector2 ancMin, Vector2 ancMax, Vector2 pivot,
-            Vector2 pos, Vector2 size)
+        private static Button MakeButton(RectTransform parent, string name, string label, Vector2 anchor, Vector2 pos, Vector2 size, Color bgColor)
         {
-            GameObject root = new GameObject(name, typeof(RectTransform), typeof(Slider));
-            root.transform.SetParent(parent, false);
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            obj.transform.SetParent(parent, false);
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
+            obj.GetComponent<Image>().color = bgColor;
 
-            RectTransform rootRT = root.GetComponent<RectTransform>();
-            rootRT.anchorMin = ancMin;
-            rootRT.anchorMax = ancMax;
-            rootRT.pivot = pivot;
-            rootRT.anchoredPosition = pos;
-            rootRT.sizeDelta = size;
-
-            GameObject bg = new GameObject("Background", typeof(RectTransform), typeof(Image));
-            bg.transform.SetParent(root.transform, false);
-            RectTransform bgRT = bg.GetComponent<RectTransform>();
-            bgRT.anchorMin = Vector2.zero;
-            bgRT.anchorMax = Vector2.one;
-            bgRT.offsetMin = Vector2.zero;
-            bgRT.offsetMax = Vector2.zero;
-            bg.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.25f);
-
-            GameObject fillArea = new GameObject("Fill Area", typeof(RectTransform));
-            fillArea.transform.SetParent(root.transform, false);
-            RectTransform fillAreaRT = fillArea.GetComponent<RectTransform>();
-            fillAreaRT.anchorMin = Vector2.zero;
-            fillAreaRT.anchorMax = Vector2.one;
-            fillAreaRT.offsetMin = Vector2.zero;
-            fillAreaRT.offsetMax = Vector2.zero;
-
-            GameObject fill = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-            fill.transform.SetParent(fillArea.transform, false);
-            RectTransform fillRT = fill.GetComponent<RectTransform>();
-            fillRT.anchorMin = Vector2.zero;
-            fillRT.anchorMax = Vector2.one;
-            fillRT.offsetMin = Vector2.zero;
-            fillRT.offsetMax = Vector2.zero;
-            fill.GetComponent<Image>().color = new Color(0.4f, 0.5f, 0.7f);
-
-            GameObject handleArea = new GameObject("Handle Slide Area", typeof(RectTransform));
-            handleArea.transform.SetParent(root.transform, false);
-            RectTransform handleAreaRT = handleArea.GetComponent<RectTransform>();
-            handleAreaRT.anchorMin = Vector2.zero;
-            handleAreaRT.anchorMax = Vector2.one;
-            handleAreaRT.offsetMin = Vector2.zero;
-            handleAreaRT.offsetMax = Vector2.zero;
-
-            GameObject handle = new GameObject("Handle", typeof(RectTransform), typeof(Image));
-            handle.transform.SetParent(handleArea.transform, false);
-            RectTransform handleRT = handle.GetComponent<RectTransform>();
-            handleRT.sizeDelta = new Vector2(30, size.y + 10);
-            handle.GetComponent<Image>().color = Color.white;
-
-            Slider slider = root.GetComponent<Slider>();
-            slider.fillRect = fillRT;
-            slider.handleRect = handleRT;
-            slider.targetGraphic = handle.GetComponent<Image>();
-
-            return root;
-        }
-
-        private void OnDestroy()
-        {
-            OnResumeRequested = null;
-            OnQuitRequested = null;
+            var txtGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            txtGO.transform.SetParent(obj.transform, false);
+            var txtRT = txtGO.GetComponent<RectTransform>();
+            txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
+            txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
+            var t = txtGO.GetComponent<Text>();
+            t.font = UIHelpers.GetDefaultFont(28);
+            t.fontSize = 28; t.alignment = TextAnchor.MiddleCenter;
+            t.color = UIHelpers.OffWhite; t.fontStyle = FontStyle.Bold; t.text = label;
+            return obj.GetComponent<Button>();
         }
     }
 }

@@ -10,9 +10,6 @@ using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.UI
 {
-    /// <summary>
-    /// Post-battle reward pick screen. 1920x1080 reference resolution.
-    /// </summary>
     public class RewardPickScreen : MonoBehaviour
     {
         [Header("References")]
@@ -30,12 +27,16 @@ namespace RhythmRogue.UI
         private bool _picked;
         private UIFocusSetter _focusSetter;
 
-        private static readonly Color CommonColor = new(0.25f, 0.3f, 0.25f);
-        private static readonly Color UncommonColor = new(0.2f, 0.25f, 0.4f);
-        private static readonly Color RareColor = new(0.4f, 0.25f, 0.15f);
-        private static readonly Color CommonBorder = new(0.5f, 0.7f, 0.5f);
-        private static readonly Color UncommonBorder = new(0.4f, 0.5f, 0.9f);
-        private static readonly Color RareBorder = new(0.9f, 0.6f, 0.2f);
+        // Rarity colors from warm palette.
+        // Common = neutral (BgSurface bg, RustOrange border)
+        // Uncommon = warmer (Shadow bg, AmberOrange border)
+        // Rare = special (BgLight bg, WarmGold border)
+        private static Color CommonBG => UIHelpers.BgSurface;
+        private static Color UncommonBG => UIHelpers.Shadow;
+        private static Color RareBG => UIHelpers.BgLight;
+        private static Color CommonBorder => UIHelpers.RustOrange;
+        private static Color UncommonBorder => UIHelpers.AmberOrange;
+        private static Color RareBorder => UIHelpers.WarmGold;
 
         private void Start() { GenerateOptions(); CreateUI(); }
 
@@ -58,7 +59,7 @@ namespace RhythmRogue.UI
             if (chosen.effect == RelicEffect.MaxHPBoost) { var ph = PlayerHealth.Instance; if (ph != null) ph.IncreaseMaxHP(chosen.intValue); }
             GameLog.Info($"[RewardPick] Picked: {chosen.relicName} ({chosen.effect})");
             foreach (var btn in _optionButtons) btn.interactable = false;
-            _optionButtons[index].GetComponent<Image>().color = new Color(0.3f, 0.5f, 0.3f);
+            _optionButtons[index].GetComponent<Image>().color = UIHelpers.WarmGold;
             StartCoroutine(TransitionAfterDelay(0.5f));
         }
 
@@ -85,24 +86,24 @@ namespace RhythmRogue.UI
             _canvasRT = canvasGO.GetComponent<RectTransform>();
             UIEventSystemProvider.EnsureEventSystem();
 
-            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0.06f, 0.06f, 0.1f));
+            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.BgDeep);
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
             string titlePrefix = _runState.LastBattleWasElite ? "ELITE " : "";
             _titleText = MakeText(_canvasRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -80), new Vector2(1500, 80), 42, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0f));
+                new Vector2(0, -80), new Vector2(1500, 80), 42, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             _titleText.fontStyle = FontStyle.Bold;
             _titleText.text = $"{titlePrefix}CHOOSE A RELIC";
 
             var sub = MakeText(_canvasRT, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -140), new Vector2(1500, 50), 22, TextAnchor.MiddleCenter, new Color(0.6f, 0.6f, 0.6f));
+                new Vector2(0, -140), new Vector2(1500, 50), 22, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
             sub.text = $"Relics: {_runState.ActiveRelics.Count}";
 
             if (_options.Count == 0)
             {
                 MakeText(_canvasRT, "NoRelics", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                    Vector2.zero, new Vector2(1000, 70), 32, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f)).text = "No relics available";
+                    Vector2.zero, new Vector2(1000, 70), 32, TextAnchor.MiddleCenter, UIHelpers.Shadow).text = "No relics available";
                 StartCoroutine(TransitionAfterDelay(1.5f));
                 return;
             }
@@ -129,7 +130,7 @@ namespace RhythmRogue.UI
 
         private void CreateRelicCard(RelicData relic, int index, float x, float cardW, float cardH)
         {
-            Color bgColor = relic.rarity switch { RelicRarity.Common => CommonColor, RelicRarity.Uncommon => UncommonColor, RelicRarity.Rare => RareColor, _ => CommonColor };
+            Color bgColor = relic.rarity switch { RelicRarity.Common => CommonBG, RelicRarity.Uncommon => UncommonBG, RelicRarity.Rare => RareBG, _ => CommonBG };
             Color borderColor = relic.rarity switch { RelicRarity.Common => CommonBorder, RelicRarity.Uncommon => UncommonBorder, RelicRarity.Rare => RareBorder, _ => CommonBorder };
 
             var cardGO = MakePanel(_canvasRT, $"Card_{index}", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -40), new Vector2(cardW, cardH), bgColor);
@@ -138,22 +139,22 @@ namespace RhythmRogue.UI
             _optionButtons.Add(btn);
             RectTransform cardRT = cardGO.GetComponent<RectTransform>();
 
-            var borderGO = MakePanel(cardRT, "Border", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(borderColor.r, borderColor.g, borderColor.b, 0.3f));
+            var borderGO = MakePanel(cardRT, "Border", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(borderColor.r, borderColor.g, borderColor.b, 0.4f));
             var brt = borderGO.GetComponent<RectTransform>(); brt.offsetMin = new Vector2(-10, -10); brt.offsetMax = new Vector2(10, 10); brt.SetAsFirstSibling();
 
             MakeText(cardRT, "Rarity", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -30), new Vector2(cardW - 40, 40), 18, TextAnchor.MiddleCenter, borderColor).text = relic.rarity.ToString().ToUpper();
 
             MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(150, 150), relic.cardColor);
 
-            var nameText = MakeText(cardRT, "Name", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -250), new Vector2(cardW - 40, 60), 28, TextAnchor.MiddleCenter, Color.white);
+            var nameText = MakeText(cardRT, "Name", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -250), new Vector2(cardW - 40, 60), 28, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             nameText.fontStyle = FontStyle.Bold; nameText.text = relic.relicName;
 
-            MakeText(cardRT, "Desc", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -360), new Vector2(cardW - 60, 200), 20, TextAnchor.UpperCenter, new Color(0.75f, 0.75f, 0.75f)).text = relic.description;
+            MakeText(cardRT, "Desc", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -360), new Vector2(cardW - 60, 200), 20, TextAnchor.UpperCenter, UIHelpers.AmberOrange).text = relic.description;
 
             string valueStr = FormatEffectValue(relic);
             if (!string.IsNullOrEmpty(valueStr))
             {
-                var vt = MakeText(cardRT, "Value", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(cardW - 40, 50), 24, TextAnchor.MiddleCenter, new Color(0.5f, 1f, 0.5f));
+                var vt = MakeText(cardRT, "Value", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(cardW - 40, 50), 24, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
                 vt.fontStyle = FontStyle.Bold; vt.text = valueStr;
             }
         }

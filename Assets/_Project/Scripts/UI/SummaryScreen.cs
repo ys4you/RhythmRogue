@@ -59,7 +59,11 @@ namespace RhythmRogue.UI
         private IEnumerator AnimateEntrance()
         {
             float t = 0f;
-            Color bgTarget = _isVictory ? new Color(0.05f, 0.08f, 0.02f, 0.9f) : new Color(0.1f, 0.02f, 0.02f, 0.9f);
+            // Victory: warm purple highlight. Defeat: dark rust shadow
+            Color bgTarget = _isVictory
+                ? new Color(UIHelpers.BgLight.r, UIHelpers.BgLight.g, UIHelpers.BgLight.b, 0.9f)
+                : new Color(UIHelpers.Shadow.r, UIHelpers.Shadow.g, UIHelpers.Shadow.b, 0.9f);
+
             while (t < _headerAnimDuration)
             {
                 t += Time.unscaledDeltaTime;
@@ -137,21 +141,33 @@ namespace RhythmRogue.UI
             _canvasRT = canvasGO.GetComponent<RectTransform>();
             UIEventSystemProvider.EnsureEventSystem();
 
-            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero,
-                _isVictory ? new Color(0.05f, 0.08f, 0.02f, 0f) : new Color(0.1f, 0.02f, 0.02f, 0f));
+            // Base background: palette BgDeep
+            var baseBg = MakePanel(_canvasRT, "BaseBG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.BgDeep);
+            baseBg.GetComponent<RectTransform>().offsetMin = Vector2.zero;
+            baseBg.GetComponent<RectTransform>().offsetMax = Vector2.zero;
+
+            // Animated overlay tint
+            Color overlayStart = _isVictory
+                ? new Color(UIHelpers.BgLight.r, UIHelpers.BgLight.g, UIHelpers.BgLight.b, 0f)
+                : new Color(UIHelpers.Shadow.r, UIHelpers.Shadow.g, UIHelpers.Shadow.b, 0f);
+            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, overlayStart);
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
             _bgOverlay = bgGO.GetComponent<Image>();
 
+            // Header: gold for victory, rust for defeat
+            Color headerColor = _isVictory
+                ? new Color(UIHelpers.WarmGold.r, UIHelpers.WarmGold.g, UIHelpers.WarmGold.b, 0f)
+                : new Color(UIHelpers.RustOrange.r, UIHelpers.RustOrange.g, UIHelpers.RustOrange.b, 0f);
             _headerText = MakeText(_canvasRT, "Header", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -90), new Vector2(1500, 100), 60, TextAnchor.MiddleCenter,
-                _isVictory ? new Color(1f, 0.85f, 0f, 0f) : new Color(1f, 0.25f, 0.25f, 0f));
+                new Vector2(0, -90), new Vector2(1500, 100), 60, TextAnchor.MiddleCenter, headerColor);
             _headerText.fontStyle = FontStyle.Bold;
             _headerText.text = _isVictory ? "VICTORY" : "DEFEATED";
 
             string subText = _isVictory ? "You conquered the dungeon!" : $"You were defeated. Made it through {_nodesCompleted} nodes.";
             _subHeaderText = MakeText(_canvasRT, "SubHeader", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -160), new Vector2(1500, 60), 26, TextAnchor.MiddleCenter, new Color(0.7f, 0.7f, 0.7f, 0f));
+                new Vector2(0, -160), new Vector2(1500, 60), 26, TextAnchor.MiddleCenter,
+                new Color(UIHelpers.AmberOrange.r, UIHelpers.AmberOrange.g, UIHelpers.AmberOrange.b, 0f));
             _subHeaderText.text = subText;
 
             string[] labels = { "Battles Won", "Nodes Cleared", "Score", "Max Combo", "Best Accuracy", "Final HP" };
@@ -162,32 +178,32 @@ namespace RhythmRogue.UI
             for (int i = 0; i < labels.Length; i++)
             {
                 float y = startY - i * rowH;
-
-                // Label: pivot at right edge, so anchoredPosition.x = right edge position
                 _statLabels[i] = MakeTextPivoted(_canvasRT, $"SL_{i}",
                     new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(1f, 1f),
-                    new Vector2(-20, y), new Vector2(400, 55), 26, TextAnchor.MiddleRight, new Color(0.7f, 0.7f, 0.7f, 0f));
+                    new Vector2(-20, y), new Vector2(400, 55), 26, TextAnchor.MiddleRight,
+                    new Color(UIHelpers.AmberOrange.r, UIHelpers.AmberOrange.g, UIHelpers.AmberOrange.b, 0f));
                 _statLabels[i].text = labels[i];
 
-                // Value: pivot at left edge, so anchoredPosition.x = left edge position
                 _statValues[i] = MakeTextPivoted(_canvasRT, $"SV_{i}",
                     new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, 1f),
-                    new Vector2(20, y), new Vector2(400, 55), 26, TextAnchor.MiddleLeft, new Color(1f, 1f, 1f, 0f));
+                    new Vector2(20, y), new Vector2(400, 55), 26, TextAnchor.MiddleLeft,
+                    new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0f));
                 _statValues[i].fontStyle = FontStyle.Bold;
                 _statValues[i].text = "0";
             }
 
             _seedText = MakeText(_canvasRT, "Seed", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, startY - labels.Length * rowH - 40), new Vector2(1000, 50),
-                22, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f, 0f));
+                22, TextAnchor.MiddleCenter,
+                new Color(UIHelpers.Shadow.r, UIHelpers.Shadow.g, UIHelpers.Shadow.b, 0f));
             _seedText.text = $"Seed: {_seed}";
 
             float btnY = 90f, btnW = 300f, btnH = 70f, btnGap = 40f;
-            _newRunBtn = MakeButton(_canvasRT, "NewRunBtn", "New Run", new Vector2(0.5f, 0), new Vector2(-(btnW + btnGap), btnY), new Vector2(btnW, btnH), new Color(0.2f, 0.5f, 0.2f));
+            _newRunBtn = MakeButton(_canvasRT, "NewRunBtn", "New Run", new Vector2(0.5f, 0), new Vector2(-(btnW + btnGap), btnY), new Vector2(btnW, btnH), UIHelpers.RustOrange);
             _newRunBtn.onClick.AddListener(OnNewRun); _newRunBtn.gameObject.SetActive(false);
-            _retryBtn = MakeButton(_canvasRT, "RetryBtn", "Retry Seed", new Vector2(0.5f, 0), new Vector2(0, btnY), new Vector2(btnW, btnH), new Color(0.3f, 0.3f, 0.6f));
+            _retryBtn = MakeButton(_canvasRT, "RetryBtn", "Retry Seed", new Vector2(0.5f, 0), new Vector2(0, btnY), new Vector2(btnW, btnH), UIHelpers.BgLight);
             _retryBtn.onClick.AddListener(OnRetry); _retryBtn.gameObject.SetActive(false);
-            _menuBtn = MakeButton(_canvasRT, "MenuBtn", "Menu", new Vector2(0.5f, 0), new Vector2(btnW + btnGap, btnY), new Vector2(btnW, btnH), new Color(0.4f, 0.2f, 0.2f));
+            _menuBtn = MakeButton(_canvasRT, "MenuBtn", "Menu", new Vector2(0.5f, 0), new Vector2(btnW + btnGap, btnY), new Vector2(btnW, btnH), UIHelpers.Shadow);
             _menuBtn.onClick.AddListener(OnMenu); _menuBtn.gameObject.SetActive(false);
         }
 
@@ -239,7 +255,7 @@ namespace RhythmRogue.UI
             var t = txtGO.GetComponent<Text>();
             t.font = UIHelpers.GetDefaultFont(28);
             t.fontSize = 28; t.alignment = TextAnchor.MiddleCenter;
-            t.color = Color.white; t.fontStyle = FontStyle.Bold; t.text = label;
+            t.color = UIHelpers.OffWhite; t.fontStyle = FontStyle.Bold; t.text = label;
             return obj.GetComponent<Button>();
         }
     }

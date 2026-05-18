@@ -101,8 +101,8 @@ namespace RhythmRogue.UI
         private void ShowAudioTab()
         {
             _audioPanel.SetActive(true); _controlsPanel.SetActive(false);
-            _audioTabBtn.GetComponent<Image>().color = new Color(0.3f, 0.3f, 0.5f);
-            _controlsTabBtn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
+            _audioTabBtn.GetComponent<Image>().color = UIHelpers.BgLight;
+            _controlsTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
             UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn);
             UINavigationHelper.AddLink(_audioTabBtn, down: _scrollSpeedSlider);
             UINavigationHelper.AddLink(_controlsTabBtn, down: _scrollSpeedSlider);
@@ -120,8 +120,8 @@ namespace RhythmRogue.UI
         private void ShowControlsTab()
         {
             _audioPanel.SetActive(false); _controlsPanel.SetActive(true);
-            _audioTabBtn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
-            _controlsTabBtn.GetComponent<Image>().color = new Color(0.3f, 0.3f, 0.5f);
+            _audioTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
+            _controlsTabBtn.GetComponent<Image>().color = UIHelpers.BgLight;
             RefreshBindingDisplay();
             UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn);
             UINavigationHelper.AddLink(_audioTabBtn, down: _rebindButtons[0]);
@@ -150,11 +150,11 @@ namespace RhythmRogue.UI
         {
             if (KeybindManager.IsRebinding) return;
             string originalText = displayText.text;
-            displayText.text = "Press a key..."; displayText.color = new Color(1f, 0.85f, 0f);
+            displayText.text = "Press a key..."; displayText.color = UIHelpers.WarmGold;
             HideConflictWarning();
             KeybindManager.StartRebind(lane, bindingIndex,
-                onComplete: d => { displayText.text = d; displayText.color = Color.white; RefreshBindingDisplay(); },
-                onCancel: () => { displayText.text = originalText; displayText.color = Color.white; ShowConflictWarning("Key already in use!"); });
+                onComplete: d => { displayText.text = d; displayText.color = UIHelpers.OffWhite; RefreshBindingDisplay(); },
+                onCancel: () => { displayText.text = originalText; displayText.color = UIHelpers.OffWhite; ShowConflictWarning("Key already in use!"); });
         }
 
         private void OnResetDefaults() { KeybindManager.ResetToDefaults(); RefreshBindingDisplay(); HideConflictWarning(); }
@@ -173,10 +173,6 @@ namespace RhythmRogue.UI
         private void ShowConflictWarning(string msg) { if (_conflictWarning != null) { _conflictWarning.text = msg; _conflictWarning.gameObject.SetActive(true); } }
         private void HideConflictWarning() { if (_conflictWarning != null) _conflictWarning.gameObject.SetActive(false); }
 
-        // =================================================================
-        // UI CREATION (1920x1080)
-        // =================================================================
-
         private void CreateUI()
         {
             GameObject canvasGO = new GameObject("MenuCanvas");
@@ -192,25 +188,25 @@ namespace RhythmRogue.UI
             _canvasRT = canvasGO.GetComponent<RectTransform>();
             UIEventSystemProvider.EnsureEventSystem();
 
-            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0.06f, 0.06f, 0.1f));
+            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.BgDeep);
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            MakePanel(_canvasRT, "AccentLine", new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 2), new Color(0.4f, 0.3f, 0.6f, 0.4f));
+            MakePanel(_canvasRT, "AccentLine", new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 2), new Color(UIHelpers.BgLight.r, UIHelpers.BgLight.g, UIHelpers.BgLight.b, 0.5f));
 
-            var title = MakeText(_canvasRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(1500, 120), 64, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0f));
+            var title = MakeText(_canvasRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(1500, 120), 64, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             title.fontStyle = FontStyle.Bold; title.text = "RHYTHM ROGUE";
 
-            var subtitle = MakeText(_canvasRT, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -230), new Vector2(1000, 50), 22, TextAnchor.MiddleCenter, new Color(0.6f, 0.5f, 0.7f));
+            var subtitle = MakeText(_canvasRT, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -230), new Vector2(1000, 50), 22, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
             subtitle.text = "a rhythm roguelike";
 
             float btnW = 400f, btnH = 80f, startY = -340f, gap = 100f;
-            _newRunBtn = MakeMenuButton("New Run", startY, btnW, btnH, new Color(0.2f, 0.45f, 0.2f), OnNewRun);
+            _newRunBtn = MakeMenuButton("New Run", startY, btnW, btnH, UIHelpers.RustOrange, OnNewRun);
             CreateSeedEntry(startY - gap, btnW, btnH);
-            _settingsBtn = MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, new Color(0.3f, 0.3f, 0.45f), OnSettings);
-            _quitBtn = MakeMenuButton("Quit", startY - gap * 3, btnW, btnH, new Color(0.4f, 0.2f, 0.2f), OnQuit);
+            _settingsBtn = MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, UIHelpers.BgLight, OnSettings);
+            _quitBtn = MakeMenuButton("Quit", startY - gap * 3, btnW, btnH, UIHelpers.Shadow, OnQuit);
 
-            var version = MakeText(_canvasRT, "Version", new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-20, 20), new Vector2(400, 40), 18, TextAnchor.MiddleRight, new Color(0.35f, 0.35f, 0.35f));
+            var version = MakeText(_canvasRT, "Version", new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-20, 20), new Vector2(400, 40), 18, TextAnchor.MiddleRight, UIHelpers.Shadow);
             version.text = _versionText;
 
             CreateSettingsPanel();
@@ -233,7 +229,7 @@ namespace RhythmRogue.UI
             irt.pivot = new Vector2(0, 0.5f);
             irt.anchoredPosition = new Vector2(-btnW * 0.5f - 100, 0);
             irt.sizeDelta = new Vector2(btnW - 50, btnH);
-            inputGO.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.2f);
+            inputGO.GetComponent<Image>().color = UIHelpers.BgSurface;
 
             var textGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
             textGO.transform.SetParent(inputGO.transform, false);
@@ -244,7 +240,7 @@ namespace RhythmRogue.UI
             inputText.font = UIHelpers.GetDefaultFont(26);
             inputText.fontSize = 26;
             inputText.alignment = TextAnchor.MiddleLeft;
-            inputText.color = Color.white;
+            inputText.color = UIHelpers.OffWhite;
             inputText.supportRichText = false;
 
             var placeholderGO = new GameObject("Placeholder", typeof(RectTransform), typeof(Text));
@@ -256,7 +252,7 @@ namespace RhythmRogue.UI
             placeholder.font = UIHelpers.GetDefaultFont(26);
             placeholder.fontSize = 26;
             placeholder.alignment = TextAnchor.MiddleLeft;
-            placeholder.color = new Color(0.4f, 0.4f, 0.4f);
+            placeholder.color = UIHelpers.Shadow;
             placeholder.fontStyle = FontStyle.Italic;
             placeholder.text = "Enter seed...";
 
@@ -265,40 +261,40 @@ namespace RhythmRogue.UI
             _seedInput.placeholder = placeholder;
             _seedInput.characterLimit = 20;
 
-            var goBtnGO = MakePanel(crt, "GoBtn", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(btnW * 0.5f + 100, 0), new Vector2(140, btnH), new Color(0.2f, 0.45f, 0.2f));
+            var goBtnGO = MakePanel(crt, "GoBtn", new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(1, 0.5f), new Vector2(btnW * 0.5f + 100, 0), new Vector2(140, btnH), UIHelpers.RustOrange);
             _seedGoBtn = goBtnGO.AddComponent<Button>();
             _seedGoBtn.onClick.AddListener(OnSeededRun);
-            var goText = MakeText(goBtnGO.GetComponent<RectTransform>(), "GoText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(140, btnH), 28, TextAnchor.MiddleCenter, Color.white);
+            var goText = MakeText(goBtnGO.GetComponent<RectTransform>(), "GoText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(140, btnH), 28, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             goText.fontStyle = FontStyle.Bold; goText.text = "Go";
         }
 
         private void CreateSettingsPanel()
         {
-            _settingsPanel = MakePanel(_canvasRT, "SettingsPanel", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0.7f));
+            _settingsPanel = MakePanel(_canvasRT, "SettingsPanel", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(UIHelpers.BgDeep.r, UIHelpers.BgDeep.g, UIHelpers.BgDeep.b, 0.85f));
             _settingsPanel.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             _settingsPanel.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            var card = MakePanel(_settingsPanel.GetComponent<RectTransform>(), "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1100, 800), new Color(0.1f, 0.1f, 0.15f, 0.95f));
+            var card = MakePanel(_settingsPanel.GetComponent<RectTransform>(), "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1100, 800), UIHelpers.BgSurface);
             var cardRT = card.GetComponent<RectTransform>();
 
-            var st = MakeText(cardRT, "SettingsTitle", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(1000, 70), 36, TextAnchor.MiddleCenter, Color.white);
+            var st = MakeText(cardRT, "SettingsTitle", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(1000, 70), 36, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             st.fontStyle = FontStyle.Bold; st.text = "Settings";
 
             float tabY = -110f, tabW = 300f, tabH = 60f;
-            var audioTabGO = MakePanel(cardRT, "AudioTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-175, tabY), new Vector2(tabW, tabH), new Color(0.3f, 0.3f, 0.5f));
+            var audioTabGO = MakePanel(cardRT, "AudioTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-175, tabY), new Vector2(tabW, tabH), UIHelpers.BgLight);
             _audioTabBtn = audioTabGO.AddComponent<Button>(); _audioTabBtn.onClick.AddListener(ShowAudioTab);
-            MakeText(audioTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, Color.white).text = "Audio";
+            MakeText(audioTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Audio";
 
-            var ctrlTabGO = MakePanel(cardRT, "ControlsTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(175, tabY), new Vector2(tabW, tabH), new Color(0.15f, 0.15f, 0.2f));
+            var ctrlTabGO = MakePanel(cardRT, "ControlsTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(175, tabY), new Vector2(tabW, tabH), UIHelpers.BgSurface);
             _controlsTabBtn = ctrlTabGO.AddComponent<Button>(); _controlsTabBtn.onClick.AddListener(ShowControlsTab);
-            MakeText(ctrlTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, Color.white).text = "Controls";
+            MakeText(ctrlTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Controls";
 
             CreateAudioPanel(cardRT);
             CreateControlsPanel(cardRT);
 
-            var closeBtnGO = MakePanel(cardRT, "CloseBtn", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(250, 70), new Color(0.35f, 0.2f, 0.2f));
+            var closeBtnGO = MakePanel(cardRT, "CloseBtn", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 40), new Vector2(250, 70), UIHelpers.Shadow);
             _settingsCloseBtn = closeBtnGO.AddComponent<Button>(); _settingsCloseBtn.onClick.AddListener(OnSettingsClose);
-            MakeText(closeBtnGO.GetComponent<RectTransform>(), "CloseText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(250, 70), 26, TextAnchor.MiddleCenter, Color.white).text = "Back";
+            MakeText(closeBtnGO.GetComponent<RectTransform>(), "CloseText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(250, 70), 26, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Back";
             _settingsPanel.SetActive(false);
         }
 
@@ -339,57 +335,53 @@ namespace RhythmRogue.UI
             _secondaryLabels = new Text[4]; _secondaryButtons = new Button[4]; _secondaryTexts = new Text[4];
 
             float rowY = -190f, rowGap = 90f;
-            MakeText(cpRT, "HdrLane", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, rowY + 60), new Vector2(200, 50), 18, TextAnchor.MiddleLeft, new Color(0.5f, 0.5f, 0.5f)).text = "Lane";
-            MakeText(cpRT, "HdrPrimary", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(275, rowY + 60), new Vector2(300, 50), 18, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f)).text = "Primary";
-            MakeText(cpRT, "HdrSecondary", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(650, rowY + 60), new Vector2(300, 50), 18, TextAnchor.MiddleCenter, new Color(0.5f, 0.5f, 0.5f)).text = "Alt";
+            MakeText(cpRT, "HdrLane", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, rowY + 60), new Vector2(200, 50), 18, TextAnchor.MiddleLeft, UIHelpers.Shadow).text = "Lane";
+            MakeText(cpRT, "HdrPrimary", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(275, rowY + 60), new Vector2(300, 50), 18, TextAnchor.MiddleCenter, UIHelpers.Shadow).text = "Primary";
+            MakeText(cpRT, "HdrSecondary", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(650, rowY + 60), new Vector2(300, 50), 18, TextAnchor.MiddleCenter, UIHelpers.Shadow).text = "Alt";
 
             for (int i = 0; i < 4; i++)
             {
                 float ry = rowY - i * rowGap; int lane = i;
-                _bindingLabels[i] = MakeText(cpRT, $"Lane{i}Label", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, ry), new Vector2(200, 60), 22, TextAnchor.MiddleLeft, new Color(0.8f, 0.8f, 0.8f));
+                _bindingLabels[i] = MakeText(cpRT, $"Lane{i}Label", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, ry), new Vector2(200, 60), 22, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
                 _bindingLabels[i].text = KeybindManager.LaneNames[i];
 
-                var pGO = MakePanel(cpRT, $"Rebind{i}", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(275, ry), new Vector2(300, 60), new Color(0.2f, 0.2f, 0.25f));
+                var pGO = MakePanel(cpRT, $"Rebind{i}", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(275, ry), new Vector2(300, 60), UIHelpers.BgLight);
                 _rebindButtons[i] = pGO.AddComponent<Button>();
-                _rebindButtonTexts[i] = MakeText(pGO.GetComponent<RectTransform>(), "KeyText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280, 60), 22, TextAnchor.MiddleCenter, Color.white);
+                _rebindButtonTexts[i] = MakeText(pGO.GetComponent<RectTransform>(), "KeyText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280, 60), 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
                 _rebindButtonTexts[i].text = "---";
                 int pL = lane; _rebindButtons[i].onClick.AddListener(() => { var idx = KeybindManager.GetKeyboardBindingIndices(pL); if (idx.Count > 0) StartRebind(pL, idx[0], _rebindButtonTexts[pL]); });
 
-                var sGO = MakePanel(cpRT, $"Rebind{i}Alt", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(650, ry), new Vector2(300, 60), new Color(0.2f, 0.2f, 0.25f));
+                var sGO = MakePanel(cpRT, $"Rebind{i}Alt", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(650, ry), new Vector2(300, 60), UIHelpers.BgLight);
                 _secondaryButtons[i] = sGO.AddComponent<Button>();
-                _secondaryTexts[i] = MakeText(sGO.GetComponent<RectTransform>(), "KeyText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280, 60), 22, TextAnchor.MiddleCenter, Color.white);
+                _secondaryTexts[i] = MakeText(sGO.GetComponent<RectTransform>(), "KeyText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(280, 60), 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
                 _secondaryTexts[i].text = "---";
                 int sL = lane; _secondaryButtons[i].onClick.AddListener(() => { var idx = KeybindManager.GetKeyboardBindingIndices(sL); if (idx.Count > 1) StartRebind(sL, idx[1], _secondaryTexts[sL]); });
             }
 
-            var resetGO = MakePanel(cpRT, "ResetDefaults", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, rowY - 4 * rowGap - 20), new Vector2(400, 60), new Color(0.35f, 0.25f, 0.15f));
+            var resetGO = MakePanel(cpRT, "ResetDefaults", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, rowY - 4 * rowGap - 20), new Vector2(400, 60), UIHelpers.RustOrange);
             _resetDefaultsBtn = resetGO.AddComponent<Button>(); _resetDefaultsBtn.onClick.AddListener(OnResetDefaults);
-            MakeText(resetGO.GetComponent<RectTransform>(), "ResetText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(380, 60), 22, TextAnchor.MiddleCenter, Color.white).text = "Reset Defaults";
+            MakeText(resetGO.GetComponent<RectTransform>(), "ResetText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(380, 60), 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Reset Defaults";
 
-            _conflictWarning = MakeText(cpRT, "ConflictWarn", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 120), new Vector2(900, 50), 22, TextAnchor.MiddleCenter, new Color(1f, 0.4f, 0.3f));
+            _conflictWarning = MakeText(cpRT, "ConflictWarn", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 120), new Vector2(900, 50), 22, TextAnchor.MiddleCenter, UIHelpers.RustOrange);
             _conflictWarning.text = ""; _conflictWarning.gameObject.SetActive(false);
             _controlsPanel.SetActive(false);
         }
-
-        // =================================================================
-        // HELPERS
-        // =================================================================
 
         private Button MakeMenuButton(string label, float y, float w, float h, Color bgColor, UnityEngine.Events.UnityAction onClick)
         {
             var btnGO = MakePanel(_canvasRT, $"Btn_{label}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0, y), new Vector2(w, h), bgColor);
             var btn = btnGO.AddComponent<Button>(); btn.onClick.AddListener(onClick);
-            var txt = MakeText(btnGO.GetComponent<RectTransform>(), "Text", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(w, h), 30, TextAnchor.MiddleCenter, Color.white);
+            var txt = MakeText(btnGO.GetComponent<RectTransform>(), "Text", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(w, h), 30, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             txt.fontStyle = FontStyle.Bold; txt.text = label;
             return btn;
         }
 
         private Slider CreateSliderRow(RectTransform parent, string label, float y, float min, float max, float value, out Text valueText)
         {
-            MakeText(parent, $"{label}_Label", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, y), new Vector2(300, 50), 22, TextAnchor.MiddleLeft, new Color(0.7f, 0.7f, 0.7f)).text = label;
+            MakeText(parent, $"{label}_Label", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(50, y), new Vector2(300, 50), 22, TextAnchor.MiddleLeft, UIHelpers.AmberOrange).text = label;
             var sliderGO = CreateSliderGO(parent, $"{label}_Slider", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(75, y - 50), new Vector2(600, 40));
             var slider = sliderGO.GetComponent<Slider>(); slider.minValue = min; slider.maxValue = max; slider.value = value;
-            valueText = MakeText(parent, $"{label}_Value", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-50, y), new Vector2(200, 50), 22, TextAnchor.MiddleRight, Color.white);
+            valueText = MakeText(parent, $"{label}_Value", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-50, y), new Vector2(200, 50), 22, TextAnchor.MiddleRight, UIHelpers.OffWhite);
             if (max <= 1f) { Text vt = valueText; vt.text = $"{Mathf.RoundToInt(value * 100)}%"; slider.onValueChanged.AddListener(v => vt.text = $"{Mathf.RoundToInt(v * 100)}%"); }
             return slider;
         }
@@ -429,24 +421,25 @@ namespace RhythmRogue.UI
             rootRT.anchoredPosition = pos; rootRT.sizeDelta = size;
 
             var bg = new GameObject("Background", typeof(RectTransform), typeof(Image)); bg.transform.SetParent(root.transform, false);
-            var bgRT = bg.GetComponent<RectTransform>(); bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one; bgRT.offsetMin = Vector2.zero; bgRT.offsetMax = Vector2.zero;
-            bg.GetComponent<Image>().color = new Color(0.2f, 0.2f, 0.25f);
+            var bgRT = bg.GetComponent<RectTransform>(); bgRT.anchorMin = Vector2.zero; bgRT.anchorMax = Vector2.one; bgRT.offsetMin = bgRT.offsetMax = Vector2.zero;
+            bg.GetComponent<Image>().color = UIHelpers.BgSurface;
 
             var fillArea = new GameObject("Fill Area", typeof(RectTransform)); fillArea.transform.SetParent(root.transform, false);
-            var faRT = fillArea.GetComponent<RectTransform>(); faRT.anchorMin = Vector2.zero; faRT.anchorMax = Vector2.one; faRT.offsetMin = Vector2.zero; faRT.offsetMax = Vector2.zero;
+            var faRT = fillArea.GetComponent<RectTransform>(); faRT.anchorMin = Vector2.zero; faRT.anchorMax = Vector2.one; faRT.offsetMin = faRT.offsetMax = Vector2.zero;
 
             var fill = new GameObject("Fill", typeof(RectTransform), typeof(Image)); fill.transform.SetParent(fillArea.transform, false);
-            var fillRT = fill.GetComponent<RectTransform>(); fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one; fillRT.offsetMin = Vector2.zero; fillRT.offsetMax = Vector2.zero;
-            fill.GetComponent<Image>().color = new Color(0.4f, 0.5f, 0.7f);
+            var fillRT = fill.GetComponent<RectTransform>(); fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one; fillRT.offsetMin = fillRT.offsetMax = Vector2.zero;
+            fill.GetComponent<Image>().color = UIHelpers.AmberOrange;
 
             var handleArea = new GameObject("Handle Slide Area", typeof(RectTransform)); handleArea.transform.SetParent(root.transform, false);
-            var haRT = handleArea.GetComponent<RectTransform>(); haRT.anchorMin = Vector2.zero; haRT.anchorMax = Vector2.one; haRT.offsetMin = Vector2.zero; haRT.offsetMax = Vector2.zero;
+            var haRT = handleArea.GetComponent<RectTransform>(); haRT.anchorMin = Vector2.zero; haRT.anchorMax = Vector2.one; haRT.offsetMin = haRT.offsetMax = Vector2.zero;
 
             var handle = new GameObject("Handle", typeof(RectTransform), typeof(Image)); handle.transform.SetParent(handleArea.transform, false);
-            var handleRT = handle.GetComponent<RectTransform>(); handleRT.sizeDelta = new Vector2(30, size.y + 10);
-            handle.GetComponent<Image>().color = Color.white;
+            handle.GetComponent<RectTransform>().sizeDelta = new Vector2(30, size.y + 10);
+            handle.GetComponent<Image>().color = UIHelpers.WarmGold;
 
-            var slider = root.GetComponent<Slider>(); slider.fillRect = fillRT; slider.handleRect = handleRT; slider.targetGraphic = handle.GetComponent<Image>();
+            var slider = root.GetComponent<Slider>();
+            slider.fillRect = fillRT; slider.handleRect = handle.GetComponent<RectTransform>(); slider.targetGraphic = handle.GetComponent<Image>();
             return root;
         }
     }

@@ -3,105 +3,93 @@ using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
 using RhythmRogue.Battle;
-using RhythmRogue.UI;
 using RhythmRogue.UI.Navigation;
-using RhythmRogue.Util;
 
-namespace RhythmRogue.Map
+namespace RhythmRogue.UI
 {
-    /// <summary>
-    /// Rest node scene. 1920x1080 reference resolution.
-    /// </summary>
     public class RestScreen : MonoBehaviour
     {
         [Header("References")]
         [SerializeField] private RunState _runState;
-        [Header("Healing")]
-        [SerializeField] private float _healPercent = 0.3f;
-        [Header("Animation")]
-        [SerializeField] private float _healAnimDuration = 0.8f;
-        [Header("Audio")]
-        [SerializeField] private AudioClip _healSound;
+        [Header("Heal")]
+        [SerializeField] [Range(0.1f, 1f)] private float _healPercent = 0.3f;
 
         private Canvas _canvas;
-        private Image _hpBarBG, _hpBarFill, _hpBarPreview;
-        private Text _flavorText, _hpText, _healPreviewText;
-        private Button _restButton;
-        private Text _restButtonText;
-        private AudioSource _sfx;
-        private int _currentHP, _maxHP, _healAmount, _newHP;
-        private bool _healed;
+        private RectTransform _canvasRT;
+        private Text _titleText, _hpText, _flavorText;
+        private Button _restBtn, _continueBtn;
+        private Image _hpFill;
+        private bool _hasRested;
         private UIFocusSetter _focusSetter;
-
-        private void Awake() { _sfx = gameObject.AddComponent<AudioSource>(); _sfx.playOnAwake = false; }
+        private UICancelHandler _cancelHandler;
 
         private void Start()
         {
-            var ph = PlayerHealth.Instance;
-            if (ph == null) { GameLog.Error("[RestScreen] No PlayerHealth."); return; }
-            _currentHP = ph.CurrentHP; _maxHP = ph.MaxHP;
-            _healAmount = Mathf.CeilToInt(_maxHP * _healPercent);
-            _newHP = Mathf.Min(_currentHP + _healAmount, _maxHP);
-            _healAmount = _newHP - _currentHP;
             CreateUI();
-            UISelectableStyle.Apply(_restButton);
             _focusSetter = gameObject.AddComponent<UIFocusSetter>();
-            _focusSetter.SetDefault(_restButton.gameObject);
+            _focusSetter.SetDefault(_restBtn.gameObject);
+            _cancelHandler = gameObject.AddComponent<UICancelHandler>();
+            _cancelHandler.SetBaseAction(OnContinue);
+            UpdateHPDisplay();
         }
 
-        private void OnRestClicked()
+        private void OnRest()
         {
-            if (_healed) return;
-            _healed = true;
-            _restButton.interactable = false;
-            StartCoroutine(HealSequence());
-        }
+            if (_hasRested) return;
+            _hasRested = true;
 
-        private IEnumerator HealSequence()
-        {
-            if (_healSound != null) _sfx.PlayOneShot(_healSound, 0.5f);
-            float startFill = (float)_currentHP / _maxHP;
-            float endFill = (float)_newHP / _maxHP;
-            float elapsed = 0f;
-            while (elapsed < _healAnimDuration)
+            var ph = PlayerHealth.Instance;
+            if (ph != null)
             {
-                elapsed += Time.deltaTime;
-                float t = Mathf.SmoothStep(0f, 1f, elapsed / _healAnimDuration);
-                float fill = Mathf.Lerp(startFill, endFill, t);
-                _hpBarFill.fillAmount = fill;
-                _hpBarFill.color = UIHelpers.HPColor(fill);
-                _hpText.text = $"{Mathf.RoundToInt(Mathf.Lerp(_currentHP, _newHP, t))} / {_maxHP}";
+                int healAmount = Mathf.RoundToInt(ph.MaxHP * _healPercent);
+                ph.Heal(healAmount);
+            }
+            _restBtn.interactable = false;
+            _restBtn.GetComponent<Image>().color = UIHelpers.Shadow;
+            _flavorText.text = "You feel restored.";
+            _focusSetter.FocusOn(_continueBtn.gameObject);
+            StartCoroutine(AnimateHPRefill());
+        }
+
+        private IEnumerator AnimateHPRefill()
+        {
+            float t = 0f, dur = 0.5f;
+            float start = _hpFill.fillAmount;
+            var ph = PlayerHealth.Instance;
+            float end = ph != null ? ph.HPPercent : 1f;
+            while (t < dur)
+            {
+                t += Time.unscaledDeltaTime;
+                _hpFill.fillAmount = Mathf.Lerp(start, end, Mathf.SmoothStep(0, 1, t / dur));
+                _hpFill.color = UIHelpers.HPColor(_hpFill.fillAmount);
                 yield return null;
             }
-            _hpBarFill.fillAmount = endFill;
-            _hpBarFill.color = UIHelpers.HPColor(endFill);
-            _hpText.text = $"{_newHP} / {_maxHP}";
-            var ph = PlayerHealth.Instance;
-            if (ph != null) ph.Heal(_healAmount);
-            _flavorText.text = _healAmount > 0 ? "You feel refreshed." : "You're already at full health.";
-            _healPreviewText.text = "";
-            _hpBarPreview.fillAmount = _hpBarFill.fillAmount;
-            yield return new WaitForSeconds(0.3f);
-            _restButtonText.text = "Continue";
-            _restButton.interactable = true;
-            _restButton.onClick.RemoveAllListeners();
-            _restButton.onClick.AddListener(OnContinueClicked);
-            UISelectableStyle.Apply(_restButton);
-            _focusSetter.FocusOn(_restButton.gameObject);
+            _hpFill.fillAmount = end;
+            UpdateHPDisplay();
         }
 
-        private void OnContinueClicked()
+        private void OnContinue()
         {
-            _restButton.interactable = false;
             if (_runState != null) _runState.CompleteSelectedNode();
             var tm = SceneTransitionManager.Instance;
             if (tm != null) tm.GoToMap();
             else UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.MAP_SCENE);
         }
 
+        private void UpdateHPDisplay()
+        {
+            var ph = PlayerHealth.Instance;
+            if (ph != null)
+            {
+                _hpText.text = $"HP: {ph.CurrentHP} / {ph.MaxHP}";
+                _hpFill.fillAmount = ph.HPPercent;
+                _hpFill.color = UIHelpers.HPColor(ph.HPPercent);
+            }
+        }
+
         private void CreateUI()
         {
-            GameObject canvasGO = new GameObject("RestCanvas");
+            var canvasGO = new GameObject("RestCanvas");
             canvasGO.transform.SetParent(transform);
             _canvas = canvasGO.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -111,51 +99,57 @@ namespace RhythmRogue.Map
             scaler.referenceResolution = new Vector2(1920, 1080);
             scaler.matchWidthOrHeight = 0.5f;
             canvasGO.AddComponent<GraphicRaycaster>();
+            _canvasRT = canvasGO.GetComponent<RectTransform>();
             UIEventSystemProvider.EnsureEventSystem();
-            RectTransform canvasRT = canvasGO.GetComponent<RectTransform>();
 
-            var bgGO = MakePanel(canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(0.12f, 0.08f, 0.06f));
+            // Background: deep palette dark
+            var bgGO = MakePanel(_canvasRT, "BG", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.BgDeep);
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            MakePanel(canvasRT, "Glow", new Vector2(0.5f, 0.2f), new Vector2(0.5f, 0.2f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(400, 400), new Color(1f, 0.6f, 0.2f, 0.15f));
+            // Warm "campfire" glow at center: subtle rust/amber tint
+            var glowGO = MakePanel(_canvasRT, "Glow", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1400, 900), new Color(UIHelpers.RustOrange.r, UIHelpers.RustOrange.g, UIHelpers.RustOrange.b, 0.12f));
 
-            _flavorText = MakeText(canvasRT, "Flavor", new Vector2(0.5f, 0.8f), new Vector2(0.5f, 0.8f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1500, 80), 36, TextAnchor.MiddleCenter, new Color(0.9f, 0.8f, 0.6f));
+            // Title
+            _titleText = MakeText(_canvasRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0, -120), new Vector2(1500, 100), 56, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
+            _titleText.fontStyle = FontStyle.Bold;
+            _titleText.text = "REST";
+
+            _flavorText = MakeText(_canvasRT, "Flavor", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0, -210), new Vector2(1200, 60), 24, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
             _flavorText.fontStyle = FontStyle.Italic;
-            _flavorText.text = "You take a moment to rest...";
+            _flavorText.text = "You gather around the fire and catch your breath.";
 
-            _hpBarBG = MakePanel(canvasRT, "HPBarBG", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 25), new Vector2(800, 50), new Color(0.15f, 0.15f, 0.15f, 0.9f)).GetComponent<Image>();
-            RectTransform barParent = _hpBarBG.GetComponent<RectTransform>();
+            // HP display
+            _hpText = MakeText(_canvasRT, "HPText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0, 80), new Vector2(600, 50), 32, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            _hpText.text = "HP: 100 / 100";
 
-            var previewGO = MakePanel(barParent, "PreviewFill", Vector2.zero, Vector2.one, new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, new Color(1f, 1f, 1f, 0.25f));
-            previewGO.GetComponent<RectTransform>().offsetMin = new Vector2(4, 4);
-            previewGO.GetComponent<RectTransform>().offsetMax = new Vector2(-4, -4);
-            _hpBarPreview = previewGO.GetComponent<Image>();
-            _hpBarPreview.type = Image.Type.Filled;
-            _hpBarPreview.fillMethod = Image.FillMethod.Horizontal;
-            _hpBarPreview.fillAmount = (float)_newHP / _maxHP;
+            // HP Bar
+            var hpBarBG = MakePanel(_canvasRT, "HPBarBG", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 20), new Vector2(600, 40), new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.9f));
+            var hpFillObj = MakePanel(hpBarBG.GetComponent<RectTransform>(), "HPFill", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.WarmGold);
+            _hpFill = hpFillObj.GetComponent<Image>();
+            _hpFill.type = Image.Type.Filled; _hpFill.fillMethod = Image.FillMethod.Horizontal; _hpFill.fillAmount = 1f;
+            hpFillObj.GetComponent<RectTransform>().offsetMin = new Vector2(3, 3);
+            hpFillObj.GetComponent<RectTransform>().offsetMax = new Vector2(-3, -3);
 
-            var fillGO = MakePanel(barParent, "HPFill", Vector2.zero, Vector2.one, new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.HPColor((float)_currentHP / _maxHP));
-            fillGO.GetComponent<RectTransform>().offsetMin = new Vector2(4, 4);
-            fillGO.GetComponent<RectTransform>().offsetMax = new Vector2(-4, -4);
-            _hpBarFill = fillGO.GetComponent<Image>();
-            _hpBarFill.type = Image.Type.Filled;
-            _hpBarFill.fillMethod = Image.FillMethod.Horizontal;
-            _hpBarFill.fillAmount = (float)_currentHP / _maxHP;
+            // Heal preview text
+            int healPct = Mathf.RoundToInt(_healPercent * 100);
+            var preview = MakeText(_canvasRT, "Preview", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0, -50), new Vector2(1000, 50), 22, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
+            preview.text = $"Resting heals {healPct}% of your maximum HP";
 
-            _hpText = MakeText(canvasRT, "HPText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -40), new Vector2(800, 60), 32, TextAnchor.MiddleCenter, Color.white);
-            _hpText.text = $"{_currentHP} / {_maxHP}";
+            // Buttons
+            float btnY = -180f, btnW = 360f, btnH = 80f, btnGap = 40f;
+            _restBtn = MakeButton(_canvasRT, "RestBtn", "Rest", new Vector2(0.5f, 0.5f), new Vector2(-(btnW * 0.5f + btnGap * 0.5f), btnY), new Vector2(btnW, btnH), UIHelpers.RustOrange);
+            _restBtn.onClick.AddListener(OnRest);
 
-            _healPreviewText = MakeText(canvasRT, "HealPreview", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -100), new Vector2(800, 50), 26, TextAnchor.MiddleCenter, new Color(0.4f, 1f, 0.4f));
-            _healPreviewText.text = _healAmount > 0 ? $"+{_healAmount} HP  →  {_newHP} / {_maxHP}" : "Already at full HP";
+            _continueBtn = MakeButton(_canvasRT, "ContinueBtn", "Continue", new Vector2(0.5f, 0.5f), new Vector2(btnW * 0.5f + btnGap * 0.5f, btnY), new Vector2(btnW, btnH), UIHelpers.BgLight);
+            _continueBtn.onClick.AddListener(OnContinue);
 
-            var btnGO = MakePanel(canvasRT, "RestBtn", new Vector2(0.5f, 0.15f), new Vector2(0.5f, 0.15f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350, 90), new Color(0.2f, 0.5f, 0.2f));
-            _restButton = btnGO.AddComponent<Button>();
-            _restButton.onClick.AddListener(OnRestClicked);
-            _restButtonText = MakeText(btnGO.GetComponent<RectTransform>(), "BtnText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(350, 90), 32, TextAnchor.MiddleCenter, Color.white);
-            _restButtonText.text = "Rest";
-            _restButtonText.fontStyle = FontStyle.Bold;
-            UINavigationHelper.SetExplicit(_restButton);
+            UINavigationHelper.WireHorizontal(_restBtn, _continueBtn);
+            UISelectableStyle.Apply(_restBtn); UISelectableStyle.Apply(_continueBtn);
         }
 
         private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
@@ -182,6 +176,28 @@ namespace RhythmRogue.Map
             t.horizontalOverflow = HorizontalWrapMode.Overflow;
             t.verticalOverflow = VerticalWrapMode.Overflow;
             return t;
+        }
+
+        private static Button MakeButton(RectTransform parent, string name, string label, Vector2 anchor, Vector2 pos, Vector2 size, Color bgColor)
+        {
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
+            obj.transform.SetParent(parent, false);
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = anchor;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
+            obj.GetComponent<Image>().color = bgColor;
+
+            var txtGO = new GameObject("Text", typeof(RectTransform), typeof(Text));
+            txtGO.transform.SetParent(obj.transform, false);
+            var txtRT = txtGO.GetComponent<RectTransform>();
+            txtRT.anchorMin = Vector2.zero; txtRT.anchorMax = Vector2.one;
+            txtRT.offsetMin = Vector2.zero; txtRT.offsetMax = Vector2.zero;
+            var t = txtGO.GetComponent<Text>();
+            t.font = UIHelpers.GetDefaultFont(30);
+            t.fontSize = 30; t.alignment = TextAnchor.MiddleCenter;
+            t.color = UIHelpers.OffWhite; t.fontStyle = FontStyle.Bold; t.text = label;
+            return obj.GetComponent<Button>();
         }
     }
 }

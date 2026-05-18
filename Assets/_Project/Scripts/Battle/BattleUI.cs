@@ -64,7 +64,7 @@ namespace RhythmRogue.Battle
             if (enemyData != null)
             {
                 _enemyNameText.text = enemyData.enemyName;
-                if (enemyData.IsBoss) { _bossLabel.text = "BOSS"; _bossLabel.gameObject.SetActive(true); _enemyNameText.color = new Color(1f, 0.3f, 0.3f); }
+                if (enemyData.IsBoss) { _bossLabel.text = "BOSS"; _bossLabel.gameObject.SetActive(true); _enemyNameText.color = UIHelpers.RustOrange; }
                 else _bossLabel.gameObject.SetActive(false);
             }
         }
@@ -97,8 +97,8 @@ namespace RhythmRogue.Battle
             _playerHPFill.color = UIHelpers.HPColor(_playerHPDisplay);
             _enemyHPFill.color = UIHelpers.HPColor(_enemyHPDisplay);
 
-            if (_playerFlash > 0f) { _playerFlash -= Time.deltaTime * 4f; _playerHPFill.color = Color.Lerp(_playerHPFill.color, Color.white, _playerFlash); }
-            if (_enemyFlash > 0f) { _enemyFlash -= Time.deltaTime * 4f; _enemyHPFill.color = Color.Lerp(_enemyHPFill.color, Color.white, _enemyFlash); }
+            if (_playerFlash > 0f) { _playerFlash -= Time.deltaTime * 4f; _playerHPFill.color = Color.Lerp(_playerHPFill.color, UIHelpers.OffWhite, _playerFlash); }
+            if (_enemyFlash > 0f) { _enemyFlash -= Time.deltaTime * 4f; _enemyHPFill.color = Color.Lerp(_enemyHPFill.color, UIHelpers.OffWhite, _enemyFlash); }
             if (_comboPopScale > 1f) { _comboPopScale = Mathf.Lerp(_comboPopScale, 1f, Time.deltaTime * 10f); _comboRect.localScale = Vector3.one * _comboPopScale; }
 
             if (_displayScore < _currentScore)
@@ -115,8 +115,8 @@ namespace RhythmRogue.Battle
         private void OnEnemyDamaged(int amount, int current) => _enemyFlash = 1f;
         private void OnEnemyHPChanged(int current, int max) => UpdateEnemyHP();
         private void OnComboChanged(int combo, float mult) => SetCombo(combo, mult);
-        private void OnComboReset(int lost) { SetCombo(0, 1f); _comboText.color = new Color(1f, 0.3f, 0.3f); }
-        private void OnComboMilestone(int milestone) { _comboPopScale = 1.5f; _comboText.color = new Color(1f, 0.85f, 0f); }
+        private void OnComboReset(int lost) { SetCombo(0, 1f); _comboText.color = UIHelpers.RustOrange; }
+        private void OnComboMilestone(int milestone) { _comboPopScale = 1.5f; _comboText.color = UIHelpers.WarmGold; }
         private void OnDamageDealt(DamageResult result) { if (!result.IsPlayerDamage) _currentScore += result.Amount; }
 
         private void UpdatePlayerHP()
@@ -136,7 +136,7 @@ namespace RhythmRogue.Battle
         {
             _comboText.text = combo > 0 ? combo.ToString() : "";
             _multiplierText.text = combo > 0 ? $"x{mult:F1}" : "";
-            _comboText.color = Color.white;
+            _comboText.color = UIHelpers.OffWhite;
             if (combo > 0) _comboPopScale = 1.2f;
         }
 
@@ -146,7 +146,7 @@ namespace RhythmRogue.Battle
         {
             _resultBG.gameObject.SetActive(true);
             _resultText.text = victory ? "VICTORY" : "DEFEATED";
-            _resultText.color = victory ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.3f, 0.3f);
+            _resultText.color = victory ? UIHelpers.WarmGold : UIHelpers.RustOrange;
             StartCoroutine(AnimateResult());
         }
 
@@ -178,36 +178,33 @@ namespace RhythmRogue.Battle
             canvasGO.AddComponent<GraphicRaycaster>();
             RectTransform canvasRT = canvasGO.GetComponent<RectTransform>();
 
-            // All positions inset by ~50px to clear the CRT bezel
-
-            // Enemy name + HP (top center, pushed down from bezel)
+            // Enemy name + HP (top center, inset from CRT bezel)
             _enemyNameText = CreateText(canvasRT, "EnemyName", "Enemy",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -50), new Vector2(600, 50), 32, TextAnchor.MiddleCenter);
+                new Vector2(0, -50), new Vector2(600, 50), 32, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
 
             _bossLabel = CreateText(canvasRT, "BossLabel", "",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(-325, -50), new Vector2(250, 50), 32, TextAnchor.MiddleRight);
+                new Vector2(-325, -50), new Vector2(250, 50), 32, TextAnchor.MiddleRight, UIHelpers.RustOrange);
             _bossLabel.fontStyle = FontStyle.Bold;
-            _bossLabel.color = new Color(1f, 0.2f, 0.2f);
             _bossLabel.gameObject.SetActive(false);
 
             CreateHPBar(canvasRT, "EnemyHP",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -95), new Vector2(600, 30),
-                Color.red, out _enemyHPFill, out _enemyHPGhost);
+                UIHelpers.RustOrange, out _enemyHPFill, out _enemyHPGhost);
 
-            // Player HP (bottom-left, pushed up and right from bezel)
+            // Player HP (bottom-left, inset from CRT bezel)
             _playerHPText = CreateText(canvasRT, "PlayerHPText", "100/100",
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(50, 100), new Vector2(300, 50), 26, TextAnchor.MiddleLeft);
+                new Vector2(50, 100), new Vector2(300, 50), 26, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
 
             CreateHPBar(canvasRT, "PlayerHP",
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
                 new Vector2(50, 55), new Vector2(400, 25),
-                Color.green, out _playerHPFill, out _playerHPGhost);
+                UIHelpers.WarmGold, out _playerHPFill, out _playerHPGhost);
 
-            // Combo (right side, pushed left from bezel)
+            // Combo (right side, inset from CRT bezel)
             var comboGroup = CreatePanel(canvasRT, "ComboGroup",
                 new Vector2(1, 0.4f), new Vector2(1, 0.4f), new Vector2(1, 0.4f),
                 new Vector2(-70, 0), new Vector2(200, 120), new Color(0, 0, 0, 0));
@@ -215,30 +212,29 @@ namespace RhythmRogue.Battle
 
             _comboText = CreateText(_comboRect, "ComboNum", "",
                 new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1),
-                new Vector2(0, -5), new Vector2(200, 70), 48, TextAnchor.MiddleCenter);
+                new Vector2(0, -5), new Vector2(200, 70), 48, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             _comboText.fontStyle = FontStyle.Bold;
 
             _multiplierText = CreateText(_comboRect, "MultText", "",
                 new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0),
-                new Vector2(0, 5), new Vector2(200, 50), 26, TextAnchor.MiddleCenter);
-            _multiplierText.color = new Color(1f, 0.85f, 0f);
+                new Vector2(0, 5), new Vector2(200, 50), 26, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
 
-            // Score (top-right, pushed down and left from bezel)
+            // Score (top-right, inset from CRT bezel)
             _scoreText = CreateText(canvasRT, "Score", "0",
                 new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-50, -50), new Vector2(300, 50), 32, TextAnchor.MiddleRight);
+                new Vector2(-50, -50), new Vector2(300, 50), 32, TextAnchor.MiddleRight, UIHelpers.AmberOrange);
 
             // Result overlay (fullscreen, unaffected by bezel)
             var resultBGObj = CreatePanel(canvasRT, "ResultBG",
                 new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f),
-                Vector2.zero, Vector2.zero, new Color(0, 0, 0, 0.6f));
+                Vector2.zero, Vector2.zero, new Color(UIHelpers.BgDeep.r, UIHelpers.BgDeep.g, UIHelpers.BgDeep.b, 0.6f));
             _resultBG = resultBGObj.GetComponent<Image>();
             var resultBGRT = resultBGObj.GetComponent<RectTransform>();
             resultBGRT.offsetMin = Vector2.zero; resultBGRT.offsetMax = Vector2.zero;
 
             _resultText = CreateText(resultBGRT, "ResultText", "",
                 new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(1000, 150), 72, TextAnchor.MiddleCenter);
+                Vector2.zero, new Vector2(1000, 150), 72, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             _resultText.fontStyle = FontStyle.Bold;
             resultBGObj.SetActive(false);
         }
@@ -247,10 +243,10 @@ namespace RhythmRogue.Battle
             Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
             Vector2 pos, Vector2 size, Color fillColor, out Image fill, out Image ghost)
         {
-            var bgObj = CreatePanel(parent, name + "_BG", anchorMin, anchorMax, pivot, pos, size, new Color(0.15f, 0.15f, 0.15f, 0.8f));
+            var bgObj = CreatePanel(parent, name + "_BG", anchorMin, anchorMax, pivot, pos, size, new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.8f));
             var bgRT = bgObj.GetComponent<RectTransform>();
 
-            var ghostObj = CreatePanel(bgRT, name + "_Ghost", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, new Color(1, 1, 1, 0.3f));
+            var ghostObj = CreatePanel(bgRT, name + "_Ghost", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.25f));
             ghost = ghostObj.GetComponent<Image>(); ghost.type = Image.Type.Filled; ghost.fillMethod = Image.FillMethod.Horizontal; ghost.fillAmount = 1f;
             ghostObj.GetComponent<RectTransform>().offsetMin = new Vector2(2, 2); ghostObj.GetComponent<RectTransform>().offsetMax = new Vector2(-2, -2);
 
@@ -269,7 +265,7 @@ namespace RhythmRogue.Battle
             obj.GetComponent<Image>().color = color; return obj;
         }
 
-        private static Text CreateText(RectTransform parent, string name, string text, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor alignment)
+        private static Text CreateText(RectTransform parent, string name, string text, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, int fontSize, TextAnchor alignment, Color color)
         {
             var obj = new GameObject(name, typeof(RectTransform), typeof(Text));
             obj.transform.SetParent(parent, false);
@@ -278,7 +274,7 @@ namespace RhythmRogue.Battle
             rt.anchoredPosition = pos; rt.sizeDelta = size;
             var t = obj.GetComponent<Text>();
             t.text = text; t.fontSize = fontSize; t.font = UIHelpers.GetDefaultFont(fontSize);
-            t.alignment = alignment; t.color = Color.white;
+            t.alignment = alignment; t.color = color;
             t.horizontalOverflow = HorizontalWrapMode.Overflow; t.verticalOverflow = VerticalWrapMode.Overflow;
             return t;
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using RhythmRogue.Core.Audio;
 
 namespace RhythmRogue.UI.Navigation
 {
@@ -79,6 +80,9 @@ namespace RhythmRogue.UI.Navigation
 
         private void HandleCancel()
         {
+            var mgr = AudioManager.Instance;
+            if (mgr != null) mgr.Play(SfxId.UiBack);
+
             if (_stack.Count > 0)
             {
                 Action top = _stack.Pop();

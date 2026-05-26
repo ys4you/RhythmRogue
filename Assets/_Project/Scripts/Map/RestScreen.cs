@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.Battle;
 using RhythmRogue.UI.Navigation;
 
@@ -44,6 +45,10 @@ namespace RhythmRogue.UI
                 int healAmount = Mathf.RoundToInt(ph.MaxHP * _healPercent);
                 ph.Heal(healAmount);
             }
+
+            var mgr = AudioManager.Instance;
+            if (mgr != null) mgr.Play(SfxId.Heal);
+
             _restBtn.interactable = false;
             _restBtn.GetComponent<Image>().color = UIHelpers.Shadow;
             _flavorText.text = "You feel restored.";

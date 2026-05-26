@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Core;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.Map;
 using RhythmRogue.Util;
 
@@ -46,6 +47,9 @@ namespace RhythmRogue.Battle
             if (_runState == null) return;
 
             _runState.RecordBattleResult(victory, _battleScore, accuracy, maxCombo);
+
+            var mgr = AudioManager.Instance;
+            if (mgr != null) mgr.Play(victory ? SfxId.Victory : SfxId.Defeat);
 
             if (victory)
             {

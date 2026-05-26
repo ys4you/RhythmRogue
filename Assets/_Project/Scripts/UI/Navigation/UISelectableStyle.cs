@@ -1,13 +1,16 @@
 using UnityEngine;
 using UnityEngine.UI;
+using RhythmRogue.Core.Audio;
 
 namespace RhythmRogue.UI.Navigation
 {
     /// <summary>
-    /// Applies a consistent visual focus style to a Selectable.
+    /// Applies a consistent visual focus style to a Selectable AND
+    /// attaches UISelectableSounds so hover/confirm SFX play automatically.
     ///
     /// Call ApplyStyle() after creating any interactive UI element
-    /// to ensure keyboard/gamepad focus is always clearly visible.
+    /// to ensure keyboard/gamepad focus is always clearly visible
+    /// and audio feedback is wired up.
     ///
     /// Color scheme (matches pixel-art aesthetic):
     ///   Normal:      element's original color
@@ -16,18 +19,18 @@ namespace RhythmRogue.UI.Navigation
     ///   Pressed:     dimmed flash
     ///   Disabled:    desaturated, low alpha
     ///
-    /// The Selected state is the critical one — it must be visually
+    /// The Selected state is the critical one - it must be visually
     /// distinct from Highlighted so players always know which element
     /// has keyboard focus.
     /// </summary>
     public static class UISelectableStyle
     {
-        // Accent color for selected state — warm gold, matches the game's palette
+        // Accent color for selected state - warm gold, matches the game's palette
         private static readonly Color SelectedTint = new Color(1f, 0.85f, 0.3f);
         private static readonly Color DisabledTint = new Color(0.35f, 0.35f, 0.35f, 0.6f);
 
         /// <summary>
-        /// Apply navigation-friendly color transitions to a Selectable.
+        /// Apply navigation-friendly color transitions and SFX hooks to a Selectable.
         /// Call after creating the element and setting its base color.
         ///
         ///   Button btn = MakeButton(...);
@@ -48,9 +51,9 @@ namespace RhythmRogue.UI.Navigation
             colors.fadeDuration = fadeDuration;
 
             selectable.colors = colors;
-
-            // Ensure transition uses ColorTint (not Animation or None)
             selectable.transition = Selectable.Transition.ColorTint;
+
+            AttachSoundsIfMissing(selectable);
         }
 
         /// <summary>
@@ -73,6 +76,8 @@ namespace RhythmRogue.UI.Navigation
 
             selectable.colors = colors;
             selectable.transition = Selectable.Transition.ColorTint;
+
+            AttachSoundsIfMissing(selectable);
         }
 
         /// <summary>
@@ -82,16 +87,24 @@ namespace RhythmRogue.UI.Navigation
         {
             if (slider == null) return;
 
-            // Style the slider's target graphic (handle)
             Apply(slider, fadeDuration);
 
-            // Also make the handle brighter when selected
             if (slider.handleRect != null)
             {
                 Image handle = slider.handleRect.GetComponent<Image>();
                 if (handle != null)
                     slider.targetGraphic = handle;
             }
+        }
+
+        /// <summary>
+        /// Attaches a UISelectableSounds component if not already present.
+        /// Provides automatic hover + confirm SFX for the element.
+        /// </summary>
+        private static void AttachSoundsIfMissing(Selectable selectable)
+        {
+            if (selectable.gameObject.GetComponent<UISelectableSounds>() == null)
+                selectable.gameObject.AddComponent<UISelectableSounds>();
         }
     }
 }

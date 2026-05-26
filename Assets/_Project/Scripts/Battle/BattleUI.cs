@@ -1,4 +1,5 @@
 using System.Collections;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -116,7 +117,13 @@ namespace RhythmRogue.Battle
         private void OnEnemyHPChanged(int current, int max) => UpdateEnemyHP();
         private void OnComboChanged(int combo, float mult) => SetCombo(combo, mult);
         private void OnComboReset(int lost) { SetCombo(0, 1f); _comboText.color = UIHelpers.RustOrange; }
-        private void OnComboMilestone(int milestone) { _comboPopScale = 1.5f; _comboText.color = UIHelpers.WarmGold; }
+        private void OnComboMilestone(int milestone)
+        {
+            _comboPopScale = 1.5f;
+            _comboText.color = UIHelpers.WarmGold;
+            var mgr = AudioManager.Instance;
+            if (mgr != null) mgr.Play(SfxId.ComboMilestone);
+        }
         private void OnDamageDealt(DamageResult result) { if (!result.IsPlayerDamage) _currentScore += result.Amount; }
 
         private void UpdatePlayerHP()

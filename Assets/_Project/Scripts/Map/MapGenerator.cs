@@ -9,6 +9,8 @@ namespace RhythmRogue.Map
     /// <summary>
     /// Generates a branching node map. Deterministic via ISeededRandom.
     /// Layout: Layer 0 (2 enemies) -> Layer 1 (elite) -> Layers 2-3 (mixed) -> Boss.
+    ///
+    /// Enemies are selected from the supplied Area's pools, weighted and seeded.
     /// </summary>
     public static class MapGenerator
     {
@@ -20,16 +22,30 @@ namespace RhythmRogue.Map
 
         private static readonly LayerConfig[] PrototypeLayers =
         {
-            new() { MinNodes = 2, MaxNodes = 2, RestChance = 0f,  EliteChance = 0f },
-            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0f,  EliteChance = 1f },
+            new() { MinNodes = 2, MaxNodes = 2, RestChance = 0f,   EliteChance = 0f },
+            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0f,   EliteChance = 1f },
             new() { MinNodes = 2, MaxNodes = 3, RestChance = 0.3f, EliteChance = 0.2f },
             new() { MinNodes = 2, MaxNodes = 2, RestChance = 0.4f, EliteChance = 0.35f },
         };
 
-        public static MapData Generate(ISeededRandom rng, string seed, EnemyData slimeData, EnemyData bossData)
+        /// <summary>
+        /// Generate a map for the given area. Enemies are picked from area pools
+        /// using a forked RNG so map structure and enemy selection are independent
+        /// (changing one doesn't reshuffle the other when sharing seeds).
+        /// </summary>
+        public static MapData Generate(ISeededRandom rng, string seed, Area area)
         {
+            if (area == null)
+            {
+                GameLog.Error("[MapGenerator] Area is null. Cannot generate map.");
+                return new MapData { Seed = seed };
+            }
+
             var map = new MapData { Seed = seed };
             int nextId = 0;
+
+            // Separate RNG streams keep enemy selection stable when layer RNG changes
+            ISeededRandom enemyRng = rng.Fork("enemies");
 
             foreach (var config in PrototypeLayers)
             {
@@ -40,14 +56,19 @@ namespace RhythmRogue.Map
                 {
                     NodeType type = PickNodeType(config, rng);
                     var node = new MapNode(nextId++, map.Layers.Count, col, type);
-                    if (type == NodeType.Enemy || type == NodeType.Elite) node.EnemyData = slimeData;
+                    node.EnemyData = ResolveEnemyForNode(type, area, enemyRng);
                     layer.Add(node);
                     map.AllNodes.Add(node);
                 }
                 map.Layers.Add(layer);
             }
 
-            var bossNode = new MapNode(nextId, map.Layers.Count, 0, NodeType.Boss) { EnemyData = bossData };
+            // Boss layer
+            var boss = area.bosses != null ? area.bosses.Pick(enemyRng) : null;
+            if (boss == null)
+                GameLog.Warn($"[MapGenerator] Area '{area.areaName}' has no boss configured.");
+
+            var bossNode = new MapNode(nextId, map.Layers.Count, 0, NodeType.Boss) { EnemyData = boss };
             map.Layers.Add(new List<MapNode> { bossNode });
             map.AllNodes.Add(bossNode);
 
@@ -58,9 +79,18 @@ namespace RhythmRogue.Map
 
             foreach (var node in map.Layers[0]) node.IsAccessible = true;
 
-            GameLog.Info($"[MapGenerator] Generated map: {map.AllNodes.Count} nodes, {map.LayerCount} layers");
+            GameLog.Info($"[MapGenerator] Generated map for '{area.areaName}': {map.AllNodes.Count} nodes, {map.LayerCount} layers");
             return map;
         }
+
+        private static EnemyData ResolveEnemyForNode(NodeType type, Area area, ISeededRandom rng) => type switch
+        {
+            NodeType.Enemy => area.basicEnemies != null ? area.basicEnemies.Pick(rng) : null,
+            NodeType.Elite => (area.eliteEnemies != null && !area.eliteEnemies.IsEmpty)
+                                ? area.eliteEnemies.Pick(rng)
+                                : (area.basicEnemies != null ? area.basicEnemies.Pick(rng) : null),
+            _ => null
+        };
 
         private static NodeType PickNodeType(LayerConfig config, ISeededRandom rng)
         {
@@ -69,10 +99,6 @@ namespace RhythmRogue.Map
             return NodeType.Enemy;
         }
 
-        /// <summary>
-        /// Guarantees: every current-layer node connects forward, every next-layer
-        /// node is reachable, connections prefer adjacent columns.
-        /// </summary>
         private static void ConnectLayers(List<MapNode> current, List<MapNode> next, ISeededRandom rng)
         {
             int curCount = current.Count;
@@ -120,7 +146,6 @@ namespace RhythmRogue.Map
                 {
                     float x = layer.Count == 1 ? 0.5f : Mathf.Lerp(0.15f, 0.85f, (float)col / (layer.Count - 1));
 
-                    // Jitter for organic feel (skip first and boss layers)
                     if (layerIdx > 0 && layerIdx < totalLayers - 1)
                     {
                         x += rng.Range(-0.03f, 0.03f);

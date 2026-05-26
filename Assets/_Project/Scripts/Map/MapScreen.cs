@@ -9,14 +9,7 @@ namespace RhythmRogue.Map
 {
     /// <summary>
     /// Scene controller for the map screen.
-    /// 
-    /// On Start:
-    ///   - If RunState has a map, rebuild UI from it (returning from battle)
-    ///   - If no map, generate a new one (new run)
-    /// 
-    /// On node confirm:
-    ///   - Enemy/Boss: stores node in RunState, transitions to BattleScene
-    ///   - Rest: transitions to RestScene
+    /// Builds and displays a procedural map for the current Area.
     /// </summary>
     public class MapScreen : MonoBehaviour
     {
@@ -24,9 +17,9 @@ namespace RhythmRogue.Map
         [SerializeField] private MapUI _mapUI;
         [SerializeField] private RunState _runState;
 
-        [Header("Enemy Data (for generation)")]
-        [SerializeField] private EnemyData _slimeData;
-        [SerializeField] private EnemyData _bossData;
+        [Header("Content")]
+        [Tooltip("Area data driving map generation. Holds enemy pools, boss pool, and difficulty knobs.")]
+        [SerializeField] private Area _area;
 
         [Header("Test Settings")]
         [Tooltip("Force a seed for testing. Leave empty for RunState seed.")]
@@ -45,6 +38,12 @@ namespace RhythmRogue.Map
                 return;
             }
 
+            if (_area == null)
+            {
+                GameLog.Error("[MapScreen] No Area assigned. Cannot generate map.");
+                return;
+            }
+
             if (!_runState.IsRunActive || _runState.MapData == null)
             {
                 string seed = !string.IsNullOrWhiteSpace(_forcedSeed)
@@ -56,10 +55,10 @@ namespace RhythmRogue.Map
                 else
                     _runState.StartNewRun(seed);
 
-                ph.ResetForNewRun();
+                if (ph != null) ph.ResetForNewRun();
 
                 ISeededRandom mapRng = _runState.RunSeed.GetRandom(RandomDomain.Map);
-                _runState.MapData = MapGenerator.Generate(mapRng, _runState.Seed, _slimeData, _bossData);
+                _runState.MapData = MapGenerator.Generate(mapRng, _runState.Seed, _area);
             }
 
             _mapUI.BuildMap(_runState.MapData);

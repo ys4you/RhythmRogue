@@ -174,10 +174,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _mapUI: {fileID: 712571396}
   _runState: {fileID: 11400000, guid: fd05c793c93cd014e9de44853e693de3, type: 2}
-  _slimeData: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
-  _bossData: {fileID: 11400000, guid: c823af6097ed0544481d28bb4c41acba, type: 2}
+  _area: {fileID: 11400000, guid: 5b24879524f8f504d97cd390fa1ac265, type: 2}
   _forcedSeed: 
-  _defaultChart: {fileID: 4900000, guid: d115e938fc061524cb34f6d6a03b6b30, type: 3}
+  _defaultChart: {fileID: 0}
 --- !u!4 &712571398
 Transform:
   m_ObjectHideFlags: 0

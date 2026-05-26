@@ -18,6 +18,15 @@ namespace RhythmRogue.Map
         [SerializeField] private float _nodeSize = 100f;
         [SerializeField] private float _bossNodeSize = 130f;
 
+        [Header("Node Icons (32x32 sprites, optional)")]
+        [Tooltip("If null, auto-loads from Resources/MapIcons/node_<type>. Falls back to emoji text if not found.")]
+        [SerializeField] private Sprite _iconEnemy;
+        [SerializeField] private Sprite _iconRest;
+        [SerializeField] private Sprite _iconBoss;
+        [SerializeField] private Sprite _iconElite;
+        [SerializeField] private Sprite _iconShop;
+        [SerializeField] private Sprite _iconEvent;
+
         public event Action<MapNode> OnNodeConfirmed;
 
         private Canvas _canvas;
@@ -34,7 +43,6 @@ namespace RhythmRogue.Map
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
 
-        // Node colors from warm palette
         private static Color EnemyColor => UIHelpers.RustOrange;
         private static Color RestColor => UIHelpers.WarmGold;
         private static Color BossColor => UIHelpers.RustOrange;
@@ -44,6 +52,17 @@ namespace RhythmRogue.Map
         private static Color LockedColor => UIHelpers.BgSurface;
         private static Color CompletedColor => UIHelpers.Shadow;
         private static Color AccessibleGlow => UIHelpers.WarmGold;
+
+        private void Awake()
+        {
+            // Auto-load sprites from Resources/MapIcons/ if not assigned in Inspector
+            if (_iconEnemy == null) _iconEnemy = Resources.Load<Sprite>("MapIcons/node_enemy");
+            if (_iconRest == null) _iconRest = Resources.Load<Sprite>("MapIcons/node_rest");
+            if (_iconBoss == null) _iconBoss = Resources.Load<Sprite>("MapIcons/node_boss");
+            if (_iconElite == null) _iconElite = Resources.Load<Sprite>("MapIcons/node_elite");
+            if (_iconShop == null) _iconShop = Resources.Load<Sprite>("MapIcons/node_shop");
+            if (_iconEvent == null) _iconEvent = Resources.Load<Sprite>("MapIcons/node_event");
+        }
 
         public void BuildMap(MapData mapData)
         {
@@ -175,10 +194,35 @@ namespace RhythmRogue.Map
             Button btn = rootGO.GetComponent<Button>();
             int nodeId = node.Id; btn.onClick.AddListener(() => OnNodeClicked(nodeId));
 
-            Text label = MakeText(rt, "Label", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                Vector2.zero, new Vector2(size + 20, size),
-                node.Type == NodeType.Boss ? 36 : 30, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
-            label.text = GetNodeIcon(node.Type); label.fontStyle = FontStyle.Bold;
+            // Try sprite first. Fall back to emoji text if no sprite assigned.
+            Sprite icon = GetNodeSprite(node.Type);
+            Image iconImage = null;
+            Text iconLabel = null;
+
+            if (icon != null)
+            {
+                var iconGO = new GameObject("IconSprite", typeof(RectTransform), typeof(Image));
+                iconGO.transform.SetParent(rootGO.transform, false);
+                var iconRT = iconGO.GetComponent<RectTransform>();
+                iconRT.anchorMin = iconRT.anchorMax = new Vector2(0.5f, 0.5f);
+                iconRT.pivot = new Vector2(0.5f, 0.5f);
+                iconRT.anchoredPosition = Vector2.zero;
+                float iconSize = size * 2.0f;
+                iconRT.sizeDelta = new Vector2(iconSize, iconSize);
+                iconImage = iconGO.GetComponent<Image>();
+                iconImage.sprite = icon;
+                iconImage.color = UIHelpers.OffWhite;
+                iconImage.raycastTarget = false;
+                iconImage.preserveAspect = true;
+            }
+            else
+            {
+                iconLabel = MakeText(rt, "Label", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    Vector2.zero, new Vector2(size + 20, size),
+                    node.Type == NodeType.Boss ? 36 : 30, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+                iconLabel.text = GetNodeIconEmoji(node.Type);
+                iconLabel.fontStyle = FontStyle.Bold;
+            }
 
             var glowGO = new GameObject("Glow", typeof(RectTransform), typeof(Image));
             glowGO.transform.SetParent(rootGO.transform, false);
@@ -192,14 +236,38 @@ namespace RhythmRogue.Map
                 new Vector2(10, 10), new Vector2(50, 50), 26, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             check.text = "";
 
-            return new NodeVisual { Root = rootGO, Background = bg, Label = label, Glow = glow, Checkmark = check, Button = btn };
+            return new NodeVisual { Root = rootGO, Background = bg, IconImage = iconImage, IconLabel = iconLabel, Glow = glow, Checkmark = check, Button = btn };
         }
 
         private void UpdateNodeVisual(MapNode node, NodeVisual vis)
         {
-            if (node.IsCompleted) { vis.Background.color = CompletedColor; vis.Glow.color = new Color(0, 0, 0, 0); vis.Checkmark.text = "✓"; vis.Button.interactable = false; }
-            else if (node.IsAccessible) { vis.Background.color = GetNodeColor(node); vis.Glow.color = AccessibleGlow; vis.Checkmark.text = ""; vis.Button.interactable = true; }
-            else { vis.Background.color = LockedColor; vis.Glow.color = new Color(0, 0, 0, 0); vis.Checkmark.text = ""; vis.Button.interactable = false; }
+            if (node.IsCompleted)
+            {
+                vis.Background.color = CompletedColor;
+                vis.Glow.color = new Color(0, 0, 0, 0);
+                vis.Checkmark.text = "✓";
+                vis.Button.interactable = false;
+                if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.4f);
+                if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.4f);
+            }
+            else if (node.IsAccessible)
+            {
+                vis.Background.color = GetNodeColor(node);
+                vis.Glow.color = AccessibleGlow;
+                vis.Checkmark.text = "";
+                vis.Button.interactable = true;
+                if (vis.IconImage != null) vis.IconImage.color = UIHelpers.OffWhite;
+                if (vis.IconLabel != null) vis.IconLabel.color = UIHelpers.OffWhite;
+            }
+            else
+            {
+                vis.Background.color = LockedColor;
+                vis.Glow.color = new Color(0, 0, 0, 0);
+                vis.Checkmark.text = "";
+                vis.Button.interactable = false;
+                if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
+                if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
+            }
         }
 
         private void CreatePlayerMarker()
@@ -317,6 +385,17 @@ namespace RhythmRogue.Map
             return new Vector2(x, y);
         }
 
+        private Sprite GetNodeSprite(NodeType type) => type switch
+        {
+            NodeType.Enemy => _iconEnemy,
+            NodeType.Rest => _iconRest,
+            NodeType.Boss => _iconBoss,
+            NodeType.Elite => _iconElite,
+            NodeType.Shop => _iconShop,
+            NodeType.Event => _iconEvent,
+            _ => null
+        };
+
         private static Color GetNodeColor(MapNode node) => node.Type switch
         {
             NodeType.Enemy => EnemyColor,
@@ -328,7 +407,7 @@ namespace RhythmRogue.Map
             _ => EnemyColor
         };
 
-        private static string GetNodeIcon(NodeType type) => type switch
+        private static string GetNodeIconEmoji(NodeType type) => type switch
         {
             NodeType.Enemy => "⚔", NodeType.Rest => "♥", NodeType.Boss => "☠",
             NodeType.Elite => "★", NodeType.Shop => "$", NodeType.Event => "?", _ => "?"
@@ -380,7 +459,8 @@ namespace RhythmRogue.Map
 
         private class NodeVisual
         {
-            public GameObject Root; public Image Background; public Text Label;
+            public GameObject Root; public Image Background;
+            public Image IconImage; public Text IconLabel;
             public Image Glow; public Text Checkmark; public Button Button;
         }
     }

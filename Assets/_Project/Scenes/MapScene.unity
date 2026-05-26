@@ -154,6 +154,12 @@ MonoBehaviour:
   _mapPaddingTop: 120
   _nodeSize: 20
   _bossNodeSize: 26
+  _iconEnemy: {fileID: 21300000, guid: 6497ba977ba00964d8952d401868c42c, type: 3}
+  _iconRest: {fileID: 21300000, guid: 11293f519019ad442a845414e9458512, type: 3}
+  _iconBoss: {fileID: 21300000, guid: 7845cd87b0212c148a612fff4e4fe56e, type: 3}
+  _iconElite: {fileID: 21300000, guid: f23685dfabf77a74fac435ab948134ff, type: 3}
+  _iconShop: {fileID: 21300000, guid: a94938855cd74674e83ab4a738008c19, type: 3}
+  _iconEvent: {fileID: 21300000, guid: 4a144c198f3d3df40a212153f3d7f8c6, type: 3}
 --- !u!114 &712571397
 MonoBehaviour:
   m_ObjectHideFlags: 0

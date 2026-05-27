@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using RhythmRogue.Core.Display;
 
 namespace RhythmRogue.Core
 {
@@ -31,6 +32,17 @@ namespace RhythmRogue.Core
         {
             base.Awake();
             CreateOverlay();
+            ApplyVisibility();
+        }
+
+        /// <summary>
+        /// Re-reads the CRT setting and shows/hides the overlay canvas.
+        /// Called by the settings UI toggle.
+        /// </summary>
+        public void ApplyVisibility()
+        {
+            if (_canvas != null)
+                _canvas.gameObject.SetActive(DisplaySettings.CRTEffect);
         }
 
         private void CreateOverlay()

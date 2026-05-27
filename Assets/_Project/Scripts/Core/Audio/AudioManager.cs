@@ -41,6 +41,10 @@ namespace RhythmRogue.Core.Audio
             LoadLibraryIfNeeded();
             BuildSourcePool();
             BuildClipMap();
+
+            // Apply persisted volume settings now that we're set up
+            _masterVolume = AudioSettings.MasterVolume;
+            _sfxVolume = AudioSettings.SfxVolume;
         }
 
         private void LoadLibraryIfNeeded()

@@ -127,13 +127,13 @@ namespace RhythmRogue.UI
             UINavigationHelper.AddLink(_audioTabBtn, down: _scrollSpeedSlider);
             UINavigationHelper.AddLink(_controlsTabBtn, down: _scrollSpeedSlider);
             UINavigationHelper.AddLink(_displayTabBtn, down: _scrollSpeedSlider);
-            UINavigationHelper.WireVerticalNoWrap(_scrollSpeedSlider, _offsetSlider, _masterVolSlider, _sfxVolSlider);
+            UINavigationHelper.WireVerticalNoWrap(_scrollSpeedSlider, _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider);
             UINavigationHelper.AddLink(_scrollSpeedSlider, up: _audioTabBtn);
             UINavigationHelper.AddLink(_sfxVolSlider, down: _settingsCloseBtn);
             UINavigationHelper.Wire(_settingsCloseBtn, up: _sfxVolSlider);
             UISelectableStyle.Apply(_audioTabBtn); UISelectableStyle.Apply(_controlsTabBtn); UISelectableStyle.Apply(_displayTabBtn);
             UISelectableStyle.ApplySlider(_scrollSpeedSlider); UISelectableStyle.ApplySlider(_offsetSlider);
-            UISelectableStyle.ApplySlider(_masterVolSlider);
+            UISelectableStyle.ApplySlider(_masterVolSlider); UISelectableStyle.ApplySlider(_musicVolSlider);
             UISelectableStyle.ApplySlider(_sfxVolSlider); UISelectableStyle.Apply(_settingsCloseBtn);
             _focusSetter.FocusOn(_audioTabBtn.gameObject);
         }
@@ -361,12 +361,13 @@ namespace RhythmRogue.UI
             apRT.anchorMin = Vector2.zero; apRT.anchorMax = Vector2.one;
             apRT.offsetMin = Vector2.zero; apRT.offsetMax = Vector2.zero;
 
-            // Card content: tabs end at y=-130. Back button area is bottom 90px (button 60 + padding 30).
-            // Available content area: -130 to -630 (500px tall).
-            // 4 slider rows need ~290px total (3 gaps of 80 + 50px overhang on last slider).
-            // Center them in the available space: empty 210px / 2 = 105px padding top.
-            // First slider label at -130 - 105 = -235.
-            float sliderY = -235f, sliderGap = 80f;
+            // Card content: tabs end at y=-130. Back button reserves the bottom 85px.
+            // Available content area: -130 to -635 (505px tall).
+            // 5 slider rows: each row occupies ~50px (label 30 + slider 30 overlapping).
+            // With gap=70 between label positions: 4 gaps + 50px bottom row = 330px content.
+            // Centering: empty space (505 - 330) / 2 = ~88px padding above first slider.
+            // First slider label at -130 - 88 ~= -218. Rounding to -220 for tidiness.
+            float sliderY = -220f, sliderGap = 70f;
 
             _scrollSpeedSlider = CreateSliderRow(apRT, "Scroll Speed", sliderY, 0.5f, 3.0f, ScrollSpeedSetting.Multiplier, out _scrollSpeedValue);
             _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString;
@@ -381,11 +382,13 @@ namespace RhythmRogue.UI
             _masterVolSlider = CreateSliderRow(apRT, "Master Vol", sliderY - sliderGap * 2, 0f, 1f, AudioSettings.MasterVolume, out _);
             _masterVolSlider.onValueChanged.AddListener(v => AudioSettings.MasterVolume = v);
 
-            // Music Vol slider deferred until a music system exists to consume it.
-            // AudioSettings.MusicVolume persists regardless; we just don't expose UI yet.
-            _musicVolSlider = _masterVolSlider; // navigation alias, prevents null refs
+            // Music Vol now has a backing system (MusicManager). Setter pushes through
+            // AudioSettings.MusicVolume which calls ApplyToAudioManager, which calls
+            // MusicManager.ApplyVolumeFromSettings, so changes update in-flight playback.
+            _musicVolSlider = CreateSliderRow(apRT, "Music Vol", sliderY - sliderGap * 3, 0f, 1f, AudioSettings.MusicVolume, out _);
+            _musicVolSlider.onValueChanged.AddListener(v => AudioSettings.MusicVolume = v);
 
-            _sfxVolSlider = CreateSliderRow(apRT, "SFX Vol", sliderY - sliderGap * 3, 0f, 1f, AudioSettings.SfxVolume, out _);
+            _sfxVolSlider = CreateSliderRow(apRT, "SFX Vol", sliderY - sliderGap * 4, 0f, 1f, AudioSettings.SfxVolume, out _);
             _sfxVolSlider.onValueChanged.AddListener(v => AudioSettings.SfxVolume = v);
         }
 

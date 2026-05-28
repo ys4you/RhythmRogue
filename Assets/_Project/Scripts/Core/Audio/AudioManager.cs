@@ -11,6 +11,11 @@ namespace RhythmRogue.Core.Audio
     /// Auto-loads on first access (Singleton pattern). Auto-loads the SfxLibrary
     /// ScriptableObject from Resources/Audio/SfxLibrary on Awake.
     ///
+    /// Volume convention: SetMasterVolume / SetSfxVolume receive perceptual 0-1
+    /// values (matching slider positions) and store the square-law-tapered linear
+    /// gain internally. Playback then multiplies the stored gains directly.
+    /// This converts the logarithmic ear response into a slider that feels linear.
+    ///
     /// Usage:
     ///   AudioManager.Instance.Play(SfxId.UiConfirm);
     ///   AudioManager.Instance.PlayPitched(SfxId.HitPerfect, pitch: 1.2f);
@@ -42,9 +47,10 @@ namespace RhythmRogue.Core.Audio
             BuildSourcePool();
             BuildClipMap();
 
-            // Apply persisted volume settings now that we're set up
-            _masterVolume = AudioSettings.MasterVolume;
-            _sfxVolume = AudioSettings.SfxVolume;
+            // Apply persisted volume settings now that we're set up. SetMasterVolume
+            // and SetSfxVolume both apply the perceptual-to-linear taper internally.
+            SetMasterVolume(AudioSettings.MasterVolume);
+            SetSfxVolume(AudioSettings.SfxVolume);
         }
 
         private void LoadLibraryIfNeeded()
@@ -118,8 +124,8 @@ namespace RhythmRogue.Core.Audio
         /// <summary>Play with full control over pitch and volume scale.</summary>
         public void PlayAdvanced(SfxId id, float pitch, float volumeScale) => PlayInternal(id, pitch, volumeScale);
 
-        public void SetMasterVolume(float v) => _masterVolume = Mathf.Clamp01(v);
-        public void SetSfxVolume(float v) => _sfxVolume = Mathf.Clamp01(v);
+        public void SetMasterVolume(float v) => _masterVolume = AudioSettings.ToLinearGain(v);
+        public void SetSfxVolume(float v) => _sfxVolume = AudioSettings.ToLinearGain(v);
 
         // === Internals ===
 

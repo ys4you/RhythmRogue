@@ -65,6 +65,21 @@ namespace RhythmRogue.Core.Audio
         }
 
         /// <summary>
+        /// Convert a perceptual 0-1 slider value into a linear audio gain.
+        /// Human loudness perception is logarithmic, so a linear slider feels
+        /// front-loaded: most of the perceived volume change happens in the first
+        /// ~20% of travel. The standard fix is a square-law taper, which makes
+        /// slider position roughly match perceived loudness across the full range.
+        ///
+        /// Edge cases: 0 maps to 0 (true silence at the floor), 1 maps to 1 (full gain at the top).
+        /// </summary>
+        public static float ToLinearGain(float perceptual)
+        {
+            float p = Mathf.Clamp01(perceptual);
+            return p * p;
+        }
+
+        /// <summary>
         /// Push current values to AudioManager and MusicManager. Call after either spawns
         /// to apply persisted settings. Safe to call when either is null (no-op until
         /// it exists).

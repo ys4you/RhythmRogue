@@ -20,8 +20,10 @@ namespace RhythmRogue.Core.Audio
     /// Play() call for a given track will block briefly while the clip loads; subsequent
     /// calls reuse the cached clip.
     ///
-    /// Volume: master * music multiplier, both pulled from AudioSettings. Call
-    /// ApplyVolumeFromSettings() after AudioSettings changes to update in-flight playback.
+    /// Volume convention: master and music sliders are perceptual 0-1. The square-law
+    /// taper is applied in CurrentLinearGain, so AudioSource.volume always receives the
+    /// tapered linear value. Call ApplyVolumeFromSettings() after AudioSettings changes
+    /// to update in-flight playback.
     /// </summary>
     public class MusicManager : Singleton<MusicManager>
     {
@@ -122,14 +124,21 @@ namespace RhythmRogue.Core.Audio
         }
 
         /// <summary>
+        /// The current tapered linear gain to send to AudioSource.volume.
+        /// Combines master and music sliders (perceptual) into a single linear gain.
+        /// Square-law taper applied so 50% slider feels like 50% loudness.
+        /// </summary>
+        private float CurrentLinearGain =>
+            AudioSettings.ToLinearGain(AudioSettings.MasterVolume * AudioSettings.MusicVolume);
+
+        /// <summary>
         /// Pulls master * music volumes from AudioSettings and re-applies to the active
         /// source. Call this from AudioSettings setters so slider changes update live.
         /// </summary>
         public void ApplyVolumeFromSettings()
         {
-            float target = AudioSettings.MasterVolume * AudioSettings.MusicVolume;
             if (_activeSource != null && _activeSource.isPlaying)
-                _activeSource.volume = target;
+                _activeSource.volume = CurrentLinearGain;
             // Inactive source stays at 0 unless a fade is running, in which case the
             // running coroutine will overwrite each frame anyway.
         }
@@ -167,7 +176,6 @@ namespace RhythmRogue.Core.Audio
         /// </summary>
         private IEnumerator Crossfade(AudioSource fadeIn, AudioSource fadeOut, float duration)
         {
-            float targetVolume = AudioSettings.MasterVolume * AudioSettings.MusicVolume;
             float startInVolume = fadeIn.volume;
             float startOutVolume = fadeOut.volume;
             float elapsed = 0f;
@@ -176,14 +184,15 @@ namespace RhythmRogue.Core.Audio
             {
                 elapsed += Time.unscaledDeltaTime;
                 float t = Mathf.Clamp01(elapsed / duration);
-                // Refresh target each frame so live volume slider changes feel responsive.
-                targetVolume = AudioSettings.MasterVolume * AudioSettings.MusicVolume;
+                // Read target each frame so live slider changes feel responsive.
+                // CurrentLinearGain applies the perceptual taper.
+                float targetVolume = CurrentLinearGain;
                 fadeIn.volume = Mathf.Lerp(startInVolume, targetVolume, t);
                 fadeOut.volume = Mathf.Lerp(startOutVolume, 0f, t);
                 yield return null;
             }
 
-            fadeIn.volume = AudioSettings.MasterVolume * AudioSettings.MusicVolume;
+            fadeIn.volume = CurrentLinearGain;
             fadeOut.volume = 0f;
             if (fadeOut.isPlaying) fadeOut.Stop();
             fadeOut.clip = null;

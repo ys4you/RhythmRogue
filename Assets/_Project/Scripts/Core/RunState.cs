@@ -11,17 +11,20 @@ namespace RhythmRogue.Core
     public class RunState : ScriptableObject
     {
         [Header("Run Config")]
-        public string Seed;
+        // Seed is per-run state, not config. Marked NonSerialized so the editor
+        // doesn't carry the seed from one play session to the next, which would
+        // make the first map of every session look identical.
+        [System.NonSerialized] public string Seed;
         public int StartingHP = 100;
 
         [Header("Runtime")]
-        [HideInInspector] public bool IsRunActive;
-        [HideInInspector] public int CurrentNodeId = -1;
-        [HideInInspector] public int BattlesWon;
-        [HideInInspector] public int TotalScore;
-        [HideInInspector] public float BestAccuracy;
-        [HideInInspector] public int MaxCombo;
-        [HideInInspector] public bool WasVictory;
+        [System.NonSerialized] public bool IsRunActive;
+        [System.NonSerialized] public int CurrentNodeId = -1;
+        [System.NonSerialized] public int BattlesWon;
+        [System.NonSerialized] public int TotalScore;
+        [System.NonSerialized] public float BestAccuracy;
+        [System.NonSerialized] public int MaxCombo;
+        [System.NonSerialized] public bool WasVictory;
 
         [System.NonSerialized] public MapData MapData;
         [System.NonSerialized] public MapNode SelectedNode;

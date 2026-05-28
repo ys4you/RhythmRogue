@@ -1,22 +1,57 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using RhythmRogue.UI;
 using RhythmRogue.UI.Navigation;
 
 namespace RhythmRogue.Map
 {
+    /// <summary>
+    /// Renders the run map as a scrollable, vertically-progressing graph.
+    /// Style targets: Slay the Spire 2 (scroll behaviour) + Inscryption (atmospheric look).
+    ///
+    /// Layout: layer 0 sits at the bottom of the content, the boss layer at the top.
+    /// Content height grows with the number of layers; viewport scrolls vertically.
+    ///
+    /// Sibling order inside Content (back to front):
+    ///   1. DecorationLayer - empty by default. Exposed as a public Transform so future
+    ///      atmosphere sprites (trees, rocks, candles) can be parented here without
+    ///      touching this class. Scrolls together with nodes and lines.
+    ///   2. LineLayer - connection edges between nodes.
+    ///   3. NodeLayer - interactive node buttons plus the player marker.
+    ///
+    /// The map auto-scrolls so the current node stays visible:
+    ///   - On BuildMap: snaps to current node (or bottom if no current node).
+    ///   - On UpdateVisuals (after the player advances): smooth-scrolls to the new current node.
+    ///   - On keyboard focus change: smooth-scrolls to the focused node.
+    /// Mouse wheel and drag scrolling still work normally via ScrollRect.
+    /// </summary>
     public class MapUI : MonoBehaviour
     {
-        [Header("Map Area")]
-        [SerializeField] private float _mapPadding = 200f;
-        [SerializeField] private float _mapPaddingBottom = 160f;
-        [SerializeField] private float _mapPaddingTop = 120f;
+        [Header("Map Sizing")]
+        [Tooltip("Vertical pixels between adjacent layers. Larger = more cinematic, more scrolling.")]
+        [SerializeField] private float _layerSpacing = 280f;
+
+        [Tooltip("Horizontal pixel range across which nodes are spread.")]
+        [SerializeField] private float _mapWidth = 1500f;
+
+        [SerializeField] private float _topPadding = 250f;
+        [SerializeField] private float _bottomPadding = 250f;
 
         [Header("Node Sizes")]
         [SerializeField] private float _nodeSize = 100f;
         [SerializeField] private float _bossNodeSize = 130f;
+
+        [Header("Scroll Behaviour")]
+        [Tooltip("Where the focused node should appear inside the viewport. " +
+                 "0 = at the bottom edge, 1 = at the top edge. " +
+                 "Lower values leave more room above the player so upcoming nodes are visible.")]
+        [SerializeField, Range(0f, 1f)] private float _focusViewportRatio = 0.4f;
+
+        [Tooltip("Speed of the smooth scroll lerp. Higher = snappier.")]
+        [SerializeField] private float _scrollLerpSpeed = 10f;
 
         [Header("Node Icons (32x32 sprites, optional)")]
         [Tooltip("If null, auto-loads from Resources/MapIcons/node_<type>. Falls back to emoji text if not found.")]
@@ -29,19 +64,48 @@ namespace RhythmRogue.Map
 
         public event Action<MapNode> OnNodeConfirmed;
 
+        /// <summary>
+        /// Transform under which future decorative sprites (trees, rocks, candles, etc.)
+        /// should be parented. Lives behind the lines/nodes and scrolls with them.
+        /// </summary>
+        public Transform DecorationLayer => _decorLayer != null ? _decorLayer.transform : null;
+
+        // Root canvas
         private Canvas _canvas;
         private RectTransform _canvasRT;
+
+        // Scroll structure
+        private ScrollRect _scrollRect;
+        private RectTransform _viewportRT;
+        private RectTransform _contentRT;
+
+        // Content sibling layers (back to front)
+        private GameObject _decorLayer;
+        private RectTransform _lineLayerRT;
+        private RectTransform _nodeLayerRT;
+
+        // Map state
         private MapData _mapData;
         private readonly Dictionary<int, NodeVisual> _nodeVisuals = new();
         private readonly List<GameObject> _lineObjects = new();
         private MapNode _selectedNode;
+        private float _contentHeight = 0f;
+
+        // HUD + info
         private Text _seedText, _hpText;
         private GameObject _infoPanel;
         private Text _infoTitle, _infoSub;
         private Button _confirmButton;
         private Image _playerMarker;
+
+        // Navigation helpers
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
+
+        // Scroll animation
+        private float _targetNormalizedY = 0f;
+        private bool _scrollAnimating = false;
+        private GameObject _lastSelectedForScroll;
 
         private static Color EnemyColor => UIHelpers.RustOrange;
         private static Color RestColor => UIHelpers.WarmGold;
@@ -64,12 +128,32 @@ namespace RhythmRogue.Map
             if (_iconEvent == null) _iconEvent = Resources.Load<Sprite>("MapIcons/node_event");
         }
 
+        private void Update()
+        {
+            // Scroll-follow keyboard focus: when the EventSystem switches selection to
+            // one of our node buttons, smooth-scroll it into view.
+            HandleSelectionAutoScroll();
+
+            // Drive the smooth scroll lerp toward _targetNormalizedY if active.
+            HandleSmoothScroll();
+        }
+
         public void BuildMap(MapData mapData)
         {
             _mapData = mapData;
-            ClearMap(); CreateCanvas(); CreateHUD(); CreateLines();
-            CreateNodes(); CreatePlayerMarker(); CreateInfoPanel();
-            SetupNavigationComponents(); UpdateVisuals();
+            ClearMap();
+            CreateCanvas();
+            CreateScrollArea();
+            CreateHUD();
+            CreateLines();
+            CreateNodes();
+            CreatePlayerMarker();
+            CreateInfoPanel();
+            SetupNavigationComponents();
+            UpdateVisuals();
+
+            // Snap straight to the current node on first build (no smooth scroll).
+            ScrollToCurrentNode(instant: true);
         }
 
         public void UpdateVisuals()
@@ -80,9 +164,14 @@ namespace RhythmRogue.Map
                 var node = FindNode(kvp.Key);
                 if (node != null) UpdateNodeVisual(node, kvp.Value);
             }
-            UpdatePlayerMarker(); UpdateHUD();
+            UpdatePlayerMarker();
+            UpdateHUD();
             if (_infoPanel != null) _infoPanel.SetActive(false);
-            _selectedNode = null; RebuildNavigation();
+            _selectedNode = null;
+            RebuildNavigation();
+
+            // Smooth-pan to the new current node after the player advances.
+            ScrollToCurrentNode(instant: false);
         }
 
         private void SetupNavigationComponents()
@@ -123,14 +212,85 @@ namespace RhythmRogue.Map
             UIEventSystemProvider.EnsureEventSystem();
         }
 
+        /// <summary>
+        /// Builds the ScrollRect + Viewport + Content + three sibling layers.
+        /// Content height is computed from the layer count so deeper maps automatically
+        /// produce more scrollable space. Layer count is read from _mapData.
+        /// </summary>
+        private void CreateScrollArea()
+        {
+            // ScrollView root: fills the canvas but leaves room at top/bottom for HUD.
+            var scrollGO = new GameObject("ScrollView",
+                typeof(RectTransform), typeof(Image), typeof(ScrollRect), typeof(RectMask2D));
+            scrollGO.transform.SetParent(_canvasRT, false);
+            var scrollRT = scrollGO.GetComponent<RectTransform>();
+            scrollRT.anchorMin = Vector2.zero;
+            scrollRT.anchorMax = Vector2.one;
+            scrollRT.offsetMin = new Vector2(0, 80);   // leave space for bottom HUD
+            scrollRT.offsetMax = new Vector2(0, -80);  // leave space for top HUD
+            scrollGO.GetComponent<Image>().color = new Color(0, 0, 0, 0.01f); // near-transparent, gives the rect mask a graphic
+
+            _scrollRect = scrollGO.GetComponent<ScrollRect>();
+            _scrollRect.horizontal = false;
+            _scrollRect.vertical = true;
+            _scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            _scrollRect.inertia = true;
+            _scrollRect.scrollSensitivity = 30f;
+
+            // Viewport: same rect as ScrollView, but separate object as ScrollRect.viewport.
+            var viewportGO = new GameObject("Viewport", typeof(RectTransform), typeof(CanvasRenderer));
+            viewportGO.transform.SetParent(scrollGO.transform, false);
+            _viewportRT = viewportGO.GetComponent<RectTransform>();
+            _viewportRT.anchorMin = Vector2.zero;
+            _viewportRT.anchorMax = Vector2.one;
+            _viewportRT.offsetMin = Vector2.zero;
+            _viewportRT.offsetMax = Vector2.zero;
+            _scrollRect.viewport = _viewportRT;
+
+            // Content: anchored bottom-center of viewport, pivot bottom-center.
+            // Children use anchorMin/Max (0.5, 0) so their y is measured up from the bottom.
+            int layerCount = _mapData != null ? _mapData.Layers.Count : 1;
+            float computedHeight = _topPadding + _bottomPadding + Mathf.Max(0, layerCount - 1) * _layerSpacing;
+            _contentHeight = Mathf.Max(computedHeight, 1080f);
+
+            var contentGO = new GameObject("Content", typeof(RectTransform));
+            contentGO.transform.SetParent(viewportGO.transform, false);
+            _contentRT = contentGO.GetComponent<RectTransform>();
+            _contentRT.anchorMin = new Vector2(0.5f, 0);
+            _contentRT.anchorMax = new Vector2(0.5f, 0);
+            _contentRT.pivot = new Vector2(0.5f, 0);
+            _contentRT.anchoredPosition = Vector2.zero;
+            _contentRT.sizeDelta = new Vector2(_mapWidth, _contentHeight);
+            _scrollRect.content = _contentRT;
+
+            // Three child layers. Order matters: first child is back-most.
+            _decorLayer = CreateContentLayer("DecorationLayer");
+            _lineLayerRT = CreateContentLayer("LineLayer").GetComponent<RectTransform>();
+            _nodeLayerRT = CreateContentLayer("NodeLayer").GetComponent<RectTransform>();
+        }
+
+        private GameObject CreateContentLayer(string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.transform.SetParent(_contentRT, false);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+            return go;
+        }
+
         private void CreateHUD()
         {
+            // Seed text: top-left of canvas (outside scroll area).
             _seedText = MakeText(_canvasRT, "SeedText", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
                 new Vector2(50, -50), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, UIHelpers.Shadow);
             _seedText.text = $"Seed: {_mapData.Seed}";
 
+            // HP text: bottom-left of canvas (outside scroll area).
             _hpText = MakeText(_canvasRT, "HPText", new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(50, 50), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
+                new Vector2(50, 30), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
         }
 
         private void UpdateHUD()
@@ -149,23 +309,25 @@ namespace RhythmRogue.Map
         {
             foreach (var node in _mapData.AllNodes)
             {
-                Vector2 from = NodeToCanvas(node.Position);
+                Vector2 from = NodeToContent(node.Position);
                 foreach (var conn in node.Connections)
-                    CreateLine(from, NodeToCanvas(conn.Position), node.IsCompleted);
+                    CreateLine(from, NodeToContent(conn.Position), node.IsCompleted);
             }
         }
 
         private void CreateLine(Vector2 from, Vector2 to, bool completed)
         {
             var lineGO = new GameObject("Line", typeof(RectTransform), typeof(Image));
-            lineGO.transform.SetParent(_canvasRT, false);
-            lineGO.transform.SetAsFirstSibling();
+            lineGO.transform.SetParent(_lineLayerRT, false);
             Color lineColor = completed
                 ? new Color(UIHelpers.AmberOrange.r, UIHelpers.AmberOrange.g, UIHelpers.AmberOrange.b, 0.8f)
                 : new Color(UIHelpers.Shadow.r, UIHelpers.Shadow.g, UIHelpers.Shadow.b, 0.6f);
             lineGO.GetComponent<Image>().color = lineColor;
             var rt = lineGO.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            // Anchored to bottom-center of LineLayer (which fills Content), so positions
+            // line up with NodeToContent output.
+            rt.anchorMin = new Vector2(0.5f, 0);
+            rt.anchorMax = new Vector2(0.5f, 0);
             rt.pivot = new Vector2(0, 0.5f);
             Vector2 diff = to - from;
             rt.anchoredPosition = from;
@@ -184,17 +346,17 @@ namespace RhythmRogue.Map
         {
             float size = node.Type == NodeType.Boss ? _bossNodeSize : _nodeSize;
             var rootGO = new GameObject($"Node_{node.Id}", typeof(RectTransform), typeof(Image), typeof(Button));
-            rootGO.transform.SetParent(_canvasRT, false);
+            rootGO.transform.SetParent(_nodeLayerRT, false);
             var rt = rootGO.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.anchorMin = new Vector2(0.5f, 0);
+            rt.anchorMax = new Vector2(0.5f, 0);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = NodeToCanvas(node.Position);
+            rt.anchoredPosition = NodeToContent(node.Position);
             rt.sizeDelta = new Vector2(size, size);
             Image bg = rootGO.GetComponent<Image>(); bg.color = GetNodeColor(node);
             Button btn = rootGO.GetComponent<Button>();
             int nodeId = node.Id; btn.onClick.AddListener(() => OnNodeClicked(nodeId));
 
-            // Try sprite first. Fall back to emoji text if no sprite assigned.
             Sprite icon = GetNodeSprite(node.Type);
             Image iconImage = null;
             Text iconLabel = null;
@@ -273,9 +435,10 @@ namespace RhythmRogue.Map
         private void CreatePlayerMarker()
         {
             var markerGO = new GameObject("PlayerMarker", typeof(RectTransform), typeof(Image));
-            markerGO.transform.SetParent(_canvasRT, false);
+            markerGO.transform.SetParent(_nodeLayerRT, false);
             var rt = markerGO.GetComponent<RectTransform>();
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.anchorMin = new Vector2(0.5f, 0);
+            rt.anchorMax = new Vector2(0.5f, 0);
             rt.pivot = new Vector2(0.5f, 0.5f);
             rt.sizeDelta = new Vector2(30, 30);
             _playerMarker = markerGO.GetComponent<Image>();
@@ -288,19 +451,30 @@ namespace RhythmRogue.Map
             if (_playerMarker == null) return;
             if (_mapData.CurrentNode != null)
             {
-                Vector2 pos = NodeToCanvas(_mapData.CurrentNode.Position);
+                Vector2 pos = NodeToContent(_mapData.CurrentNode.Position);
                 _playerMarker.rectTransform.anchoredPosition = pos + new Vector2(0, -(_nodeSize * 0.5f + 25f));
                 _playerMarker.gameObject.SetActive(true);
             }
             else
             {
-                _playerMarker.rectTransform.anchoredPosition = new Vector2(0, -(_canvasRT.rect.height * 0.5f - _mapPaddingBottom - 50f));
+                // No node selected yet (start of run): park the marker just under layer 0.
+                if (_mapData.Layers.Count > 0 && _mapData.Layers[0].Count > 0)
+                {
+                    Vector2 pos = NodeToContent(_mapData.Layers[0][0].Position);
+                    _playerMarker.rectTransform.anchoredPosition = pos + new Vector2(0, -(_nodeSize * 0.5f + 50f));
+                }
+                else
+                {
+                    _playerMarker.rectTransform.anchoredPosition = new Vector2(0, _bottomPadding * 0.5f);
+                }
                 _playerMarker.gameObject.SetActive(true);
             }
         }
 
         private void CreateInfoPanel()
         {
+            // Lives on the canvas root (outside the scroll area) so it stays anchored
+            // at the bottom of the screen even while the map scrolls.
             _infoPanel = new GameObject("InfoPanel", typeof(RectTransform), typeof(Image));
             _infoPanel.transform.SetParent(_canvasRT, false);
             var rt = _infoPanel.GetComponent<RectTransform>();
@@ -375,15 +549,102 @@ namespace RhythmRogue.Map
             OnNodeConfirmed?.Invoke(_selectedNode);
         }
 
-        private Vector2 NodeToCanvas(Vector2 normalized)
+        // ============================================================
+        // Scrolling
+        // ============================================================
+
+        /// <summary>
+        /// Convert a node's normalised (0..1, 0..1) position into Content-local pixel coords.
+        /// X = horizontal spread (centered on Content's middle column).
+        /// Y = vertical position, measured from the bottom of Content.
+        /// </summary>
+        private Vector2 NodeToContent(Vector2 normalized)
         {
-            float mapWidth = 1920f - _mapPadding * 2f;
-            float mapHeight = 1080f - _mapPaddingBottom - _mapPaddingTop;
-            float x = (normalized.x - 0.5f) * mapWidth;
-            float y = (normalized.y - 0.5f) * mapHeight;
-            y += (_mapPaddingBottom - _mapPaddingTop) * 0.5f;
+            float x = (normalized.x - 0.5f) * _mapWidth;
+            float mapAreaHeight = _contentHeight - _topPadding - _bottomPadding;
+            float y = _bottomPadding + normalized.y * mapAreaHeight;
             return new Vector2(x, y);
         }
+
+        private void ScrollToCurrentNode(bool instant)
+        {
+            MapNode target = _mapData.CurrentNode;
+            if (target == null && _mapData.Layers.Count > 0 && _mapData.Layers[0].Count > 0)
+                target = _mapData.Layers[0][0];
+            if (target != null) ScrollToNode(target, instant);
+        }
+
+        /// <summary>
+        /// Smooth-scroll (or snap) the view so the given node sits at the configured
+        /// vertical ratio inside the viewport. Mouse wheel / drag input can override
+        /// the animation just by interrupting it - the user's input wins.
+        /// </summary>
+        private void ScrollToNode(MapNode node, bool instant)
+        {
+            if (node == null || _scrollRect == null || _contentRT == null || _viewportRT == null) return;
+
+            float vh = _viewportRT.rect.height;
+            float ch = _contentRT.rect.height;
+            if (ch <= vh) return; // Map fits entirely; no scrolling needed.
+
+            Vector2 contentPos = NodeToContent(node.Position);
+
+            // Target window bottom in content coords: place the node at vh * ratio above the
+            // viewport's bottom edge. Inverting gives the window bottom we need.
+            float windowBottom = contentPos.y - vh * _focusViewportRatio;
+            float normalized = Mathf.Clamp01(windowBottom / (ch - vh));
+
+            _targetNormalizedY = normalized;
+            if (instant)
+            {
+                _scrollRect.verticalNormalizedPosition = _targetNormalizedY;
+                _scrollAnimating = false;
+            }
+            else
+            {
+                _scrollAnimating = true;
+            }
+        }
+
+        private void HandleSmoothScroll()
+        {
+            if (!_scrollAnimating || _scrollRect == null) return;
+            float current = _scrollRect.verticalNormalizedPosition;
+            float next = Mathf.Lerp(current, _targetNormalizedY, Time.unscaledDeltaTime * _scrollLerpSpeed);
+            _scrollRect.verticalNormalizedPosition = next;
+            if (Mathf.Abs(next - _targetNormalizedY) < 0.001f)
+            {
+                _scrollRect.verticalNormalizedPosition = _targetNormalizedY;
+                _scrollAnimating = false;
+            }
+        }
+
+        private void HandleSelectionAutoScroll()
+        {
+            if (_scrollRect == null || _nodeVisuals.Count == 0) return;
+            var es = EventSystem.current;
+            if (es == null) return;
+            var selected = es.currentSelectedGameObject;
+            if (selected == _lastSelectedForScroll) return;
+            _lastSelectedForScroll = selected;
+            if (selected == null) return;
+
+            // Match the selected GameObject against our node roots. Cheap because
+            // map node counts are small (< 30).
+            foreach (var kvp in _nodeVisuals)
+            {
+                if (kvp.Value.Root == selected)
+                {
+                    var node = FindNode(kvp.Key);
+                    if (node != null) ScrollToNode(node, instant: false);
+                    return;
+                }
+            }
+        }
+
+        // ============================================================
+        // Helpers
+        // ============================================================
 
         private Sprite GetNodeSprite(NodeType type) => type switch
         {
@@ -434,7 +695,11 @@ namespace RhythmRogue.Map
 
         private void ClearMap()
         {
-            _nodeVisuals.Clear(); _lineObjects.Clear(); _selectedNode = null;
+            _nodeVisuals.Clear();
+            _lineObjects.Clear();
+            _selectedNode = null;
+            _scrollAnimating = false;
+            _lastSelectedForScroll = null;
             if (_canvas != null) Destroy(_canvas.gameObject);
         }
 

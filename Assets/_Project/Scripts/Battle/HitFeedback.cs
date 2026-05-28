@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.UI;
 
 namespace RhythmRogue.Battle
@@ -25,16 +26,15 @@ namespace RhythmRogue.Battle
         [SerializeField] private float _perfectShakeIntensity = 0.5f;
         [SerializeField] private float _shakeDuration = 0.1f;
 
-        [Header("Hit SFX")]
-        [SerializeField] private AudioClip _hitSound;
-        [SerializeField] [Range(0f, 1f)] private float _hitVolume = 0.3f;
+        // Hit SFX are now sourced from AudioManager via SfxId.HitPerfect / HitGood / HitBad / Miss.
+        // Add clips to Resources/Audio/SfxLibrary to enable them; until then, PlayIfRegistered
+        // silently no-ops, so no console spam.
 
         [Header("Pool Size")]
         [SerializeField] private int _textPoolSize = 8;
 
         private Canvas _canvas;
         private RectTransform _canvasRT;
-        private AudioSource _sfxSource;
         private readonly List<JudgmentTextInstance> _textPool = new();
         private int _nextTextIndex;
         private JudgmentTextInstance _milestoneText;
@@ -51,8 +51,6 @@ namespace RhythmRogue.Battle
         {
             if (_mainCamera == null) _mainCamera = Camera.main;
             _cameraOriginalPos = _mainCamera != null ? _mainCamera.transform.localPosition : Vector3.zero;
-            _sfxSource = gameObject.AddComponent<AudioSource>();
-            _sfxSource.playOnAwake = false;
 
             if (_receptorAnimator == null && _highway != null) _receptorAnimator = _highway.GetComponent<ReceptorAnimator>();
             if (_hitParticles == null) _hitParticles = GetComponent<HitParticles>();
@@ -135,11 +133,19 @@ namespace RhythmRogue.Battle
                 _ => 0f
             });
 
-            if (result.Judgment != Judgment.Miss && _hitSound != null)
+            // Route hit SFX through AudioManager. Each judgment has its own SfxId so each
+            // can be a distinct sound. PlayIfRegistered is silent if the clip isn't in the
+            // library yet, so the console stays clean while sounds are being authored.
+            SfxId hitId = result.Judgment switch
             {
-                _sfxSource.pitch = result.Judgment switch { Judgment.Perfect => 1.1f, Judgment.Good => 1.0f, _ => 0.9f };
-                _sfxSource.PlayOneShot(_hitSound, _hitVolume);
-            }
+                Judgment.Perfect => SfxId.HitPerfect,
+                Judgment.Good => SfxId.HitGood,
+                Judgment.Bad => SfxId.HitBad,
+                Judgment.Miss => SfxId.Miss,
+                _ => SfxId.None
+            };
+            if (hitId != SfxId.None && AudioManager.Instance != null)
+                AudioManager.Instance.PlayIfRegistered(hitId);
         }
 
         private void HandleMilestone(int milestone)

@@ -90,8 +90,24 @@ namespace RhythmRogue.Core.Audio
 
         // === Public API ===
 
-        /// <summary>Play a registered SFX by id. No-op if not found.</summary>
+        /// <summary>Play a registered SFX by id. Logs a warning if not found.</summary>
         public void Play(SfxId id) => PlayInternal(id, pitch: 1f, volumeScale: 1f);
+
+        /// <summary>
+        /// Play a SFX if it's registered. Silent no-op (no warning) when missing.
+        /// Use this for SFX slots that are still being authored, so the console stays clean.
+        /// </summary>
+        public void PlayIfRegistered(SfxId id)
+        {
+            if (_clipMap == null || !_clipMap.TryGetValue(id, out var clip) || clip == null) return;
+            var src = GetNextSource();
+            src.pitch = 1f;
+            src.volume = _masterVolume * _sfxVolume;
+            src.PlayOneShot(clip);
+        }
+
+        /// <summary>Returns true if the given SfxId is registered with a non-null clip.</summary>
+        public bool IsRegistered(SfxId id) => _clipMap != null && _clipMap.TryGetValue(id, out var clip) && clip != null;
 
         /// <summary>Play with a pitch multiplier. Useful for tonal variation.</summary>
         public void PlayPitched(SfxId id, float pitch) => PlayInternal(id, pitch: pitch, volumeScale: 1f);

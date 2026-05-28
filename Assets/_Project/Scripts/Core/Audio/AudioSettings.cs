@@ -65,17 +65,21 @@ namespace RhythmRogue.Core.Audio
         }
 
         /// <summary>
-        /// Push current values to AudioManager. Call after AudioManager spawns
-        /// to apply persisted settings. Safe to call when AudioManager is null
-        /// (no-op until it exists).
+        /// Push current values to AudioManager and MusicManager. Call after either spawns
+        /// to apply persisted settings. Safe to call when either is null (no-op until
+        /// it exists).
         /// </summary>
         public static void ApplyToAudioManager()
         {
             var mgr = AudioManager.Instance;
-            if (mgr == null) return;
-            mgr.SetMasterVolume(MasterVolume);
-            mgr.SetSfxVolume(SfxVolume);
-            // MusicVolume is reserved for a future music system (Conductor's AudioSource).
+            if (mgr != null)
+            {
+                mgr.SetMasterVolume(MasterVolume);
+                mgr.SetSfxVolume(SfxVolume);
+            }
+
+            var music = MusicManager.Instance;
+            if (music != null) music.ApplyVolumeFromSettings();
         }
 
         /// <summary>

@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Core;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
 using RhythmRogue.Util;
@@ -63,6 +64,10 @@ namespace RhythmRogue.Map
 
             _mapUI.BuildMap(_runState.MapData);
             _mapUI.OnNodeConfirmed += HandleNodeConfirmed;
+
+            // Crossfade from whatever was playing (menu drone, or silence after a battle)
+            // into the map's shamanic ambient. Idempotent across re-entries to the map.
+            MusicManager.Instance.Play(MusicTrack.MapShamanic);
         }
 
         private void OnDestroy()

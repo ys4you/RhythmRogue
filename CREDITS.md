@@ -52,7 +52,31 @@ to honor creators.
 
 ## Audio - Music
 
-(none yet)
+### Menu Drone - "Drone Darkness is Returning"
+- **Artist:** Fronbondi Skegs
+- **Source:** Pixabay - track ID `528515`
+- **URL:** https://pixabay.com/music/528515 (verify exact slug at download time)
+- **License:** Pixabay Content License
+- **Attribution required:** No (credit appreciated but not mandatory)
+- **Used for:** Main menu ambient drone
+- **File:** `Assets/_Project/Resources/Audio/Music/menu_drone.mp3`
+- **Original filename:** `fronbondi_skegs-drone-darkness-is-returning-eerie-surging-ambient-background-528515.mp3`
+- **Date added:** 2026-05
+- **Notes:** Eerie surging ambient drone. Loopable. Designed as background.
+  Selected for the candlelit-ritual-chamber feel without demanding attention.
+
+### Map Ambient - "Dark Shamanic Horror"
+- **Artist:** Universfield
+- **Source:** Pixabay - track ID `516353`
+- **URL:** https://pixabay.com/music/516353 (verify exact slug at download time)
+- **License:** Pixabay Content License
+- **Attribution required:** No (credit appreciated but not mandatory)
+- **Used for:** Map screen ambient (intended), or pre-battle build-up / elite encounter
+- **File:** `Assets/_Project/Resources/Audio/Music/map_shamanic.mp3`
+- **Original filename:** `universfield-dark-shamanic-horror-516353.mp3`
+- **Date added:** 2026-05
+- **Notes:** Shamanic ritual percussion + horror atmosphere. Has more rhythmic
+  motion than the menu drone, suitable for screens with implied forward progress.
 
 ---
 

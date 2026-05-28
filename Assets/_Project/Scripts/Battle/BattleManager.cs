@@ -1,5 +1,6 @@
 using UnityEngine;
 using RhythmRogue.Core;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.Data;
 using RhythmRogue.Map;
 using RhythmRogue.Util.FSM;
@@ -72,6 +73,11 @@ namespace RhythmRogue.Battle
         {
             _conductor = Conductor.Instance;
             _playerHealth = PlayerHealth.Instance;
+
+            // Fade out the map ambient before the conductor's song takes over. The fade
+            // begins immediately so by the time the intro delay elapses, the room is quiet
+            // and the chart audio enters cleanly without a music clash.
+            MusicManager.Instance.Stop();
 
             _currentEnemy = (_runState?.SelectedNode?.EnemyData) ?? _defaultEnemy;
             _isElite = _runState?.SelectedNode?.Type == NodeType.Elite;

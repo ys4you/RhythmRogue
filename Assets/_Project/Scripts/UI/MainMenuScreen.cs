@@ -51,6 +51,9 @@ namespace RhythmRogue.UI
         {
             if (_rhythmActions != null) KeybindManager.Initialize(_rhythmActions);
             DisplaySettings.ApplyAll();
+            // Start the menu drone. Idempotent: returning to the main menu from elsewhere
+            // won't restart the track if it's already playing (MusicManager survives scene changes).
+            MusicManager.Instance.Play(MusicTrack.MenuDrone);
             CreateUI();
             SetupNavigation();
         }

@@ -32,6 +32,12 @@ namespace RhythmRogue.UI
             _cancelHandler = gameObject.AddComponent<UICancelHandler>();
             _cancelHandler.SetBaseAction(OnContinue);
             UpdateHPDisplay();
+
+            // Continue the map's shamanic ambient through the rest screen. Idempotent:
+            // if the track is already playing (it usually is, having come from the map
+            // before the battle), this is a no-op. If we're returning from a battle
+            // (which stopped the music), it fades back in.
+            MusicManager.Instance.Play(MusicTrack.MapShamanic);
         }
 
         private void OnRest()

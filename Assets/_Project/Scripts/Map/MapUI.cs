@@ -69,6 +69,12 @@ namespace RhythmRogue.Map
         [Tooltip("Boss pulse scale growth at peak. Slightly more pronounced than accessible pulse for emphasis.")]
         [SerializeField, Range(0f, 0.3f)] private float _bossPulseScale = 0.1f;
 
+        [Header("Player Marker Bob")]
+        [Tooltip("How fast the player marker bobs up and down (radians/second). A full breath cycle takes 2*PI / speed seconds.")]
+        [SerializeField] private float _markerBobSpeed = 2.5f;
+        [Tooltip("How many pixels the marker travels above/below its rest position at the peak of the bob.")]
+        [SerializeField] private float _markerBobAmplitude = 6f;
+
         [Header("Node Icons (32x32 sprites, optional)")]
         [Tooltip("If null, auto-loads from Resources/MapIcons/node_<type>. Falls back to emoji text if not found.")]
         [SerializeField] private Sprite _iconEnemy;
@@ -129,6 +135,13 @@ namespace RhythmRogue.Map
         // derived from the accessible timer (avoids beat-locking the two animations).
         private float _bossPulseTime = 0f;
 
+        // Player marker bob animation. _markerBasePos is the "rest" position under the
+        // current node, set by UpdatePlayerMarker. The per-frame Update adds a sine Y
+        // offset on top, so the marker visibly floats without drifting from its anchor.
+        private Vector2 _markerBasePos = Vector2.zero;
+        private bool _hasMarkerBase = false;
+        private float _markerBobTime = 0f;
+
         private static Color EnemyColor => UIHelpers.RustOrange;
         private static Color RestColor => UIHelpers.WarmGold;
         private static Color BossColor => UIHelpers.RustOrange;
@@ -166,6 +179,9 @@ namespace RhythmRogue.Map
 
             // Pulse accessible node glows so the player can see at a glance what's clickable.
             UpdateGlowPulse(Time.unscaledDeltaTime);
+
+            // Float the player marker so it reads as a character rather than static UI.
+            UpdateMarkerBob(Time.unscaledDeltaTime);
         }
 
         public void BuildMap(MapData mapData)
@@ -504,7 +520,8 @@ namespace RhythmRogue.Map
             if (_mapData.CurrentNode != null)
             {
                 Vector2 pos = NodeToContent(_mapData.CurrentNode.Position);
-                _playerMarker.rectTransform.anchoredPosition = pos + new Vector2(0, -(_nodeSize * 0.5f + 25f));
+                _markerBasePos = pos + new Vector2(0, -(_nodeSize * 0.5f + 25f));
+                _hasMarkerBase = true;
                 _playerMarker.gameObject.SetActive(true);
             }
             else
@@ -513,14 +530,32 @@ namespace RhythmRogue.Map
                 if (_mapData.Layers.Count > 0 && _mapData.Layers[0].Count > 0)
                 {
                     Vector2 pos = NodeToContent(_mapData.Layers[0][0].Position);
-                    _playerMarker.rectTransform.anchoredPosition = pos + new Vector2(0, -(_nodeSize * 0.5f + 50f));
+                    _markerBasePos = pos + new Vector2(0, -(_nodeSize * 0.5f + 50f));
                 }
                 else
                 {
-                    _playerMarker.rectTransform.anchoredPosition = new Vector2(0, _bottomPadding * 0.5f);
+                    _markerBasePos = new Vector2(0, _bottomPadding * 0.5f);
                 }
+                _hasMarkerBase = true;
                 _playerMarker.gameObject.SetActive(true);
             }
+            // Snap to base immediately so the marker doesn't sit at (0,0) for a frame on
+            // first build before Update applies the bob.
+            _playerMarker.rectTransform.anchoredPosition = _markerBasePos;
+        }
+
+        /// <summary>
+        /// Adds a vertical sine offset to the player marker each frame so it gently bobs.
+        /// The base position is set by UpdatePlayerMarker; this only adds the wave on top,
+        /// so changing nodes (which moves the base) doesn't reset the bob phase. Uses
+        /// unscaled time so the animation continues even if Time.timeScale is 0.
+        /// </summary>
+        private void UpdateMarkerBob(float dt)
+        {
+            if (_playerMarker == null || !_hasMarkerBase) return;
+            _markerBobTime += dt * _markerBobSpeed;
+            float yOffset = Mathf.Sin(_markerBobTime) * _markerBobAmplitude;
+            _playerMarker.rectTransform.anchoredPosition = _markerBasePos + new Vector2(0, yOffset);
         }
 
         private void CreateInfoPanel()

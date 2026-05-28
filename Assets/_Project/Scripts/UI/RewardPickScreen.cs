@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.Data;
 using RhythmRogue.Battle;
 using RhythmRogue.Util;
@@ -38,7 +39,15 @@ namespace RhythmRogue.UI
         private static Color UncommonBorder => UIHelpers.AmberOrange;
         private static Color RareBorder => UIHelpers.WarmGold;
 
-        private void Start() { GenerateOptions(); CreateUI(); }
+        private void Start()
+        {
+            GenerateOptions();
+            CreateUI();
+            // Continue the map ambient through the reward screen. The battle's stop call
+            // left the music silent; this fades it back in so the moment of picking a relic
+            // shares the same atmosphere as the map itself.
+            MusicManager.Instance.Play(MusicTrack.MapShamanic);
+        }
 
         private void GenerateOptions()
         {

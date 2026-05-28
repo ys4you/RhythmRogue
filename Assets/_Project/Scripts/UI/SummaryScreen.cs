@@ -2,6 +2,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.Core;
+using RhythmRogue.Core.Audio;
 using RhythmRogue.Battle;
 using RhythmRogue.UI.Navigation;
 
@@ -36,6 +37,13 @@ namespace RhythmRogue.UI
             _focusSetter = gameObject.AddComponent<UIFocusSetter>();
             _cancelHandler = gameObject.AddComponent<UICancelHandler>();
             _cancelHandler.SetBaseAction(OnMenu);
+
+            // End-of-run moment. Fade in the menu drone (calmer of the two tracks) rather
+            // than the shamanic ambient: the run is over, the player is in a contemplative
+            // 'looking at stats' state, and most paths from here lead back to the main menu
+            // anyway, where this same track continues seamlessly.
+            MusicManager.Instance.Play(MusicTrack.MenuDrone);
+
             StartCoroutine(AnimateEntrance());
         }
 

@@ -733,20 +733,29 @@ namespace RhythmRogue.Map
             NodeType.Elite => "★", NodeType.Shop => "$", NodeType.Event => "?", _ => "?"
         };
 
-        private static string GetNodeTitle(MapNode node)
+        // Node titles and subtitles deliberately hide the enemy's identity and stats.
+        // The roguelike tension comes from committing to a fight without knowing what waits;
+        // discovery happens on the battle screen, not on the map. Only node type and broad
+        // hints (danger, reward) are surfaced here.
+        private static string GetNodeTitle(MapNode node) => node.Type switch
         {
-            if (node.Type == NodeType.Rest) return "Rest";
-            if (node.Type == NodeType.Elite && node.EnemyData != null) return $"Elite {node.EnemyData.enemyName}";
-            if (node.EnemyData != null) return node.EnemyData.enemyName;
-            return node.Type.ToString();
-        }
+            NodeType.Enemy => "Battle",
+            NodeType.Elite => "Elite Battle",
+            NodeType.Boss => "Boss Battle",
+            NodeType.Rest => "Rest",
+            NodeType.Shop => "Merchant",
+            NodeType.Event => "Unknown",
+            _ => node.Type.ToString()
+        };
 
         private static string GetNodeSubtitle(MapNode node) => node.Type switch
         {
-            NodeType.Enemy => node.EnemyData != null ? $"HP: {node.EnemyData.maxHP}" : "Battle",
-            NodeType.Elite => node.EnemyData != null ? $"ELITE  |  HP: ~{Mathf.RoundToInt(node.EnemyData.maxHP * 1.75f)}  |  Harder patterns" : "Elite Battle",
+            NodeType.Enemy => "Something lurks here.",
+            NodeType.Elite => "A stronger foe. Better rewards.",
+            NodeType.Boss => "The end of this path.",
             NodeType.Rest => "Heal 30% HP",
-            NodeType.Boss => node.EnemyData != null ? $"BOSS  |  HP: {node.EnemyData.maxHP}" : "Boss Battle",
+            NodeType.Shop => "Spend Beats on relics and curiosities.",
+            NodeType.Event => "Anything could happen.",
             _ => ""
         };
 

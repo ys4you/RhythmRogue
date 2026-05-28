@@ -61,6 +61,14 @@ namespace RhythmRogue.Map
         [Tooltip("How much the glow grows at the peak of the pulse. 0 = no scale, 0.1 = 10% larger.")]
         [SerializeField, Range(0f, 0.3f)] private float _glowPulseScale = 0.08f;
 
+        [Header("Boss Node Pulse")]
+        [Tooltip("Rate of the boss menace pulse (radians/second). Default is roughly half the accessible pulse so it reads as slower and heavier.")]
+        [SerializeField] private float _bossPulseSpeed = 1.5f;
+        [Tooltip("Minimum glow alpha for the boss pulse. Higher than accessible so the boss never disappears from view.")]
+        [SerializeField, Range(0f, 1f)] private float _bossPulseMinAlpha = 0.5f;
+        [Tooltip("Boss pulse scale growth at peak. Slightly more pronounced than accessible pulse for emphasis.")]
+        [SerializeField, Range(0f, 0.3f)] private float _bossPulseScale = 0.1f;
+
         [Header("Node Icons (32x32 sprites, optional)")]
         [Tooltip("If null, auto-loads from Resources/MapIcons/node_<type>. Falls back to emoji text if not found.")]
         [SerializeField] private Sprite _iconEnemy;
@@ -117,6 +125,9 @@ namespace RhythmRogue.Map
 
         // Glow pulse animation. Continuous timer; only nodes flagged PulseGlow react.
         private float _pulseTime = 0f;
+        // Independent timer for the boss menace pulse so its slower rate can't be
+        // derived from the accessible timer (avoids beat-locking the two animations).
+        private float _bossPulseTime = 0f;
 
         private static Color EnemyColor => UIHelpers.RustOrange;
         private static Color RestColor => UIHelpers.WarmGold;
@@ -127,6 +138,11 @@ namespace RhythmRogue.Map
         private static Color LockedColor => UIHelpers.BgSurface;
         private static Color CompletedColor => UIHelpers.Shadow;
         private static Color AccessibleGlow => UIHelpers.WarmGold;
+        // Boss menace pulse uses the darkest warm-palette tone (RustOrange). It reads as
+        // ominous within the palette - separate from the gold accessible glow - without
+        // breaking the colour cohesion the way a true red would. The slower pulse rate and
+        // larger scale do most of the work; the colour just supports it.
+        private static Color BossGlow => UIHelpers.RustOrange;
 
         private void Awake()
         {
@@ -412,7 +428,7 @@ namespace RhythmRogue.Map
                 new Vector2(10, 10), new Vector2(50, 50), 26, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             check.text = "";
 
-            return new NodeVisual { Root = rootGO, Background = bg, IconImage = iconImage, IconLabel = iconLabel, Glow = glow, GlowRT = glowRT, Checkmark = check, Button = btn };
+            return new NodeVisual { Root = rootGO, Background = bg, IconImage = iconImage, IconLabel = iconLabel, Glow = glow, GlowRT = glowRT, Checkmark = check, Button = btn, IsBoss = node.Type == NodeType.Boss };
         }
 
         private void UpdateNodeVisual(MapNode node, NodeVisual vis)
@@ -431,7 +447,7 @@ namespace RhythmRogue.Map
             else if (node.IsAccessible)
             {
                 vis.Background.color = GetNodeColor(node);
-                vis.Glow.color = AccessibleGlow;
+                vis.Glow.color = vis.IsBoss ? BossGlow : AccessibleGlow;
                 vis.Checkmark.text = "";
                 vis.Button.interactable = true;
                 vis.PulseGlow = true;
@@ -440,14 +456,31 @@ namespace RhythmRogue.Map
             }
             else
             {
-                vis.Background.color = LockedColor;
-                vis.Glow.color = new Color(0, 0, 0, 0);
-                vis.Checkmark.text = "";
-                vis.Button.interactable = false;
-                vis.PulseGlow = false;
-                if (vis.GlowRT != null) vis.GlowRT.localScale = Vector3.one;
-                if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
-                if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
+                // Locked. Boss is an exception: it keeps pulsing red even while locked so the
+                // player sees "the end of this path" looming from the moment the map loads.
+                if (vis.IsBoss)
+                {
+                    vis.Background.color = LockedColor;
+                    vis.Glow.color = BossGlow;
+                    vis.Checkmark.text = "";
+                    vis.Button.interactable = false;
+                    vis.PulseGlow = true;
+                    // Icon kept a touch dim so it still reads as locked, but more visible than
+                    // other locked nodes (0.7 vs 0.5) so the boss silhouette is recognisable.
+                    if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.7f);
+                    if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.7f);
+                }
+                else
+                {
+                    vis.Background.color = LockedColor;
+                    vis.Glow.color = new Color(0, 0, 0, 0);
+                    vis.Checkmark.text = "";
+                    vis.Button.interactable = false;
+                    vis.PulseGlow = false;
+                    if (vis.GlowRT != null) vis.GlowRT.localScale = Vector3.one;
+                    if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
+                    if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
+                }
             }
         }
 
@@ -543,7 +576,8 @@ namespace RhythmRogue.Map
                 if (n != null && n.IsAccessible && !n.IsCompleted)
                 {
                     bool isClicked = (n.Id == nodeId);
-                    kvp.Value.Glow.color = isClicked ? UIHelpers.OffWhite : AccessibleGlow;
+                    Color baseGlow = kvp.Value.IsBoss ? BossGlow : AccessibleGlow;
+                    kvp.Value.Glow.color = isClicked ? UIHelpers.OffWhite : baseGlow;
                     // The clicked node holds steady at full intensity so it reads as the focus
                     // target; other accessible nodes keep pulsing in the background.
                     kvp.Value.PulseGlow = !isClicked;
@@ -563,7 +597,7 @@ namespace RhythmRogue.Map
                 var n = FindNode(kvp.Key);
                 if (n != null && n.IsAccessible && !n.IsCompleted)
                 {
-                    kvp.Value.Glow.color = AccessibleGlow;
+                    kvp.Value.Glow.color = kvp.Value.IsBoss ? BossGlow : AccessibleGlow;
                     kvp.Value.PulseGlow = true;
                 }
             }
@@ -673,9 +707,10 @@ namespace RhythmRogue.Map
         }
 
         /// <summary>
-        /// Per-frame pulse for accessible node glows. The pulse is driven by a single shared
-        /// sine timer so all accessible nodes breathe in unison, which reads as a coherent
-        /// 'these are the things you can pick' signal rather than chaotic flicker.
+        /// Per-frame pulse for accessible node glows. Accessible nodes share one sine timer
+        /// so they breathe in unison; the boss runs on a separate, slower timer with a red
+        /// colour so it stands apart. Timers aren't multiples of each other on purpose, so
+        /// the two pulses drift against each other instead of beat-locking.
         ///
         /// Cheap: O(n) over node count, no allocations. With < 30 nodes per map this is
         /// well below any noticeable cost.
@@ -684,20 +719,36 @@ namespace RhythmRogue.Map
         {
             if (_nodeVisuals.Count == 0) return;
             _pulseTime += dt * _glowPulseSpeed;
+            _bossPulseTime += dt * _bossPulseSpeed;
 
-            // Sine wave shifted to [0, 1].
+            // Sine waves shifted to [0, 1] for each timer.
             float t = (Mathf.Sin(_pulseTime) + 1f) * 0.5f;
             float alpha = Mathf.Lerp(_glowPulseMinAlpha, 1f, t);
             float scale = 1f + _glowPulseScale * t;
+
+            float bossT = (Mathf.Sin(_bossPulseTime) + 1f) * 0.5f;
+            float bossAlpha = Mathf.Lerp(_bossPulseMinAlpha, 1f, bossT);
+            float bossScale = 1f + _bossPulseScale * bossT;
 
             foreach (var kvp in _nodeVisuals)
             {
                 var vis = kvp.Value;
                 if (!vis.PulseGlow) continue;
-                Color c = vis.Glow.color;
-                c.a = alpha;
-                vis.Glow.color = c;
-                if (vis.GlowRT != null) vis.GlowRT.localScale = new Vector3(scale, scale, 1f);
+
+                if (vis.IsBoss)
+                {
+                    Color c = BossGlow;
+                    c.a = bossAlpha;
+                    vis.Glow.color = c;
+                    if (vis.GlowRT != null) vis.GlowRT.localScale = new Vector3(bossScale, bossScale, 1f);
+                }
+                else
+                {
+                    Color c = vis.Glow.color;
+                    c.a = alpha;
+                    vis.Glow.color = c;
+                    if (vis.GlowRT != null) vis.GlowRT.localScale = new Vector3(scale, scale, 1f);
+                }
             }
         }
 
@@ -796,7 +847,8 @@ namespace RhythmRogue.Map
             public Image IconImage; public Text IconLabel;
             public Image Glow; public RectTransform GlowRT;
             public Text Checkmark; public Button Button;
-            public bool PulseGlow; // True when the node is accessible and not currently the clicked focus.
+            public bool PulseGlow; // True when accessible (or boss-locked) and not currently the clicked focus.
+            public bool IsBoss;    // True for the boss node. Drives red pulse + 'always visible' locked behaviour.
         }
     }
 }

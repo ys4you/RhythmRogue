@@ -18,9 +18,17 @@ namespace RhythmRogue.Battle
         [SerializeField] private Data.EnemyData _fallbackEnemyData;
 
         private Canvas _canvas;
-        private Image _playerHPFill, _playerHPGhost;
+        // HP bars use direct RectTransform width scaling rather than Image.Type.Filled,
+        // because Filled mode has rendering edge cases when no sprite is assigned to the
+        // Image component. Width scaling works unconditionally and produces the cleaner
+        // 'traditional HP bar' look (just shrinks from right to left, no ghost trail).
+        private RectTransform _playerHPFillRT;
+        private Image _playerHPFill;
+        private float _playerHPBarWidth;
         private Text _playerHPText;
-        private Image _enemyHPFill, _enemyHPGhost;
+        private RectTransform _enemyHPFillRT;
+        private Image _enemyHPFill;
+        private float _enemyHPBarWidth;
         private Text _enemyNameText, _bossLabel;
         private Text _comboText, _multiplierText;
         private RectTransform _comboRect;
@@ -28,8 +36,8 @@ namespace RhythmRogue.Battle
         private int _currentScore, _displayScore;
         private Text _resultText;
         private Image _resultBG;
-        private float _playerHPTarget = 1f, _playerHPDisplay = 1f, _playerGhostTarget = 1f;
-        private float _enemyHPTarget = 1f, _enemyHPDisplay = 1f, _enemyGhostTarget = 1f;
+        private float _playerHPTarget = 1f, _playerHPDisplay = 1f;
+        private float _enemyHPTarget = 1f, _enemyHPDisplay = 1f;
         private float _comboPopScale = 1f, _playerFlash, _enemyFlash;
         private PlayerHealth _playerHealth;
 
@@ -54,11 +62,13 @@ namespace RhythmRogue.Battle
 
         private void Start()
         {
-            if (_enemyHealth?.Health != null)
-            {
-                _enemyHealth.Health.OnHPChanged += OnEnemyHPChanged;
-                _enemyHealth.Health.OnDamaged += OnEnemyDamaged;
-            }
+            // NOTE: We deliberately do NOT subscribe to _enemyHealth.Health events here.
+            // _enemyHealth.Health is created inside EnemyHealth.InitForBattle(), which is
+            // called from BattleManager.Start() - and Unity does not guarantee that runs
+            // before BattleUI.Start(). Any subscription attempt here would silently no-op
+            // against the null Health, then never get retried once Health is created.
+            // Instead, the enemy HP bar polls _enemyHealth.HPPercent every frame in
+            // LateUpdate. The cost is one property access; the gain is no race condition.
             UpdatePlayerHP(); UpdateEnemyHP(); SetCombo(0, 1f); SetScore(0);
 
             var enemyData = _battleManager?.CurrentEnemy ?? _fallbackEnemyData;
@@ -80,20 +90,32 @@ namespace RhythmRogue.Battle
             }
             if (_comboSystem != null) { _comboSystem.OnComboChanged -= OnComboChanged; _comboSystem.OnComboReset -= OnComboReset; _comboSystem.OnComboMilestone -= OnComboMilestone; }
             if (_damagePipeline != null) _damagePipeline.OnDamageDealt -= OnDamageDealt;
-            if (_enemyHealth?.Health != null) { _enemyHealth.Health.OnHPChanged -= OnEnemyHPChanged; _enemyHealth.Health.OnDamaged -= OnEnemyDamaged; }
+            // Enemy events were never subscribed (see Start() comment), so nothing to unwire.
         }
 
         private void LateUpdate()
         {
-            _playerHPDisplay = Mathf.Lerp(_playerHPDisplay, _playerHPTarget, Time.deltaTime * 8f);
-            _playerHPFill.fillAmount = _playerHPDisplay;
-            _playerGhostTarget = Mathf.Lerp(_playerGhostTarget, _playerHPTarget, Time.deltaTime * 3f);
-            _playerHPGhost.fillAmount = _playerGhostTarget;
+            // Poll enemy HP each frame. EnemyHealth.Health is created mid-lifecycle
+            // (during BattleManager.Start), so subscribing at BattleUI.Start would race
+            // the creation and silently no-op. Polling sidesteps the order entirely.
+            if (_enemyHealth?.Health != null)
+            {
+                float newTarget = _enemyHealth.HPPercent;
+                if (newTarget < _enemyHPTarget - 0.001f) _enemyFlash = 1f;
+                _enemyHPTarget = newTarget;
+            }
 
+            // Lerp displayed HP toward the target. Lerp factor 8 gives a quick but visible
+            // animation: a Perfect-tier hit drops the bar over ~150ms which reads as
+            // 'something happened' without feeling lazy.
+            _playerHPDisplay = Mathf.Lerp(_playerHPDisplay, _playerHPTarget, Time.deltaTime * 8f);
             _enemyHPDisplay = Mathf.Lerp(_enemyHPDisplay, _enemyHPTarget, Time.deltaTime * 8f);
-            _enemyHPFill.fillAmount = _enemyHPDisplay;
-            _enemyGhostTarget = Mathf.Lerp(_enemyGhostTarget, _enemyHPTarget, Time.deltaTime * 3f);
-            _enemyHPGhost.fillAmount = _enemyGhostTarget;
+
+            // Direct width scaling. Pivot of the fill RectTransform is (0, 0.5) so changing
+            // sizeDelta.x shrinks the bar from the right toward the left, which is the
+            // 'traditional HP bar' visual the player expects.
+            ApplyHPBarWidth(_playerHPFillRT, _playerHPBarWidth, _playerHPDisplay);
+            ApplyHPBarWidth(_enemyHPFillRT, _enemyHPBarWidth, _enemyHPDisplay);
 
             _playerHPFill.color = UIHelpers.HPColor(_playerHPDisplay);
             _enemyHPFill.color = UIHelpers.HPColor(_enemyHPDisplay);
@@ -108,6 +130,20 @@ namespace RhythmRogue.Battle
                 if (_currentScore - _displayScore < 2) _displayScore = _currentScore;
                 _scoreText.text = _displayScore.ToString();
             }
+        }
+
+        /// <summary>
+        /// Set the width of an HP-bar fill RectTransform based on a 0-1 percentage of
+        /// the original maximum width. RectTransform anchored to top-left + bottom-left
+        /// of its parent with pivot (0, 0.5), so sizeDelta.x is the literal pixel width
+        /// of the bar (no anchor math needed).
+        /// </summary>
+        private static void ApplyHPBarWidth(RectTransform fillRT, float maxWidth, float percent)
+        {
+            if (fillRT == null) return;
+            float w = Mathf.Max(0f, maxWidth * Mathf.Clamp01(percent));
+            var sd = fillRT.sizeDelta;
+            fillRT.sizeDelta = new Vector2(w, sd.y);
         }
 
         private void OnPlayerDamaged(int amount, int current) => _playerFlash = 1f;
@@ -196,20 +232,20 @@ namespace RhythmRogue.Battle
             _bossLabel.fontStyle = FontStyle.Bold;
             _bossLabel.gameObject.SetActive(false);
 
-            CreateHPBar(canvasRT, "EnemyHP",
+            _enemyHPBarWidth = CreateHPBar(canvasRT, "EnemyHP",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -95), new Vector2(600, 30),
-                UIHelpers.RustOrange, out _enemyHPFill, out _enemyHPGhost);
+                UIHelpers.RustOrange, out _enemyHPFill, out _enemyHPFillRT);
 
             // Player HP (bottom-left, inset from CRT bezel)
             _playerHPText = CreateText(canvasRT, "PlayerHPText", "100/100",
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
                 new Vector2(50, 100), new Vector2(300, 50), 26, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
 
-            CreateHPBar(canvasRT, "PlayerHP",
+            _playerHPBarWidth = CreateHPBar(canvasRT, "PlayerHP",
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
                 new Vector2(50, 55), new Vector2(400, 25),
-                UIHelpers.WarmGold, out _playerHPFill, out _playerHPGhost);
+                UIHelpers.WarmGold, out _playerHPFill, out _playerHPFillRT);
 
             // Combo (right side, inset from CRT bezel)
             var comboGroup = CreatePanel(canvasRT, "ComboGroup",
@@ -246,20 +282,44 @@ namespace RhythmRogue.Battle
             resultBGObj.SetActive(false);
         }
 
-        private void CreateHPBar(RectTransform parent, string name,
+        /// <summary>
+        /// Create an HP bar consisting of a background panel + a fill panel.
+        /// The fill is anchored to the top-left + bottom-left of the background with
+        /// pivot (0, 0.5), so its sizeDelta.x maps directly to displayed pixel width.
+        /// We resize that sizeDelta in LateUpdate; no Image.fillAmount, no sprite
+        /// requirements, no rendering edge cases.
+        ///
+        /// Returns the inner-bar maximum width (after the 2px inset padding), which
+        /// LateUpdate multiplies by HP percent to get the current displayed width.
+        /// </summary>
+        private float CreateHPBar(RectTransform parent, string name,
             Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot,
-            Vector2 pos, Vector2 size, Color fillColor, out Image fill, out Image ghost)
+            Vector2 pos, Vector2 size, Color fillColor,
+            out Image fill, out RectTransform fillRT)
         {
             var bgObj = CreatePanel(parent, name + "_BG", anchorMin, anchorMax, pivot, pos, size, new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.8f));
             var bgRT = bgObj.GetComponent<RectTransform>();
 
-            var ghostObj = CreatePanel(bgRT, name + "_Ghost", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.25f));
-            ghost = ghostObj.GetComponent<Image>(); ghost.type = Image.Type.Filled; ghost.fillMethod = Image.FillMethod.Horizontal; ghost.fillAmount = 1f;
-            ghostObj.GetComponent<RectTransform>().offsetMin = new Vector2(2, 2); ghostObj.GetComponent<RectTransform>().offsetMax = new Vector2(-2, -2);
+            const float pad = 2f;
+            float innerWidth = size.x - pad * 2f;
+            float innerHeight = size.y - pad * 2f;
 
-            var fillObj = CreatePanel(bgRT, name + "_Fill", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0, 0.5f), Vector2.zero, Vector2.zero, fillColor);
-            fill = fillObj.GetComponent<Image>(); fill.type = Image.Type.Filled; fill.fillMethod = Image.FillMethod.Horizontal; fill.fillAmount = 1f;
-            fillObj.GetComponent<RectTransform>().offsetMin = new Vector2(2, 2); fillObj.GetComponent<RectTransform>().offsetMax = new Vector2(-2, -2);
+            var fillObj = new GameObject(name + "_Fill", typeof(RectTransform), typeof(Image));
+            fillObj.transform.SetParent(bgRT, false);
+            fillRT = fillObj.GetComponent<RectTransform>();
+            // Anchor to the left edge of the background so the bar 'grows from the left'.
+            // Pivot (0, 0.5) means sizeDelta.x IS the rendered width in pixels.
+            fillRT.anchorMin = new Vector2(0, 0.5f);
+            fillRT.anchorMax = new Vector2(0, 0.5f);
+            fillRT.pivot = new Vector2(0, 0.5f);
+            fillRT.anchoredPosition = new Vector2(pad, 0);
+            fillRT.sizeDelta = new Vector2(innerWidth, innerHeight);
+
+            fill = fillObj.GetComponent<Image>();
+            fill.color = fillColor;
+            // Image stays Simple (default). No sprite needed; Unity renders a solid colour
+            // rectangle which is exactly what we want.
+            return innerWidth;
         }
 
         private static GameObject CreatePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)

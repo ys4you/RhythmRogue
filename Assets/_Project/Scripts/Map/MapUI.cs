@@ -115,6 +115,13 @@ namespace RhythmRogue.Map
 
         // HUD + info
         private Text _seedText, _hpText;
+        // HP bar uses direct RectTransform width scaling (same approach as BattleUI). The
+        // fill panel has pivot (0, 0.5) so its sizeDelta.x is the literal rendered width.
+        // No Image.fillAmount, no ghost trail - just a clean bar that shrinks visibly.
+        private RectTransform _hpFillRT;
+        private Image _hpFill;
+        private float _hpBarMaxWidth;
+        private float _hpFillTarget = 1f, _hpFillDisplay = 1f;
         private GameObject _infoPanel;
         private Text _infoTitle, _infoSub;
         private Button _confirmButton;
@@ -182,6 +189,9 @@ namespace RhythmRogue.Map
 
             // Float the player marker so it reads as a character rather than static UI.
             UpdateMarkerBob(Time.unscaledDeltaTime);
+
+            // Lerp the HP bar fill toward target so damage/healing animates rather than snapping.
+            UpdateHPBar(Time.unscaledDeltaTime);
         }
 
         public void BuildMap(MapData mapData)
@@ -334,21 +344,81 @@ namespace RhythmRogue.Map
                 new Vector2(50, -50), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, UIHelpers.Shadow);
             _seedText.text = $"Seed: {_mapData.Seed}";
 
-            // HP text: bottom-left of canvas (outside scroll area).
+            // HP HUD: bar + number, bottom-left corner of the screen (outside scroll area).
+            // Layout: number text sits above the bar so it's readable; bar uses direct width
+            // scaling for a clean 'traditional HP bar' shrink animation.
+            const float hpBarWidth = 400f;
+            const float hpBarHeight = 28f;
+            const float hpBarX = 50f;
+            const float hpBarY = 50f;
+            const float pad = 2f;
+
+            // Bar background (dark surface, slightly transparent).
+            var bgGO = MakePanel(_canvasRT, "HPBarBG",
+                new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
+                new Vector2(hpBarX, hpBarY), new Vector2(hpBarWidth, hpBarHeight),
+                new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.85f));
+            var bgRT = bgGO.GetComponent<RectTransform>();
+
+            // Fill: anchored top-left + bottom-left of the background with pivot (0, 0.5).
+            // sizeDelta.x is the rendered pixel width. UpdateHPBar resizes this each frame.
+            _hpBarMaxWidth = hpBarWidth - pad * 2f;
+            var fillGO = new GameObject("HPFill", typeof(RectTransform), typeof(Image));
+            fillGO.transform.SetParent(bgRT, false);
+            _hpFillRT = fillGO.GetComponent<RectTransform>();
+            _hpFillRT.anchorMin = new Vector2(0, 0.5f);
+            _hpFillRT.anchorMax = new Vector2(0, 0.5f);
+            _hpFillRT.pivot = new Vector2(0, 0.5f);
+            _hpFillRT.anchoredPosition = new Vector2(pad, 0);
+            _hpFillRT.sizeDelta = new Vector2(_hpBarMaxWidth, hpBarHeight - pad * 2f);
+            _hpFill = fillGO.GetComponent<Image>();
+            _hpFill.color = UIHelpers.WarmGold;
+
+            // HP number text: sits above the bar.
             _hpText = MakeText(_canvasRT, "HPText", new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
-                new Vector2(50, 30), new Vector2(400, 50), 26, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
+                new Vector2(hpBarX, hpBarY + hpBarHeight + 4f), new Vector2(hpBarWidth, 40f),
+                24, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
         }
 
         private void UpdateHUD()
         {
             var ph = Battle.PlayerHealth.Instance;
-            if (ph != null && _hpText != null)
-            {
-                float pct = ph.HPPercent;
-                Color c = UIHelpers.HPColor(pct);
-                string hex = ColorUtility.ToHtmlStringRGB(c);
-                _hpText.text = $"HP: <color=#{hex}>{ph.CurrentHP}/{ph.MaxHP}</color>";
-            }
+            if (ph == null || _hpText == null) return;
+
+            float pct = ph.HPPercent;
+            _hpFillTarget = pct;
+
+            Color c = UIHelpers.HPColor(pct);
+            string hex = ColorUtility.ToHtmlStringRGB(c);
+            _hpText.text = $"HP <color=#{hex}>{ph.CurrentHP}/{ph.MaxHP}</color>";
+        }
+
+        /// <summary>
+        /// Per-frame lerp for the HP bar. Direct width scaling on the fill RectTransform
+        /// (no Image.fillAmount). Colour is recomputed each frame from the displayed value
+        /// so the bar reads correctly mid-animation.
+        /// </summary>
+        private void UpdateHPBar(float dt)
+        {
+            if (_hpFill == null || _hpFillRT == null) return;
+            _hpFillDisplay = Mathf.Lerp(_hpFillDisplay, _hpFillTarget, dt * 8f);
+            float w = Mathf.Max(0f, _hpBarMaxWidth * Mathf.Clamp01(_hpFillDisplay));
+            var sd = _hpFillRT.sizeDelta;
+            _hpFillRT.sizeDelta = new Vector2(w, sd.y);
+            _hpFill.color = UIHelpers.HPColor(_hpFillDisplay);
+        }
+
+        /// <summary>Helper: create a uniformly-coloured RectTransform panel.</summary>
+        private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot,
+            Vector2 pos, Vector2 size, Color color)
+        {
+            var obj = new GameObject(name, typeof(RectTransform), typeof(Image));
+            obj.transform.SetParent(parent, false);
+            var rt = obj.GetComponent<RectTransform>();
+            rt.anchorMin = ancMin; rt.anchorMax = ancMax; rt.pivot = pivot;
+            rt.anchoredPosition = pos; rt.sizeDelta = size;
+            obj.GetComponent<Image>().color = color;
+            return obj;
         }
 
         private void CreateLines()

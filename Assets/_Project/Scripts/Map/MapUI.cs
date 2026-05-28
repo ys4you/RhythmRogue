@@ -53,6 +53,14 @@ namespace RhythmRogue.Map
         [Tooltip("Speed of the smooth scroll lerp. Higher = snappier.")]
         [SerializeField] private float _scrollLerpSpeed = 10f;
 
+        [Header("Accessible Node Pulse")]
+        [Tooltip("Rate of the glow pulse on accessible nodes (radians/second). Higher = faster heartbeat.")]
+        [SerializeField] private float _glowPulseSpeed = 3f;
+        [Tooltip("Minimum glow alpha during the pulse dip. 0 = invisible at the trough, 1 = no fade.")]
+        [SerializeField, Range(0f, 1f)] private float _glowPulseMinAlpha = 0.4f;
+        [Tooltip("How much the glow grows at the peak of the pulse. 0 = no scale, 0.1 = 10% larger.")]
+        [SerializeField, Range(0f, 0.3f)] private float _glowPulseScale = 0.08f;
+
         [Header("Node Icons (32x32 sprites, optional)")]
         [Tooltip("If null, auto-loads from Resources/MapIcons/node_<type>. Falls back to emoji text if not found.")]
         [SerializeField] private Sprite _iconEnemy;
@@ -107,6 +115,9 @@ namespace RhythmRogue.Map
         private bool _scrollAnimating = false;
         private GameObject _lastSelectedForScroll;
 
+        // Glow pulse animation. Continuous timer; only nodes flagged PulseGlow react.
+        private float _pulseTime = 0f;
+
         private static Color EnemyColor => UIHelpers.RustOrange;
         private static Color RestColor => UIHelpers.WarmGold;
         private static Color BossColor => UIHelpers.RustOrange;
@@ -136,6 +147,9 @@ namespace RhythmRogue.Map
 
             // Drive the smooth scroll lerp toward _targetNormalizedY if active.
             HandleSmoothScroll();
+
+            // Pulse accessible node glows so the player can see at a glance what's clickable.
+            UpdateGlowPulse(Time.unscaledDeltaTime);
         }
 
         public void BuildMap(MapData mapData)
@@ -398,7 +412,7 @@ namespace RhythmRogue.Map
                 new Vector2(10, 10), new Vector2(50, 50), 26, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             check.text = "";
 
-            return new NodeVisual { Root = rootGO, Background = bg, IconImage = iconImage, IconLabel = iconLabel, Glow = glow, Checkmark = check, Button = btn };
+            return new NodeVisual { Root = rootGO, Background = bg, IconImage = iconImage, IconLabel = iconLabel, Glow = glow, GlowRT = glowRT, Checkmark = check, Button = btn };
         }
 
         private void UpdateNodeVisual(MapNode node, NodeVisual vis)
@@ -409,6 +423,8 @@ namespace RhythmRogue.Map
                 vis.Glow.color = new Color(0, 0, 0, 0);
                 vis.Checkmark.text = "✓";
                 vis.Button.interactable = false;
+                vis.PulseGlow = false;
+                if (vis.GlowRT != null) vis.GlowRT.localScale = Vector3.one;
                 if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.4f);
                 if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.4f);
             }
@@ -418,6 +434,7 @@ namespace RhythmRogue.Map
                 vis.Glow.color = AccessibleGlow;
                 vis.Checkmark.text = "";
                 vis.Button.interactable = true;
+                vis.PulseGlow = true;
                 if (vis.IconImage != null) vis.IconImage.color = UIHelpers.OffWhite;
                 if (vis.IconLabel != null) vis.IconLabel.color = UIHelpers.OffWhite;
             }
@@ -427,6 +444,8 @@ namespace RhythmRogue.Map
                 vis.Glow.color = new Color(0, 0, 0, 0);
                 vis.Checkmark.text = "";
                 vis.Button.interactable = false;
+                vis.PulseGlow = false;
+                if (vis.GlowRT != null) vis.GlowRT.localScale = Vector3.one;
                 if (vis.IconImage != null) vis.IconImage.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
                 if (vis.IconLabel != null) vis.IconLabel.color = new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.5f);
             }
@@ -522,7 +541,14 @@ namespace RhythmRogue.Map
             {
                 var n = FindNode(kvp.Key);
                 if (n != null && n.IsAccessible && !n.IsCompleted)
-                    kvp.Value.Glow.color = (n.Id == nodeId) ? UIHelpers.OffWhite : AccessibleGlow;
+                {
+                    bool isClicked = (n.Id == nodeId);
+                    kvp.Value.Glow.color = isClicked ? UIHelpers.OffWhite : AccessibleGlow;
+                    // The clicked node holds steady at full intensity so it reads as the focus
+                    // target; other accessible nodes keep pulsing in the background.
+                    kvp.Value.PulseGlow = !isClicked;
+                    if (isClicked && kvp.Value.GlowRT != null) kvp.Value.GlowRT.localScale = Vector3.one;
+                }
             }
             if (_nodeVisuals.TryGetValue(nodeId, out var vis)) MapNavigationBuilder.WireInfoPanel(vis.Button, _confirmButton);
             _cancelHandler.Push(() => CloseInfoPanel(nodeId));
@@ -535,7 +561,11 @@ namespace RhythmRogue.Map
             foreach (var kvp in _nodeVisuals)
             {
                 var n = FindNode(kvp.Key);
-                if (n != null && n.IsAccessible && !n.IsCompleted) kvp.Value.Glow.color = AccessibleGlow;
+                if (n != null && n.IsAccessible && !n.IsCompleted)
+                {
+                    kvp.Value.Glow.color = AccessibleGlow;
+                    kvp.Value.PulseGlow = true;
+                }
             }
             RebuildNavigation();
             if (_nodeVisuals.TryGetValue(nodeIdToRestore, out var vis) && vis.Button.IsInteractable())
@@ -642,6 +672,35 @@ namespace RhythmRogue.Map
             }
         }
 
+        /// <summary>
+        /// Per-frame pulse for accessible node glows. The pulse is driven by a single shared
+        /// sine timer so all accessible nodes breathe in unison, which reads as a coherent
+        /// 'these are the things you can pick' signal rather than chaotic flicker.
+        ///
+        /// Cheap: O(n) over node count, no allocations. With < 30 nodes per map this is
+        /// well below any noticeable cost.
+        /// </summary>
+        private void UpdateGlowPulse(float dt)
+        {
+            if (_nodeVisuals.Count == 0) return;
+            _pulseTime += dt * _glowPulseSpeed;
+
+            // Sine wave shifted to [0, 1].
+            float t = (Mathf.Sin(_pulseTime) + 1f) * 0.5f;
+            float alpha = Mathf.Lerp(_glowPulseMinAlpha, 1f, t);
+            float scale = 1f + _glowPulseScale * t;
+
+            foreach (var kvp in _nodeVisuals)
+            {
+                var vis = kvp.Value;
+                if (!vis.PulseGlow) continue;
+                Color c = vis.Glow.color;
+                c.a = alpha;
+                vis.Glow.color = c;
+                if (vis.GlowRT != null) vis.GlowRT.localScale = new Vector3(scale, scale, 1f);
+            }
+        }
+
         // ============================================================
         // Helpers
         // ============================================================
@@ -726,7 +785,9 @@ namespace RhythmRogue.Map
         {
             public GameObject Root; public Image Background;
             public Image IconImage; public Text IconLabel;
-            public Image Glow; public Text Checkmark; public Button Button;
+            public Image Glow; public RectTransform GlowRT;
+            public Text Checkmark; public Button Button;
+            public bool PulseGlow; // True when the node is accessible and not currently the clicked focus.
         }
     }
 }

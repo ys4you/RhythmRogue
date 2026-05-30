@@ -32,6 +32,7 @@ namespace RhythmRogue.UI.Navigation
             if (existing != null)
             {
                 EnsureInputModule(existing.gameObject);
+                UINavigationGate.Ensure();
                 return existing;
             }
 
@@ -39,6 +40,9 @@ namespace RhythmRogue.UI.Navigation
             GameObject go = new GameObject("EventSystem");
             EventSystem es = go.AddComponent<EventSystem>();
             EnsureInputModule(go);
+            // Gate keyboard/gamepad navigation so it stays off until actually used.
+            // Added after the input module so the gate can find and control it.
+            UINavigationGate.Ensure();
 
             return es;
         }

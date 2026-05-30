@@ -132,7 +132,18 @@ namespace RhythmRogue.UI
             if (_optionButtons.Count > 0)
             {
                 UINavigationHelper.WireHorizontal(_optionButtons.ToArray());
-                foreach (var btn in _optionButtons) UISelectableStyle.Apply(btn);
+                // NOTE: deliberately NOT calling UISelectableStyle.Apply here. That sets a
+                // ColorTint transition whose selected-state color multiplies the card
+                // background, making the focused card a different color than its siblings.
+                // Focus is instead shown by UIFocusFrame (a toggled gold ring) set up in
+                // CreateRelicCard, with the button transition forced to None. We still want
+                // the hover/confirm SFX that UISelectableStyle would have attached, so we
+                // attach the sound component directly.
+                foreach (var btn in _optionButtons)
+                {
+                    if (btn.GetComponent<UISelectableSounds>() == null)
+                        btn.gameObject.AddComponent<UISelectableSounds>();
+                }
                 _focusSetter.SetDefault(_optionButtons[_optionButtons.Count > 2 ? 1 : 0].gameObject);
             }
         }
@@ -148,8 +159,33 @@ namespace RhythmRogue.UI
             _optionButtons.Add(btn);
             RectTransform cardRT = cardGO.GetComponent<RectTransform>();
 
+            // Always-on rarity border: a thin static halo behind the card, tinted by rarity.
+            // Identical for cards of the same rarity, never recolored by focus state.
             var borderGO = MakePanel(cardRT, "Border", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, new Color(borderColor.r, borderColor.g, borderColor.b, 0.4f));
             var brt = borderGO.GetComponent<RectTransform>(); brt.offsetMin = new Vector2(-10, -10); brt.offsetMax = new Vector2(10, 10); brt.SetAsFirstSibling();
+
+            // Focus frame: a bright gold ring shown ONLY when this card has keyboard/mouse
+            // focus. Hidden by default, toggled by UIFocusFrame via select/hover events.
+            //
+            // Ordering matters. Both this frame and the rarity border sit BEHIND the card
+            // body (SetAsFirstSibling makes the most-recently-set one the back-most child).
+            // We want, from back to front: focus frame (biggest) -> rarity border -> card body.
+            // So the focus frame must be set to first-sibling AFTER the border, and must be
+            // LARGER than the border (16px vs 10px outset) so a gold edge peeks out beyond
+            // the rarity halo when focused. If it were smaller or set before the border, the
+            // border would completely cover it and the focus highlight would be invisible
+            // (which was the original bug).
+            //
+            // Replaces Unity's ColorTint focus transition, which multiplied the selected-state
+            // color against the card background and made the focused card a different color
+            // than its siblings. With ColorTint off + this frame, card backgrounds stay true.
+            var focusFrameGO = MakePanel(cardRT, "FocusFrame", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.WarmGold);
+            var ffrt = focusFrameGO.GetComponent<RectTransform>(); ffrt.offsetMin = new Vector2(-16, -16); ffrt.offsetMax = new Vector2(16, 16); ffrt.SetAsFirstSibling();
+
+            // Disable Unity's built-in tint transition and drive focus via UIFocusFrame.
+            btn.transition = Selectable.Transition.None;
+            var focus = cardGO.AddComponent<UIFocusFrame>();
+            focus.SetFrame(focusFrameGO);
 
             MakeText(cardRT, "Rarity", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -30), new Vector2(cardW - 40, 40), 18, TextAnchor.MiddleCenter, borderColor).text = relic.rarity.ToString().ToUpper();
 
@@ -168,18 +204,35 @@ namespace RhythmRogue.UI
             }
         }
 
-        private static string FormatEffectValue(RelicData relic) => relic.effect switch
+        // Builds the value badge string (e.g. "+5ms", "-2 dmg"). Returns empty when the
+        // relevant value is zero so a misconfigured relic shows no badge rather than a
+        // meaningless "+0". Each effect reads exactly one value field, matching the
+        // canonical mapping in RelicEffectAggregator: float-backed effects read floatValue,
+        // int-backed effects read intValue.
+        private static string FormatEffectValue(RelicData relic)
         {
-            RelicEffect.WiderPerfectWindow => $"+{relic.floatValue}ms",
-            RelicEffect.BonusPerfectDamage => $"+{relic.floatValue} dmg",
-            RelicEffect.ComboRateBoost => $"+{relic.floatValue}/hit",
-            RelicEffect.ComboCapBoost => $"+{relic.floatValue}x cap",
-            RelicEffect.HealOnComboMilestone => $"+{relic.intValue} HP",
-            RelicEffect.ReduceMissDamage => $"-{relic.intValue} dmg",
-            RelicEffect.MaxHPBoost => $"+{relic.intValue} max HP",
-            RelicEffect.CurrencyMultiplier => $"+{relic.floatValue * 100:0}%",
-            _ => ""
-        };
+            switch (relic.effect)
+            {
+                case RelicEffect.WiderPerfectWindow:
+                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}ms" : "";
+                case RelicEffect.BonusPerfectDamage:
+                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##} dmg" : "";
+                case RelicEffect.ComboRateBoost:
+                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}/hit" : "";
+                case RelicEffect.ComboCapBoost:
+                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}x cap" : "";
+                case RelicEffect.HealOnComboMilestone:
+                    return relic.intValue != 0 ? $"+{relic.intValue} HP" : "";
+                case RelicEffect.ReduceMissDamage:
+                    return relic.intValue != 0 ? $"-{relic.intValue} dmg" : "";
+                case RelicEffect.MaxHPBoost:
+                    return relic.intValue != 0 ? $"+{relic.intValue} max HP" : "";
+                case RelicEffect.CurrencyMultiplier:
+                    return relic.floatValue != 0f ? $"+{relic.floatValue * 100:0}%" : "";
+                default:
+                    return "";
+            }
+        }
 
         private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
         {

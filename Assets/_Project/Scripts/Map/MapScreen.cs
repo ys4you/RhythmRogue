@@ -62,6 +62,7 @@ namespace RhythmRogue.Map
                 _runState.MapData = MapGenerator.Generate(mapRng, _runState.Seed, _area);
             }
 
+            _mapUI.SetRunState(_runState);
             _mapUI.BuildMap(_runState.MapData);
             _mapUI.OnNodeConfirmed += HandleNodeConfirmed;
 

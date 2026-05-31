@@ -1,6 +1,7 @@
 using UnityEngine;
 using RhythmRogue.Core;
 using RhythmRogue.Core.Audio;
+using RhythmRogue.Data;
 using RhythmRogue.Map;
 using RhythmRogue.Util;
 
@@ -54,7 +55,11 @@ namespace RhythmRogue.Battle
             if (victory)
             {
                 bool wasBoss = _runState.SelectedNode?.EnemyData?.IsBoss ?? false;
-                _runState.LastBattleWasElite = _runState.SelectedNode?.Type == NodeType.Elite;
+                bool wasElite = _runState.SelectedNode?.Type == NodeType.Elite;
+                _runState.LastBattleWasElite = wasElite;
+
+                AwardCurrency(wasBoss, wasElite, accuracy);
+
                 _runState.CompleteSelectedNode();
 
                 if (wasBoss) { _runState.EndRun(true); GoTo("SummaryScene"); }
@@ -65,6 +70,29 @@ namespace RhythmRogue.Battle
                 _runState.EndRun(false);
                 GoTo("SummaryScene");
             }
+        }
+
+        /// <summary>
+        /// Award run currency for a battle win. Reads the encounter kind, the player's
+        /// accuracy, and any CurrencyMultiplier relics, then asks EconomyService to
+        /// compute the amount from the EconomyConfig (model C: flat base + capped
+        /// accuracy bonus). Called before CompleteSelectedNode so SelectedNode is still
+        /// valid for reading the encounter type.
+        /// </summary>
+        private void AwardCurrency(bool wasBoss, bool wasElite, float accuracy)
+        {
+            var config = _runState.Economy;
+            if (config == null) return;
+
+            var kind = wasBoss ? EconomyService.EncounterKind.Boss
+                     : wasElite ? EconomyService.EncounterKind.Elite
+                     : EconomyService.EncounterKind.Normal;
+
+            // CurrencyMultiplier relics (e.g. Coin Magnet) stack multiplicatively via the aggregator.
+            float currencyMult = RelicEffectAggregator.Aggregate(_runState.ActiveRelics).CurrencyMultiplier;
+
+            int award = EconomyService.ComputeAward(config, kind, accuracy, currencyMult);
+            _runState.AddCurrency(award);
         }
 
         private void GoTo(string scene)

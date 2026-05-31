@@ -108,13 +108,14 @@ namespace RhythmRogue.Map
 
         // Map state
         private MapData _mapData;
+        private RhythmRogue.Core.RunState _runState; // for currency HUD; set by MapScreen before BuildMap
         private readonly Dictionary<int, NodeVisual> _nodeVisuals = new();
         private readonly List<GameObject> _lineObjects = new();
         private MapNode _selectedNode;
         private float _contentHeight = 0f;
 
         // HUD + info
-        private Text _seedText, _hpText;
+        private Text _seedText, _hpText, _currencyText;
         // HP bar uses direct RectTransform width scaling (same approach as BattleUI). The
         // fill panel has pivot (0, 0.5) so its sizeDelta.x is the literal rendered width.
         // No Image.fillAmount, no ghost trail - just a clean bar that shrinks visibly.
@@ -192,6 +193,15 @@ namespace RhythmRogue.Map
 
             // Lerp the HP bar fill toward target so damage/healing animates rather than snapping.
             UpdateHPBar(Time.unscaledDeltaTime);
+        }
+
+        /// <summary>
+        /// Provide the RunState so the HUD can show the run currency. Optional: if not set,
+        /// the currency readout simply doesn't appear. Call before BuildMap.
+        /// </summary>
+        public void SetRunState(RhythmRogue.Core.RunState runState)
+        {
+            _runState = runState;
         }
 
         public void BuildMap(MapData mapData)
@@ -378,6 +388,30 @@ namespace RhythmRogue.Map
             _hpText = MakeText(_canvasRT, "HPText", new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
                 new Vector2(hpBarX, hpBarY + hpBarHeight + 4f), new Vector2(hpBarWidth, 40f),
                 24, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
+
+            // Currency readout: top-right of canvas, mirroring the seed text top-left.
+            // Shown only if a RunState was provided. Uses the configurable currency name.
+            _currencyText = MakeText(_canvasRT, "CurrencyText", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
+                new Vector2(-50, -50), new Vector2(500, 50), 26, TextAnchor.MiddleRight, UIHelpers.WarmGold);
+            _currencyText.fontStyle = FontStyle.Bold;
+            UpdateCurrencyText();
+        }
+
+        /// <summary>
+        /// Render the current currency using the configurable name from EconomyConfig
+        /// (e.g. "Beats: 120"). Hidden if no RunState was supplied.
+        /// </summary>
+        private void UpdateCurrencyText()
+        {
+            if (_currencyText == null) return;
+            if (_runState == null)
+            {
+                _currencyText.gameObject.SetActive(false);
+                return;
+            }
+            _currencyText.gameObject.SetActive(true);
+            string name = _runState.Economy != null ? _runState.Economy.CurrencyName : "Beats";
+            _currencyText.text = $"{name}: {_runState.Currency}";
         }
 
         private void UpdateHUD()
@@ -391,6 +425,9 @@ namespace RhythmRogue.Map
             Color c = UIHelpers.HPColor(pct);
             string hex = ColorUtility.ToHtmlStringRGB(c);
             _hpText.text = $"HP <color=#{hex}>{ph.CurrentHP}/{ph.MaxHP}</color>";
+
+            // Currency can change between map visits (earned in battle), so refresh it here too.
+            UpdateCurrencyText();
         }
 
         /// <summary>

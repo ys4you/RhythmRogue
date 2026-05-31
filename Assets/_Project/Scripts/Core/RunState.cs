@@ -17,6 +17,9 @@ namespace RhythmRogue.Core
         [System.NonSerialized] public string Seed;
         public int StartingHP = 100;
 
+        [Tooltip("Economy tuning (currency name, awards, prices). If unassigned, loads Resources/Configs/DefaultEconomy.")]
+        public EconomyConfig EconomyConfig;
+
         [Header("Runtime")]
         [System.NonSerialized] public bool IsRunActive;
         [System.NonSerialized] public int CurrentNodeId = -1;
@@ -32,6 +35,20 @@ namespace RhythmRogue.Core
         [System.NonSerialized] public IRunSeed RunSeed;
         [System.NonSerialized] public List<RelicData> ActiveRelics = new();
         [System.NonSerialized] public bool LastBattleWasElite;
+
+        // Run currency (working name 'Beats', configurable via EconomyConfig.CurrencyName).
+        // NonSerialized so it doesn't persist across editor play sessions; reset each run.
+        // Other systems should use AddCurrency / TrySpendCurrency rather than mutating directly.
+        [System.NonSerialized] public int Currency;
+
+        /// <summary>Fired whenever Currency changes (delta can be negative on spend). For HUD updates.</summary>
+        public event System.Action<int, int> OnCurrencyChanged; // (newTotal, delta)
+
+        /// <summary>
+        /// Resolved economy config (Inspector reference if set, else Resources fallback).
+        /// Exposed so battle/reward/shop systems share one source of economy truth.
+        /// </summary>
+        public EconomyConfig Economy => Data.EconomyConfig.Resolve(EconomyConfig);
 
         public void StartNewRun(string seed = null)
         {
@@ -52,8 +69,9 @@ namespace RhythmRogue.Core
             MapData = null; SelectedNode = null; SelectedChart = null;
             ActiveRelics = new List<RelicData>();
             LastBattleWasElite = false;
+            Currency = Economy != null ? Economy.StartingCurrency : 0;
 
-            GameLog.Info($"[RunState] New run started. Seed: {Seed}");
+            GameLog.Info($"[RunState] New run started. Seed: {Seed} Currency: {Currency}");
         }
 
         public void RecordBattleResult(bool won, int score, float accuracy, int maxCombo)
@@ -77,7 +95,30 @@ namespace RhythmRogue.Core
         {
             WasVictory = victory;
             IsRunActive = false;
-            GameLog.Info($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} Battles:{BattlesWon} Score:{TotalScore}");
+            GameLog.Info($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} Battles:{BattlesWon} Score:{TotalScore} Currency:{Currency}");
+        }
+
+        /// <summary>Add currency (e.g. battle reward). Negative amounts are ignored; use TrySpendCurrency to spend.</summary>
+        public void AddCurrency(int amount)
+        {
+            if (amount <= 0) return;
+            Currency += amount;
+            OnCurrencyChanged?.Invoke(Currency, amount);
+            GameLog.Info($"[RunState] +{amount} currency (total {Currency}).");
+        }
+
+        /// <summary>
+        /// Attempt to spend currency. Returns true and deducts if the player can afford it;
+        /// returns false and changes nothing otherwise. Used by the shop (when built).
+        /// </summary>
+        public bool TrySpendCurrency(int amount)
+        {
+            if (amount <= 0) return true;
+            if (Currency < amount) return false;
+            Currency -= amount;
+            OnCurrencyChanged?.Invoke(Currency, -amount);
+            GameLog.Info($"[RunState] -{amount} currency (total {Currency}).");
+            return true;
         }
     }
 }

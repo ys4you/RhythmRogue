@@ -54,7 +54,14 @@ namespace RhythmRogue.Battle
 
             if (victory)
             {
-                bool wasBoss = _runState.SelectedNode?.EnemyData?.IsBoss ?? false;
+                // Boss-ness is decided by the NODE TYPE, which the map generator sets
+                // authoritatively (NodeType.Boss). Do NOT infer it from EnemyData.IsBoss
+                // (maxHP >= 250): that fails whenever the boss asset's HP is under 250 or
+                // its EnemyData is null, which silently routes the boss win to the reward
+                // screen and never grants victory. The EnemyData.IsBoss check stays only as
+                // a secondary fallback for safety.
+                bool wasBoss = _runState.SelectedNode?.Type == NodeType.Boss
+                               || (_runState.SelectedNode?.EnemyData?.IsBoss ?? false);
                 bool wasElite = _runState.SelectedNode?.Type == NodeType.Elite;
                 _runState.LastBattleWasElite = wasElite;
 

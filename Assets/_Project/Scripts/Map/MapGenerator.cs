@@ -18,7 +18,7 @@ namespace RhythmRogue.Map
         private struct LayerConfig
         {
             public int MinNodes, MaxNodes;
-            public float RestChance, EliteChance;
+            public float RestChance, EliteChance, ShopChance, EventChance;
         }
 
         // Total layer count (start + opener + mid + boss). 6 means: 1 start + 1 opener + 3 mid + 1 boss.
@@ -27,17 +27,20 @@ namespace RhythmRogue.Map
 
         // Start layer: a single entry node.
         private static readonly LayerConfig StartLayer =
-            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0f, EliteChance = 0f };
+            new() { MinNodes = 1, MaxNodes = 1, RestChance = 0f, EliteChance = 0f, ShopChance = 0f, EventChance = 0f };
 
         // Opener layer (layer 2): wider 3-4 node fan-out from the start.
         // No rest, no elite this early - just basic enemies to ease the player in.
         private static readonly LayerConfig OpenerLayer =
-            new() { MinNodes = 3, MaxNodes = 4, RestChance = 0f, EliteChance = 0f };
+            new() { MinNodes = 3, MaxNodes = 4, RestChance = 0f, EliteChance = 0f, ShopChance = 0f, EventChance = 0f };
 
         // Mid layer (layer 3+): 2-4 nodes, mixed node types.
-        // Rest and elite chances kick in here so the run gets choice and tension.
+        // Rest, elite, shop, and event chances kick in here so the run gets choice and tension.
+        // Chances are checked in priority order in PickNodeType; remainder falls through to Enemy.
+        // With these values a typical mid node is roughly: 20% elite, 18% shop, 15% rest,
+        // 15% event, ~32% enemy (the checks are sequential so later ones see the leftover share).
         private static readonly LayerConfig MidLayer =
-            new() { MinNodes = 2, MaxNodes = 4, RestChance = 0.25f, EliteChance = 0.2f };
+            new() { MinNodes = 2, MaxNodes = 4, RestChance = 0.15f, EliteChance = 0.2f, ShopChance = 0.18f, EventChance = 0.15f };
 
         /// <summary>
         /// Generate a map for the given area. Enemies are picked from area pools
@@ -128,8 +131,13 @@ namespace RhythmRogue.Map
 
         private static NodeType PickNodeType(LayerConfig config, ISeededRandom rng)
         {
+            // Sequential checks, each on the share left after the previous. Order sets priority.
+            // Shop and Event are now produced here; previously this method could only ever
+            // return Elite / Rest / Enemy, so shops never appeared on the map at all.
             if (config.EliteChance > 0f && rng.Chance(config.EliteChance)) return NodeType.Elite;
+            if (config.ShopChance > 0f && rng.Chance(config.ShopChance)) return NodeType.Shop;
             if (config.RestChance > 0f && rng.Chance(config.RestChance)) return NodeType.Rest;
+            if (config.EventChance > 0f && rng.Chance(config.EventChance)) return NodeType.Event;
             return NodeType.Enemy;
         }
 

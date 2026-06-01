@@ -25,6 +25,7 @@ namespace RhythmRogue.Core
         public const string MAP_SCENE = "MapScene";
         public const string BATTLE_SCENE = "BattleScene";
         public const string REST_SCENE = "RestScene";
+        public const string SHOP_SCENE = "ShopScene";
         public const string SUMMARY_SCENE = "SummaryScene";
 
         protected override void Awake() { base.Awake(); CreateFadeOverlay(); }
@@ -38,6 +39,7 @@ namespace RhythmRogue.Core
         public void GoToMap(Action onBeforeLoad = null) => GoTo(MAP_SCENE, onBeforeLoad);
         public void GoToBattle(Action onBeforeLoad = null) => GoTo(BATTLE_SCENE, onBeforeLoad);
         public void GoToRest(Action onBeforeLoad = null) => GoTo(REST_SCENE, onBeforeLoad);
+        public void GoToShop(Action onBeforeLoad = null) => GoTo(SHOP_SCENE, onBeforeLoad);
         public void GoToSummary(Action onBeforeLoad = null) => GoTo(SUMMARY_SCENE, onBeforeLoad);
 
         private IEnumerator TransitionCoroutine(string sceneName, Action onBeforeLoad)

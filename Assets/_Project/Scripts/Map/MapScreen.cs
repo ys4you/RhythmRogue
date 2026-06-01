@@ -97,8 +97,11 @@ namespace RhythmRogue.Map
                     DoRest(node);
                     break;
 
-                case NodeType.Event:
                 case NodeType.Shop:
+                    DoShop(node);
+                    break;
+
+                case NodeType.Event:
                     GameLog.Info($"[MapScreen] {node.Type} not implemented - skipping.");
                     _runState.SelectedNode = node;
                     _runState.CompleteSelectedNode();
@@ -132,6 +135,19 @@ namespace RhythmRogue.Map
                 tm.GoTo("RestScene");
             else
                 UnityEngine.SceneManagement.SceneManager.LoadScene("RestScene");
+        }
+
+        private void DoShop(MapNode node)
+        {
+            _runState.SelectedNode = node;
+
+            GameLog.Info("[MapScreen] ShopScene");
+
+            var tm = SceneTransitionManager.Instance;
+            if (tm != null)
+                tm.GoToShop();
+            else
+                UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.SHOP_SCENE);
         }
     }
 }

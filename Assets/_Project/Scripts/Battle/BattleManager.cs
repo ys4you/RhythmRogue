@@ -6,6 +6,9 @@ using RhythmRogue.Map;
 using RhythmRogue.Util.FSM;
 using RhythmRogue.Util;
 using RhythmRogue.Util.Random;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace RhythmRogue.Battle
 {
@@ -261,11 +264,29 @@ namespace RhythmRogue.Battle
 
         private void HandlePauseInput()
         {
-            if (!Input.GetKeyDown(KeyCode.Escape)) return;
+            // Read the pause key through the Input System. This project's Active Input
+            // Handling is set to "Input System Only" (activeInputHandler: 2), so the legacy
+            // UnityEngine.Input class is disabled and Input.GetKeyDown(Escape) never fires.
+            // That was why Escape did nothing in battle: the legacy call was silently dead.
+            // Gamepad Start also pauses, for controller play.
+            if (!PausePressedThisFrame()) return;
             if (_fsm.CurrentStateKey != BattlePhase.Playing) return;
 
             if (_conductor.IsPaused) ResumeBattle();
             else PauseBattle();
+        }
+
+        private static bool PausePressedThisFrame()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var kb = Keyboard.current;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame) return true;
+            var gp = Gamepad.current;
+            if (gp != null && gp.startButton.wasPressedThisFrame) return true;
+            return false;
+#else
+            return Input.GetKeyDown(KeyCode.Escape);
+#endif
         }
 
         private void PauseBattle()

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Core.Audio;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace RhythmRogue.UI.Navigation
 {
@@ -29,6 +32,21 @@ namespace RhythmRogue.UI.Navigation
     {
         private Action _baseAction;
         private readonly Stack<Action> _stack = new();
+
+        // Frame index up to which Cancel input is ignored. Used to prevent the same key
+        // press that OPENED a menu from being consumed again by this handler in the same
+        // (or next) frame, which would immediately cancel the menu. Set via SuppressForOneFrame.
+        private int _suppressUntilFrame = -1;
+
+        /// <summary>
+        /// Ignore Cancel input for the current and next frame. Call this right after showing
+        /// a panel whose open was triggered by the same Cancel/Escape key, so that key press
+        /// doesn't immediately bubble into a cancel here.
+        /// </summary>
+        public void SuppressForOneFrame()
+        {
+            _suppressUntilFrame = Time.frameCount + 1;
+        }
 
         /// <summary>
         /// Set the root cancel behavior (e.g. quit or go to main menu).
@@ -69,13 +87,29 @@ namespace RhythmRogue.UI.Navigation
 
         private void Update()
         {
-            // Check for Cancel input — Escape key or Gamepad B/Circle
-            // The InputSystemUIInputModule routes Cancel to the EventSystem,
-            // but we also check directly for reliability across input modes.
-            if (Input.GetKeyDown(KeyCode.Escape))
+            // Skip while suppressed (e.g. the frame the menu opened from the same key press).
+            if (Time.frameCount <= _suppressUntilFrame) return;
+
+            // Check for Cancel input - Escape key or Gamepad B/Circle.
+            // Read through the Input System because this project runs "Input System Only"
+            // (legacy UnityEngine.Input is disabled, so Input.GetKeyDown would never fire).
+            if (CancelPressedThisFrame())
             {
                 HandleCancel();
             }
+        }
+
+        private static bool CancelPressedThisFrame()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var kb = Keyboard.current;
+            if (kb != null && kb.escapeKey.wasPressedThisFrame) return true;
+            var gp = Gamepad.current;
+            if (gp != null && gp.buttonEast.wasPressedThisFrame) return true; // B / Circle
+            return false;
+#else
+            return Input.GetKeyDown(KeyCode.Escape);
+#endif
         }
 
         private void HandleCancel()

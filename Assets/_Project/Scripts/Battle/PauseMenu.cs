@@ -3,8 +3,6 @@ using UnityEngine;
 using UnityEngine.UI;
 using RhythmRogue.UI;
 using RhythmRogue.UI.Navigation;
-using RhythmRogue.Core.Audio;
-using RhythmRogue.Data;
 
 namespace RhythmRogue.Battle
 {
@@ -14,16 +12,15 @@ namespace RhythmRogue.Battle
     /// "resume" and "quit" mean by subscribing to the events (battle resumes the
     /// conductor; the map just closes the overlay).
     ///
-    /// The Settings button opens an in-place sub-panel with the run-relevant sliders
-    /// (scroll speed, audio offset, master/music/SFX volume) bound to the same
-    /// AudioSettings / ScrollSpeedSetting the main menu uses, so changes are consistent
-    /// and persist, without leaving the current scene or losing run state.
+    /// The Settings button opens the shared SettingsPanel component, the SAME full
+    /// Audio / Controls / Display settings the main menu uses. No settings UI is built
+    /// here; it's delegated, so there's one settings implementation across the game.
     ///
     /// SOLID:
-    ///   S - Presents the pause overlay + its settings sub-panel. It does not pause the
-    ///       conductor or change scenes itself; it raises events the scene handles.
-    ///   D - Reads/writes settings through the AudioSettings / ScrollSpeedSetting
-    ///       abstractions rather than touching AudioManager or PlayerPrefs directly.
+    ///   S - Presents the pause overlay (Resume/Settings/Quit) and hosts the shared
+    ///       settings panel. It does not build settings UI or pause the conductor itself.
+    ///   D - Delegates all settings to SettingsPanel; raises Resume/Quit events the
+    ///       owning scene handles.
     /// </summary>
     public class PauseMenu : MonoBehaviour
     {
@@ -37,9 +34,9 @@ namespace RhythmRogue.Battle
         private RectTransform _canvasRT;
         private GameObject _panel;
         private GameObject _mainGroup;     // Resume / Settings / Quit
-        private GameObject _settingsGroup; // sliders + Back
-        private Button _resumeBtn, _settingsBtn, _quitBtn, _settingsBackBtn;
+        private Button _resumeBtn, _settingsBtn, _quitBtn;
         private Text _titleLabel;
+        private SettingsPanel _settings;
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
 
@@ -63,14 +60,18 @@ namespace RhythmRogue.Battle
             ShowMainGroup();
             if (_focusSetter != null && _resumeBtn != null) _focusSetter.FocusOn(_resumeBtn.gameObject);
 
-            // The key press that opened this menu (Escape, handled by GlobalPauseManager)
-            // is read by this same input system. Without suppression, our own UICancelHandler
-            // would see that very same Escape this frame and immediately fire resume, closing
-            // the menu the instant it opens. Suppress cancel for one frame to avoid that.
+            // The key press that opened this menu (Escape, handled by GlobalPauseManager or
+            // BattleManager) is read by this same input system. Without suppression our own
+            // UICancelHandler would see that same Escape this frame and immediately resume,
+            // closing the menu the instant it opens. Suppress cancel for one frame.
             if (_cancelHandler != null) _cancelHandler.SuppressForOneFrame();
         }
 
-        public void Hide() { if (_panel != null) _panel.SetActive(false); }
+        public void Hide()
+        {
+            if (_settings != null && _settings.IsOpen) _settings.Close();
+            if (_panel != null) _panel.SetActive(false);
+        }
 
         // When this component is destroyed (e.g. a duplicate manager is cleaned up), also
         // destroy the root canvas we spawned, so it doesn't leak as an orphaned overlay.
@@ -87,23 +88,24 @@ namespace RhythmRogue.Battle
         private void ShowMainGroup()
         {
             _mainGroup.SetActive(true);
-            _settingsGroup.SetActive(false);
             // Base cancel = resume while on the main group.
-            _cancelHandler.SetBaseAction(OnResume);
-            _focusSetter.FocusOn(_resumeBtn.gameObject);
+            if (_cancelHandler != null) _cancelHandler.SetBaseAction(OnResume);
+            if (_focusSetter != null) _focusSetter.FocusOn(_resumeBtn.gameObject);
         }
 
-        private void ShowSettingsGroup()
+        private void OpenSettings()
         {
+            // Hand off to the shared settings panel. It pushes its own cancel handler so
+            // Escape inside settings backs out to here rather than resuming.
             _mainGroup.SetActive(false);
-            _settingsGroup.SetActive(true);
-            // While in settings, cancel goes back to the main group rather than resuming.
-            _cancelHandler.SetBaseAction(CloseSettings);
-            _focusSetter.FocusOn(_settingsBackBtn.gameObject);
+            _settings.Open();
         }
 
-        private void OpenSettings() => ShowSettingsGroup();
-        private void CloseSettings() => ShowMainGroup();
+        private void OnSettingsClosed()
+        {
+            // Settings panel closed itself; return to the main pause group.
+            ShowMainGroup();
+        }
 
         // ============================================================
         // UI
@@ -111,19 +113,14 @@ namespace RhythmRogue.Battle
 
         private void CreateUI()
         {
-            // IMPORTANT: do NOT parent the canvas under this component's transform.
-            // This PauseMenu lives under a DontDestroyOnLoad object (GlobalPauseManager),
-            // and nesting a ScreenSpaceOverlay canvas under a non-canvas parent that carries
-            // a non-identity/zero scale makes the canvas render at the wrong size (often
-            // invisible). Creating the canvas as a ROOT object guarantees Unity drives it to
-            // full screen space. We keep it alive across scene loads with its own
-            // DontDestroyOnLoad so it travels with the persistent manager logically.
+            // Create the canvas as a ROOT object (not parented under this component). This
+            // PauseMenu can live under a DontDestroyOnLoad object (GlobalPauseManager);
+            // nesting a ScreenSpaceOverlay canvas under a non-canvas parent could make it
+            // render at the wrong size. A root canvas is reliably driven to full screen.
             var canvasGO = new GameObject("PauseCanvas");
             _canvas = canvasGO.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            // High sorting order so the pause overlay draws above all in-scene UI
-            // (map canvas is 50, battle UI similar). Stays below the SceneTransitionManager
-            // fade overlay (9999) so scene-change fades still cover it.
+            // Above all in-scene UI (map canvas 50), below the fade overlay (9999).
             _canvas.sortingOrder = 500;
             var scaler = canvasGO.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -140,19 +137,24 @@ namespace RhythmRogue.Battle
             _panel.GetComponent<RectTransform>().offsetMax = Vector2.zero;
             var panelRT = _panel.GetComponent<RectTransform>();
 
-            // Card behind everything
-            MakePanel(panelRT, "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 720), UIHelpers.BgSurface);
+            // Card behind the main group
+            MakePanel(panelRT, "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(760, 560), UIHelpers.BgSurface);
 
-            _titleLabel = MakeText(panelRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -90), new Vector2(600, 100), 60, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
+            _titleLabel = MakeText(panelRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120), new Vector2(600, 100), 60, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             _titleLabel.fontStyle = FontStyle.Bold;
             _titleLabel.text = _titleText;
 
-            BuildMainGroup(panelRT);
-            BuildSettingsGroup(panelRT);
-
+            // Focus + cancel handlers, created before the groups so wiring can use them.
             _focusSetter = gameObject.AddComponent<UIFocusSetter>();
             _cancelHandler = gameObject.AddComponent<UICancelHandler>();
             _cancelHandler.SetBaseAction(OnResume);
+
+            BuildMainGroup(panelRT);
+
+            // Shared settings panel lives on the same canvas, hidden until opened.
+            _settings = gameObject.AddComponent<SettingsPanel>();
+            _settings.Build(_canvasRT, _focusSetter, _cancelHandler);
+            _settings.OnCloseRequested += OnSettingsClosed;
         }
 
         private void BuildMainGroup(RectTransform parent)
@@ -161,7 +163,7 @@ namespace RhythmRogue.Battle
             var rt = _mainGroup.GetComponent<RectTransform>();
 
             float btnW = 420f, btnH = 80f, gap = 24f;
-            float y = 120f;
+            float y = 60f;
 
             _resumeBtn = MakeButton(rt, "ResumeBtn", "Resume", new Vector2(0.5f, 0.5f), new Vector2(0, y), new Vector2(btnW, btnH), UIHelpers.RustOrange);
             _resumeBtn.onClick.AddListener(OnResume);
@@ -179,61 +181,6 @@ namespace RhythmRogue.Battle
             UISelectableStyle.Apply(_resumeBtn); UISelectableStyle.Apply(_settingsBtn); UISelectableStyle.Apply(_quitBtn);
         }
 
-        private void BuildSettingsGroup(RectTransform parent)
-        {
-            _settingsGroup = MakeGroup(parent, "SettingsGroup");
-            var rt = _settingsGroup.GetComponent<RectTransform>();
-
-            // Slider rows, top to bottom. Each binds to the shared settings singletons so
-            // values are consistent with the main menu and persist via PlayerPrefs.
-            float sliderY = 150f, sliderGap = 78f;
-
-            // Scroll Speed
-            var scrollSlider = MakeSliderRow(rt, "Scroll Speed", sliderY, 0.5f, 6.0f, ScrollSpeedSetting.Multiplier, out var scrollVal);
-            scrollVal.text = ScrollSpeedSetting.DisplayString;
-            scrollSlider.onValueChanged.AddListener(v =>
-            {
-                float r = Mathf.Round(v * 10f) / 10f;
-                ScrollSpeedSetting.Multiplier = r;
-                scrollVal.text = ScrollSpeedSetting.DisplayString;
-            });
-
-            // Audio Offset (ms)
-            float savedOffset = PlayerPrefs.GetFloat("audioOffset", 0f);
-            var offsetSlider = MakeSliderRow(rt, "Audio Offset", sliderY - sliderGap, -100f, 100f, savedOffset, out var offsetVal);
-            offsetSlider.wholeNumbers = true;
-            offsetVal.text = $"{savedOffset:+0;-0;0} ms";
-            offsetSlider.onValueChanged.AddListener(v =>
-            {
-                PlayerPrefs.SetFloat("audioOffset", v);
-                PlayerPrefs.Save();
-                offsetVal.text = $"{v:+0;-0;0} ms";
-            });
-
-            // Master / Music / SFX volume
-            var masterSlider = MakeSliderRow(rt, "Master Vol", sliderY - sliderGap * 2, 0f, 1f, RhythmRogue.Core.Audio.AudioSettings.MasterVolume, out _);
-            masterSlider.onValueChanged.AddListener(v => RhythmRogue.Core.Audio.AudioSettings.MasterVolume = v);
-
-            var musicSlider = MakeSliderRow(rt, "Music Vol", sliderY - sliderGap * 3, 0f, 1f, RhythmRogue.Core.Audio.AudioSettings.MusicVolume, out _);
-            musicSlider.onValueChanged.AddListener(v => RhythmRogue.Core.Audio.AudioSettings.MusicVolume = v);
-
-            var sfxSlider = MakeSliderRow(rt, "SFX Vol", sliderY - sliderGap * 4, 0f, 1f, RhythmRogue.Core.Audio.AudioSettings.SfxVolume, out _);
-            sfxSlider.onValueChanged.AddListener(v => RhythmRogue.Core.Audio.AudioSettings.SfxVolume = v);
-
-            // Back button returns to the main group.
-            _settingsBackBtn = MakeButton(rt, "SettingsBackBtn", "Back", new Vector2(0.5f, 0f), new Vector2(0, 50), new Vector2(320, 70), UIHelpers.RustOrange);
-            _settingsBackBtn.onClick.AddListener(CloseSettings);
-            UISelectableStyle.Apply(_settingsBackBtn);
-
-            // Vertical navigation: sliders then Back.
-            UINavigationHelper.WireVerticalNoWrap(scrollSlider, offsetSlider, masterSlider, musicSlider, sfxSlider);
-            UINavigationHelper.AddLink(sfxSlider, down: _settingsBackBtn);
-            UINavigationHelper.AddLink(_settingsBackBtn, up: sfxSlider);
-            UISelectableStyle.ApplySlider(scrollSlider); UISelectableStyle.ApplySlider(offsetSlider);
-            UISelectableStyle.ApplySlider(masterSlider); UISelectableStyle.ApplySlider(musicSlider);
-            UISelectableStyle.ApplySlider(sfxSlider);
-        }
-
         // ============================================================
         // Builders
         // ============================================================
@@ -246,54 +193,6 @@ namespace RhythmRogue.Battle
             rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
             rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
             return go;
-        }
-
-        private Slider MakeSliderRow(RectTransform parent, string label, float y, float min, float max, float value, out Text valueText)
-        {
-            // Label on the left, slider in the middle, value on the right.
-            MakeText(parent, label + "_Label", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(-260, y), new Vector2(220, 50), 22, TextAnchor.MiddleLeft, UIHelpers.OffWhite).text = label;
-
-            var sliderGO = new GameObject(label + "_Slider", typeof(RectTransform), typeof(Slider));
-            sliderGO.transform.SetParent(parent, false);
-            var sRT = sliderGO.GetComponent<RectTransform>();
-            sRT.anchorMin = sRT.anchorMax = new Vector2(0.5f, 0.5f);
-            sRT.pivot = new Vector2(0.5f, 0.5f);
-            sRT.anchoredPosition = new Vector2(60, y);
-            sRT.sizeDelta = new Vector2(360, 30);
-
-            // Background
-            var bg = MakePanel(sRT, "Background", new Vector2(0, 0.5f), new Vector2(1, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(0, 12), UIHelpers.BgDeep);
-            var bgRT = bg.GetComponent<RectTransform>(); bgRT.anchorMin = new Vector2(0, 0.5f); bgRT.anchorMax = new Vector2(1, 0.5f); bgRT.offsetMin = new Vector2(0, -6); bgRT.offsetMax = new Vector2(0, 6);
-
-            // Fill
-            var fillArea = new GameObject("FillArea", typeof(RectTransform));
-            fillArea.transform.SetParent(sRT, false);
-            var faRT = fillArea.GetComponent<RectTransform>();
-            faRT.anchorMin = new Vector2(0, 0.5f); faRT.anchorMax = new Vector2(1, 0.5f);
-            faRT.offsetMin = new Vector2(0, -6); faRT.offsetMax = new Vector2(0, 6);
-            var fill = MakePanel(faRT.GetComponent<RectTransform>(), "Fill", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, UIHelpers.AmberOrange);
-            var fillRT = fill.GetComponent<RectTransform>(); fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one; fillRT.offsetMin = Vector2.zero; fillRT.offsetMax = Vector2.zero;
-
-            // Handle
-            var handleArea = new GameObject("HandleArea", typeof(RectTransform));
-            handleArea.transform.SetParent(sRT, false);
-            var haRT = handleArea.GetComponent<RectTransform>();
-            haRT.anchorMin = Vector2.zero; haRT.anchorMax = Vector2.one; haRT.offsetMin = Vector2.zero; haRT.offsetMax = Vector2.zero;
-            var handle = MakePanel(haRT.GetComponent<RectTransform>(), "Handle", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(24, 36), UIHelpers.WarmGold);
-
-            var slider = sliderGO.GetComponent<Slider>();
-            slider.fillRect = fillRT;
-            slider.handleRect = handle.GetComponent<RectTransform>();
-            slider.targetGraphic = handle.GetComponent<Image>();
-            slider.direction = Slider.Direction.LeftToRight;
-            slider.minValue = min; slider.maxValue = max; slider.value = value;
-
-            valueText = MakeText(parent, label + "_Value", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
-                new Vector2(290, y), new Vector2(120, 50), 22, TextAnchor.MiddleRight, UIHelpers.WarmGold);
-            valueText.text = value.ToString("0.##");
-
-            return slider;
         }
 
         private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)

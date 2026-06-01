@@ -106,6 +106,10 @@ namespace RhythmRogue.Battle
         {
             foreach (NoteView note in _activeNotes)
             {
+                // A hit tap note is about to be despawned this same frame; don't bother
+                // repositioning it, so it can't visibly slide past the receptor for a frame.
+                if (note.IsHit && !note.IsBeingHeld) continue;
+
                 if (note.IsBeingHeld)
                 {
                     // Pin head at receptor, shrink tail toward it
@@ -129,6 +133,16 @@ namespace RhythmRogue.Battle
 
             foreach (NoteView note in _activeNotes)
             {
+                // A successfully HIT note should disappear at the moment it was hit, not keep
+                // scrolling past the receptor. Tap notes set IsHit on a successful match;
+                // hold notes set IsHit when the hold completes. While a hold is still being
+                // held (IsBeingHeld), keep it alive so HoldTracker can manage it.
+                if (note.IsHit && !note.IsBeingHeld)
+                {
+                    _pendingDespawn.Add(note);
+                    continue;
+                }
+
                 if (note.IsBeingHeld) continue;
 
                 // Hold notes despawn based on end beat, not head beat

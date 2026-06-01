@@ -29,6 +29,8 @@ namespace RhythmRogue.Map
         [Header("Default Chart (for battles)")]
         [SerializeField] private TextAsset _defaultChart;
 
+        private RhythmRogue.UI.RelicBar _relicBar;
+
         private void Start()
         {
             var ph = PlayerHealth.Instance;
@@ -65,6 +67,11 @@ namespace RhythmRogue.Map
             _mapUI.SetRunState(_runState);
             _mapUI.BuildMap(_runState.MapData);
             _mapUI.OnNodeConfirmed += HandleNodeConfirmed;
+
+            // Relic bar: icon strip across the top, hover for name, click for full detail.
+            // Self-contained on its own canvas, so it overlays the map HUD without touching
+            // MapUI's layout. Built fresh each time the map loads (it reads current relics).
+            _relicBar = RhythmRogue.UI.RelicBar.Create(_runState);
 
             // Crossfade from whatever was playing (menu drone, or silence after a battle)
             // into the map's shamanic ambient. Idempotent across re-entries to the map.

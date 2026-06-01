@@ -18,7 +18,12 @@ namespace RhythmRogue.Data
         public string relicName = "New Relic";
 
         [TextArea(2, 4)]
+        [Tooltip("Mechanical description of what the relic does.")]
         public string description = "";
+
+        [TextArea(2, 3)]
+        [Tooltip("Optional atmospheric flavor line shown in italics on the detail card. Purely cosmetic.")]
+        public string flavorText = "";
 
         public RelicRarity rarity = RelicRarity.Common;
 

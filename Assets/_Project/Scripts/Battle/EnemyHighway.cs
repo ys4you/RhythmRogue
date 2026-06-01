@@ -104,6 +104,16 @@ namespace RhythmRogue.Battle
                 {
                     PositionNote(active.View, currentBeat);
                 }
+                else
+                {
+                    // Tap note that has already auto-hit: snap it exactly onto the receptor
+                    // line. Without this the note keeps the position from its last pre-hit
+                    // frame, which is a few pixels ABOVE the receptor (the frame before
+                    // headDistance crossed zero), so the flash and the note never visually
+                    // line up. Pinning to _receptorY makes the hit land dead-center.
+                    int lane = Mathf.Clamp(active.Lane, 0, _laneX.Length - 1);
+                    active.View.transform.position = new Vector3(_laneX[lane], _receptorY, 0f);
+                }
 
                 float despawnBeat = active.IsHold ? active.EndBeat : active.Beat;
                 if (currentBeat - despawnBeat > _beatsDespawnBehind)

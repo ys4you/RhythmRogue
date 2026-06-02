@@ -31,6 +31,38 @@ namespace RhythmRogue.Data
         [Tooltip("Accent color shown on the relic card icon area.")]
         public Color cardColor = Color.white;
 
+        [Tooltip("Relic icon sprite. If left empty, a shared placeholder is used (the map's " +
+                 "event '?' icon) so the relic still shows something until real art exists.")]
+        public Sprite icon;
+
+        /// <summary>
+        /// The icon to display for this relic. Returns the assigned <see cref="icon"/> if set,
+        /// otherwise a shared placeholder loaded from Resources (the same '?' sprite the map
+        /// uses for Event nodes). Cached statically so the placeholder is loaded only once.
+        /// </summary>
+        public Sprite ResolvedIcon => icon != null ? icon : PlaceholderIcon;
+
+        private static Sprite _placeholderIcon;
+        private static bool _placeholderLoaded;
+
+        /// <summary>
+        /// Shared placeholder icon: the map's event node sprite (Resources/MapIcons/node_event).
+        /// Loaded lazily and cached. May be null if that sprite doesn't exist, callers must
+        /// handle a null icon (e.g. fall back to a coloured swatch).
+        /// </summary>
+        public static Sprite PlaceholderIcon
+        {
+            get
+            {
+                if (!_placeholderLoaded)
+                {
+                    _placeholderIcon = Resources.Load<Sprite>("MapIcons/node_event");
+                    _placeholderLoaded = true;
+                }
+                return _placeholderIcon;
+            }
+        }
+
         [Header("Effect")]
         public RelicEffect effect;
 

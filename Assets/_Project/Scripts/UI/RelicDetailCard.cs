@@ -25,6 +25,7 @@ namespace RhythmRogue.UI
         private RectTransform _canvasRT;
         private GameObject _root;          // dim backdrop (toggled)
         private Image _iconSwatch;
+        private Image _iconSprite;   // sprite drawn on top of the swatch (real art or placeholder)
         private Text _nameText, _rarityText, _effectText, _descText, _flavorText;
         private UICancelHandler _cancelHandler;
         private bool _built;
@@ -80,8 +81,21 @@ namespace RhythmRogue.UI
             borderRT.SetAsFirstSibling();
             _rarityBorder = border.GetComponent<Image>();
 
-            // Icon swatch (placeholder for art): a colored square at the top.
-            _iconSwatch = MakePanel(cardRT, "IconSwatch", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -90), new Vector2(120, 120), UIHelpers.RustOrange).GetComponent<Image>();
+            // Icon swatch (the relic's accent colour) with the icon sprite layered on top.
+            // The sprite is the relic's own art if assigned, else the shared event-node
+            // placeholder, so there's always something recognisable here.
+            var swatchGO = MakePanel(cardRT, "IconSwatch", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -90), new Vector2(120, 120), UIHelpers.RustOrange);
+            _iconSwatch = swatchGO.GetComponent<Image>();
+
+            var iconSpriteGO = new GameObject("IconSprite", typeof(RectTransform), typeof(Image));
+            iconSpriteGO.transform.SetParent(swatchGO.GetComponent<RectTransform>(), false);
+            var isRT = iconSpriteGO.GetComponent<RectTransform>();
+            isRT.anchorMin = Vector2.zero; isRT.anchorMax = Vector2.one;
+            isRT.offsetMin = new Vector2(12, 12); isRT.offsetMax = new Vector2(-12, -12);
+            _iconSprite = iconSpriteGO.GetComponent<Image>();
+            _iconSprite.color = UIHelpers.OffWhite;
+            _iconSprite.preserveAspect = true;
+            _iconSprite.raycastTarget = false;
 
             _rarityText = MakeText(cardRT, "Rarity", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -170), new Vector2(580, 36), 18, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             _rarityText.fontStyle = FontStyle.Bold;
@@ -120,6 +134,17 @@ namespace RhythmRogue.UI
             Color rarityColor = RarityColor(relic.rarity);
             _rarityBorder.color = new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.5f);
             _iconSwatch.color = relic.cardColor;
+
+            // Icon sprite: relic's own art, else the shared placeholder. Hidden if neither
+            // exists (the coloured swatch alone still represents the relic).
+            Sprite resolved = relic.ResolvedIcon;
+            if (resolved != null)
+            {
+                _iconSprite.sprite = resolved;
+                _iconSprite.gameObject.SetActive(true);
+            }
+            else _iconSprite.gameObject.SetActive(false);
+
             _rarityText.text = relic.rarity.ToString().ToUpper();
             _rarityText.color = rarityColor;
             _nameText.text = relic.relicName;

@@ -190,7 +190,23 @@ namespace RhythmRogue.UI
 
             MakeText(cardRT, "Rarity", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -30), new Vector2(cardW - 40, 40), 18, TextAnchor.MiddleCenter, borderColor).text = relic.rarity.ToString().ToUpper();
 
-            MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(150, 150), relic.cardColor);
+            var iconBG = MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(150, 150), relic.cardColor);
+            // Icon sprite on top of the colour swatch: the relic's own art if assigned, else
+            // the shared placeholder (the map's event '?' sprite). Always shows something.
+            Sprite resolvedIcon = relic.ResolvedIcon;
+            if (resolvedIcon != null)
+            {
+                var iconSpriteGO = new GameObject("IconSprite", typeof(RectTransform), typeof(Image));
+                iconSpriteGO.transform.SetParent(iconBG.GetComponent<RectTransform>(), false);
+                var isRT = iconSpriteGO.GetComponent<RectTransform>();
+                isRT.anchorMin = Vector2.zero; isRT.anchorMax = Vector2.one;
+                isRT.offsetMin = new Vector2(15, 15); isRT.offsetMax = new Vector2(-15, -15);
+                var isImg = iconSpriteGO.GetComponent<Image>();
+                isImg.sprite = resolvedIcon;
+                isImg.color = UIHelpers.OffWhite;
+                isImg.preserveAspect = true;
+                isImg.raycastTarget = false;
+            }
 
             var nameText = MakeText(cardRT, "Name", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -250), new Vector2(cardW - 40, 60), 28, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             nameText.fontStyle = FontStyle.Bold; nameText.text = relic.relicName;

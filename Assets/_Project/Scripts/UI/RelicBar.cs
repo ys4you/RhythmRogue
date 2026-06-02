@@ -111,7 +111,7 @@ namespace RhythmRogue.UI
 
         private GameObject BuildIcon(RelicData relic, float x)
         {
-            // Outer button (the icon). Colored swatch for now; swap to sprite when art exists.
+            // Outer button (the icon).
             var iconGO = new GameObject($"Relic_{relic.relicName}", typeof(RectTransform), typeof(Image), typeof(Button));
             iconGO.transform.SetParent(_iconRow, false);
             var rt = iconGO.GetComponent<RectTransform>();
@@ -120,13 +120,35 @@ namespace RhythmRogue.UI
             rt.anchoredPosition = new Vector2(x, 0);
             rt.sizeDelta = new Vector2(IconSize, IconSize);
 
-            // Rarity ring behind the swatch.
+            // Rarity ring behind the icon.
             var ring = MakePanel(rt, "Ring", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, RarityColor(relic.rarity));
             var ringRT = ring.GetComponent<RectTransform>();
             ringRT.offsetMin = new Vector2(-3, -3); ringRT.offsetMax = new Vector2(3, 3);
             ringRT.SetAsFirstSibling();
 
-            iconGO.GetComponent<Image>().color = relic.cardColor;
+            // The button's own Image is the background swatch (the relic's accent colour).
+            // It stays as the base layer; if the relic has a real icon (or the shared
+            // placeholder), that sprite is drawn on top via a child Image. This way a relic
+            // with art shows the art, and one without still shows a coloured, clickable tile.
+            var bgImage = iconGO.GetComponent<Image>();
+            bgImage.color = relic.cardColor;
+
+            Sprite resolved = relic.ResolvedIcon; // assigned icon, else shared event placeholder
+            if (resolved != null)
+            {
+                var spriteGO = new GameObject("IconSprite", typeof(RectTransform), typeof(Image));
+                spriteGO.transform.SetParent(rt, false);
+                var sRT = spriteGO.GetComponent<RectTransform>();
+                sRT.anchorMin = Vector2.zero; sRT.anchorMax = Vector2.one;
+                // Small inset so the sprite sits inside the rarity ring rather than over it.
+                sRT.offsetMin = new Vector2(6, 6); sRT.offsetMax = new Vector2(-6, -6);
+                var sImg = spriteGO.GetComponent<Image>();
+                sImg.sprite = resolved;
+                sImg.color = UIHelpers.OffWhite;
+                sImg.preserveAspect = true;
+                sImg.raycastTarget = false; // clicks go to the button beneath
+            }
+
             var btn = iconGO.GetComponent<Button>();
             btn.transition = Selectable.Transition.None;
             RelicData captured = relic;

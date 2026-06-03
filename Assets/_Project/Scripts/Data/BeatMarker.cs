@@ -40,14 +40,22 @@ namespace RhythmRogue.Data
         [Min(0f)]
         public float holdBeats;
 
+        [Tooltip("Which instrument stem this marker was detected in (Drums/Bass/Melody). " +
+                 "An enemy's chartInstrument selector keeps only markers matching its choice, " +
+                 "so the chart can follow one instrument. 'All' on a marker is treated as " +
+                 "untagged and always kept.")]
+        public ChartInstrument instrument;
+
         public BeatMarker(float beat, MarkerType type, float intensity,
-            float direction = 0f, float holdBeats = 0f)
+            float direction = 0f, float holdBeats = 0f,
+            ChartInstrument instrument = ChartInstrument.All)
         {
             this.beat = beat;
             this.type = type;
             this.intensity = Mathf.Clamp01(intensity);
             this.direction = Mathf.Clamp(direction, -1f, 1f);
             this.holdBeats = Mathf.Max(0f, holdBeats);
+            this.instrument = instrument;
         }
 
         /// <summary>Whether this is a hold note (sustained musical event).</summary>
@@ -59,7 +67,8 @@ namespace RhythmRogue.Data
         public override string ToString()
         {
             string hold = IsHold ? $" hold:{holdBeats:F1}b" : "";
-            return $"[{beat:F2} {type} i:{intensity:F1}{hold}]";
+            string inst = instrument != ChartInstrument.All ? $" {instrument}" : "";
+            return $"[{beat:F2} {type} i:{intensity:F1}{hold}{inst}]";
         }
     }
 }

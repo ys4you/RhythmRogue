@@ -96,7 +96,7 @@ namespace RhythmRogue.Battle
             ShapeLibrary library = GetShapeLibrary(enemy);
             float effectiveBPM = beatMap.bpm * bpmModifier;
 
-            var markers = new List<BeatMarker>(beatMap.markers);
+            var markers = FilterByInstrument(new List<BeatMarker>(beatMap.markers), enemy.chartInstrument);
             var sections = beatMap.sections != null ? new List<SongSection>(beatMap.sections) : null;
             float totalBeats = beatMap.TotalBeats > 0f ? beatMap.TotalBeats : (markers.Count > 0 ? markers[^1].beat + 4f : 0f);
 
@@ -104,6 +104,33 @@ namespace RhythmRogue.Battle
             if (chart == null) { GameLog.Error("[ChartProvider] ShapeAssembler returned null (beat map)."); return default; }
 
             return new ChartResult(chart, "beat-map", effectiveBPM, beatMap.audioOffsetSeconds);
+        }
+
+        /// <summary>
+        /// Keep only markers from the enemy's selected instrument stem, so the chart
+        /// follows that instrument. <see cref="ChartInstrument.All"/> keeps everything.
+        /// If the selection leaves no markers (an untagged/old beat map, or a stem with
+        /// no onsets), the full list is returned instead so the battle still has notes
+        /// rather than silently producing none. Sections are untouched: instrument
+        /// selection only changes which onsets become notes, not the song structure.
+        /// </summary>
+        private static List<BeatMarker> FilterByInstrument(List<BeatMarker> markers, ChartInstrument instrument)
+        {
+            if (instrument == ChartInstrument.All) return markers;
+
+            var filtered = new List<BeatMarker>(markers.Count);
+            for (int i = 0; i < markers.Count; i++)
+                if (markers[i].instrument == instrument) filtered.Add(markers[i]);
+
+            if (filtered.Count == 0)
+            {
+                GameLog.Warn($"[ChartProvider] No '{instrument}' markers in this beat map " +
+                             "(untagged or empty stem); following all instruments instead.");
+                return markers;
+            }
+
+            GameLog.Info($"[ChartProvider] Following {instrument}: {filtered.Count}/{markers.Count} markers.");
+            return filtered;
         }
 
         private bool HasAudioClip(Conductor conductor)

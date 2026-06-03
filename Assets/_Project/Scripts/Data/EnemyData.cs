@@ -14,6 +14,13 @@ namespace RhythmRogue.Data
         public ShapeLibrary shapeLibrary;
         public SongBeatMap songBeatMap;
 
+        [Tooltip("Which instrument the chart follows. 'All' uses every marker (busiest). " +
+                 "Drums/Bass/Melody keep only that stem's markers, so the chart locks to that " +
+                 "instrument. Requires a SongBeatMap generated with stems; on an untagged/old " +
+                 "beat map only 'All' produces notes. Change freely in the Inspector, no " +
+                 "regeneration needed.")]
+        public ChartInstrument chartInstrument = ChartInstrument.All;
+
         [Range(0f, 1f)]
         public float markerDifficulty = 0.5f;
 

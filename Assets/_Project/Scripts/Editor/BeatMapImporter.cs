@@ -73,10 +73,11 @@ namespace RhythmRogue.Editor
             {
                 beatMap.markers.Add(new BeatMarker(
                     beat: m.beat,
-                    type: (MarkerType)m.type,
+                    type: ParseEnum(m.type, MarkerType.Accent),
                     intensity: m.intensity,
                     direction: m.direction,
-                    holdBeats: m.holdBeats
+                    holdBeats: m.holdBeats,
+                    instrument: ParseEnum(m.instrument, ChartInstrument.All)
                 ));
             }
 
@@ -91,8 +92,8 @@ namespace RhythmRogue.Editor
                         label = s.label,
                         startBeat = s.startBeat,
                         endBeat = s.endBeat,
-                        type = (SongSectionType)s.type,
-                        highway = (SectionType)s.highway,
+                        type = ParseEnum(s.type, SongSectionType.Verse),
+                        highway = ParseEnum(s.highway, SectionType.PlayerOnly),
                         intensityScale = s.intensityScale,
                     });
                 }
@@ -139,6 +140,27 @@ namespace RhythmRogue.Editor
         }
 
         // =================================================================
+        // ENUM PARSING
+        // =================================================================
+
+        /// <summary>
+        /// Parse an enum from its string name (case-insensitive). Falls back to a
+        /// numeric string ("2") for older data, then to <paramref name="fallback"/>.
+        /// JsonUtility cannot deserialize a string value into an enum/int field (it
+        /// silently leaves 0), which previously made every imported section EnemyOnly
+        /// and every marker Kick. Reading the raw strings and parsing here fixes that.
+        /// </summary>
+        private static T ParseEnum<T>(string value, T fallback) where T : struct, System.Enum
+        {
+            if (string.IsNullOrEmpty(value)) return fallback;
+            if (System.Enum.TryParse<T>(value, ignoreCase: true, out var parsed)) return parsed;
+            if (int.TryParse(value, out int idx) && System.Enum.IsDefined(typeof(T), idx))
+                return (T)System.Enum.ToObject(typeof(T), idx);
+            Debug.LogWarning($"[BeatMapImporter] Unknown {typeof(T).Name} value '{value}', using {fallback}.");
+            return fallback;
+        }
+
+        // =================================================================
         // JSON DATA CLASSES (for JsonUtility deserialization)
         // =================================================================
 
@@ -156,10 +178,11 @@ namespace RhythmRogue.Editor
         private class MarkerJson
         {
             public float beat;
-            public int type;
+            public string type;       // enum NAME e.g. "Kick" - JsonUtility can't read a string into an int field, so keep it a string and parse
             public float intensity;
             public float direction;
             public float holdBeats;
+            public string instrument; // enum NAME e.g. "Drums"; absent on older JSON -> defaults to All
         }
 
         [System.Serializable]
@@ -168,8 +191,8 @@ namespace RhythmRogue.Editor
             public string label;
             public float startBeat;
             public float endBeat;
-            public int type;
-            public int highway;
+            public string type;       // enum NAME e.g. "Chorus"
+            public string highway;    // enum NAME e.g. "PlayerOnly"
             public float intensityScale;
         }
     }

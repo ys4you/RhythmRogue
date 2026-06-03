@@ -37,7 +37,10 @@ namespace RhythmRogue.Battle
         [SerializeField] private RelicEffectHandler _relicEffectHandler;
 
         [Header("Timing")]
-        [SerializeField] private float _introDelay = 2f;
+        [Tooltip("Flat pause after the enemy appears before the song starts. Kept short so the " +
+                 "player isn't waiting through dead air every fight; the song's own intro " +
+                 "section provides the 'settle in' beat before player notes arrive.")]
+        [SerializeField] private float _introDelay = 1f;
         [SerializeField] private float _endDelay = 2f;
 
         [Header("Systems")]

@@ -23,6 +23,12 @@ namespace RhythmRogue.Battle
         [Header("Shape System")]
         [SerializeField] private ShapeLibrary _defaultShapeLibrary;
 
+        [Header("Pattern System")]
+        [Tooltip("Default fragment library for the human-feel PatternAssembler. An enemy's own " +
+                 "patternLibrary overrides this. When a pattern library is available the " +
+                 "PatternAssembler runs; with none, the older lane-shape ShapeAssembler does.")]
+        [SerializeField] private NotePatternLibrary _defaultPatternLibrary;
+
         [Header("Elite Scaling")]
         [SerializeField] private EliteConfig _eliteConfig;
 
@@ -89,13 +95,27 @@ namespace RhythmRogue.Battle
         private ChartResult ResolveFromBeatMap(EnemyData enemy, ISeededRandom rng, float difficulty, float bpmModifier)
         {
             SongBeatMap beatMap = enemy.songBeatMap;
-            ShapeLibrary library = GetShapeLibrary(enemy);
             float effectiveBPM = beatMap.bpm * bpmModifier;
 
-            var markers = FilterByInstrument(new List<BeatMarker>(beatMap.markers), enemy.chartInstrument);
+            var allMarkers = new List<BeatMarker>(beatMap.markers);
             var sections = beatMap.sections != null ? new List<SongSection>(beatMap.sections) : null;
-            float totalBeats = beatMap.TotalBeats > 0f ? beatMap.TotalBeats : (markers.Count > 0 ? markers[^1].beat + 4f : 0f);
+            float totalBeats = beatMap.TotalBeats > 0f ? beatMap.TotalBeats : (allMarkers.Count > 0 ? allMarkers[^1].beat + 4f : 0f);
 
+            // Preferred path: human-feel fragments. The assembler does its own per-section
+            // instrument selection from the raw markers plus the enemy's selector, so they are
+            // passed unfiltered here.
+            NotePatternLibrary patternLib = enemy.patternLibrary != null ? enemy.patternLibrary : _defaultPatternLibrary;
+            if (patternLib != null && patternLib.patterns.Count > 0)
+            {
+                BattleChart patternChart = PatternAssembler.Assemble(
+                    allMarkers, sections, patternLib, enemy.chartInstrument, rng, difficulty, effectiveBPM, totalBeats);
+                if (patternChart == null) { GameLog.Error("[ChartProvider] PatternAssembler returned null (beat map)."); return default; }
+                return new ChartResult(patternChart, "pattern", effectiveBPM, beatMap.audioOffsetSeconds);
+            }
+
+            // Fallback: older lane-shape system. Markers are pre-filtered to the enemy's instrument.
+            var markers = FilterByInstrument(allMarkers, enemy.chartInstrument);
+            ShapeLibrary library = GetShapeLibrary(enemy);
             BattleChart chart = ShapeAssembler.Assemble(markers, sections, library, rng, difficulty, effectiveBPM, totalBeats);
             if (chart == null) { GameLog.Error("[ChartProvider] ShapeAssembler returned null (beat map)."); return default; }
 

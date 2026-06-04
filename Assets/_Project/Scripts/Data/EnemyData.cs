@@ -7,6 +7,11 @@ namespace RhythmRogue.Data
     public class EnemyData : ScriptableObject
     {
         [Header("Chart")]
+        [Tooltip("Fragment library for the human-feel PatternAssembler. When set (or a default is " +
+                 "set on ChartProvider), the chart is built from authored rhythm fragments placed " +
+                 "on a bar grid. Leave null with a shapeLibrary assigned to use the older " +
+                 "lane-shape system instead.")]
+        public NotePatternLibrary patternLibrary;
         public ShapeLibrary shapeLibrary;
         public SongBeatMap songBeatMap;
 

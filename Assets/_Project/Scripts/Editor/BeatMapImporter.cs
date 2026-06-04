@@ -64,8 +64,11 @@ namespace RhythmRogue.Editor
 
             // Create SongBeatMap asset
             var beatMap = ScriptableObject.CreateInstance<SongBeatMap>();
+            beatMap.songName = data.songName;
             beatMap.bpm = data.bpm;
             beatMap.audioOffsetSeconds = data.audioOffsetSeconds;
+            beatMap.totalBeats = data.totalBeats; // stored so TotalBeats is correct without loading the clip
+            beatMap.clip = FindAudioClip(data.songName); // the beat map owns its audio; auto-link by name
 
             // Convert markers
             beatMap.markers = new List<BeatMarker>(data.markers.Count);
@@ -114,29 +117,66 @@ namespace RhythmRogue.Editor
 
             // Check for existing
             var existing = AssetDatabase.LoadAssetAtPath<SongBeatMap>(assetPath);
+            SongBeatMap saved;
             if (existing != null)
             {
                 if (!EditorUtility.DisplayDialog(
                     "Overwrite?",
-                    $"A beat map already exists at:\n{assetPath}\n\nOverwrite it?",
-                    "Overwrite", "Cancel"))
+                    $"A beat map already exists at:\n{assetPath}\n\nUpdate it? It is rewritten in " +
+                    "place, so its GUID and any enemy references to it are preserved.",
+                    "Update", "Cancel"))
                 {
                     return;
                 }
-                AssetDatabase.DeleteAsset(assetPath);
+                // Update in place (CopySerialized) instead of delete + recreate, so the asset keeps
+                // its GUID. Deleting and recreating mints a new GUID and breaks every enemy's
+                // reference to this beat map.
+                EditorUtility.CopySerialized(beatMap, existing);
+                EditorUtility.SetDirty(existing);
+                saved = existing;
+            }
+            else
+            {
+                AssetDatabase.CreateAsset(beatMap, assetPath);
+                saved = beatMap;
             }
 
-            AssetDatabase.CreateAsset(beatMap, assetPath);
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
             // Select in project
-            EditorGUIUtility.PingObject(beatMap);
-            Selection.activeObject = beatMap;
+            EditorGUIUtility.PingObject(saved);
+            Selection.activeObject = saved;
 
+            string clipMsg = saved.clip != null ? saved.clip.name : "NONE FOUND (assign manually on the asset)";
             Debug.Log($"[BeatMapImporter] Imported: {assetPath}\n" +
-                      $"  BPM: {data.bpm}, Markers: {beatMap.markers.Count}, " +
-                      $"Sections: {beatMap.sections?.Count ?? 0}");
+                      $"  BPM: {data.bpm}, Markers: {saved.markers.Count}, " +
+                      $"Sections: {saved.sections?.Count ?? 0}, Clip: {clipMsg}");
+        }
+
+        // =================================================================
+        // AUDIO LINKING
+        // =================================================================
+
+        /// <summary>
+        /// Find the AudioClip this beat map was generated from, by name, so the clip travels
+        /// with the beat map. Prefers an exact name match; otherwise takes the first AudioClip
+        /// the search returns. Returns null if none found (the caller logs it).
+        /// </summary>
+        private static AudioClip FindAudioClip(string songName)
+        {
+            if (string.IsNullOrEmpty(songName)) return null;
+
+            string[] guids = AssetDatabase.FindAssets($"{songName} t:AudioClip");
+            AudioClip firstAny = null;
+            foreach (string guid in guids)
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(guid));
+                if (clip == null) continue;
+                if (clip.name == songName) return clip; // exact match wins
+                firstAny ??= clip;
+            }
+            return firstAny;
         }
 
         // =================================================================
@@ -167,6 +207,7 @@ namespace RhythmRogue.Editor
         [System.Serializable]
         private class BeatMapJson
         {
+            public string songName;
             public float bpm;
             public float totalBeats;
             public float audioOffsetSeconds;

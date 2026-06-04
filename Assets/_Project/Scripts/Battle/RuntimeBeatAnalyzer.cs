@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using RhythmRogue.Data;
+using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
@@ -108,7 +109,7 @@ namespace RhythmRogue.Battle
 
             if (clip == null || bpm <= 0f)
             {
-                Debug.LogError("[RuntimeBeatAnalyzer] Null clip or invalid BPM.");
+                GameLog.Error("[RuntimeBeatAnalyzer] Null clip or invalid BPM.");
                 return result;
             }
 
@@ -130,7 +131,7 @@ namespace RhythmRogue.Battle
             int windowCount = (mono.Length - WindowSize) / HopSize + 1;
             if (windowCount <= 0)
             {
-                Debug.LogWarning("[RuntimeBeatAnalyzer] Audio too short to analyze.");
+                GameLog.Warn("[RuntimeBeatAnalyzer] Audio too short to analyze.");
                 return result;
             }
 
@@ -157,7 +158,7 @@ namespace RhythmRogue.Battle
 
             result.Success = true;
 
-            Debug.Log($"[RuntimeBeatAnalyzer] Analyzed '{clip.name}': " +
+            GameLog.Info($"[RuntimeBeatAnalyzer] Analyzed '{clip.name}': " +
                       $"{result.Markers.Count} markers, {result.Sections.Count} sections, " +
                       $"{totalBeats:F0} beats at {bpm} BPM (sensitivity {sensitivity:F1})");
 

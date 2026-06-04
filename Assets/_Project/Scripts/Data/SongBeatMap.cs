@@ -13,8 +13,19 @@ namespace RhythmRogue.Data
         [Header("Song")]
         public string songName;
         [Min(1f)] public float bpm = 120f;
+
+        [Tooltip("The audio this chart was generated from. It lives on the beat map so the beat " +
+                 "map is a complete, swappable unit: assigning it to an enemy brings the matching " +
+                 "song with it. The importer auto-assigns this by matching songName to an AudioClip " +
+                 "in the project; reassign here if it picks the wrong one.")]
         public AudioClip clip;
+
         public float audioOffsetSeconds;
+
+        [Tooltip("Total song length in beats, written by the importer from the audio analysis. " +
+                 "Stored rather than read from clip.length so it is correct even before the clip " +
+                 "is loaded.")]
+        [Min(0f)] public float totalBeats;
 
         [Header("Sections")]
         public List<SongSection> sections = new();
@@ -22,11 +33,7 @@ namespace RhythmRogue.Data
         [Header("Beat Markers")]
         public List<BeatMarker> markers = new();
 
-        [Header("Defaults")]
-        [Min(0f)] public float leadInBeats = 4f;
-        [Min(0f)] public float tailBeats = 2f;
-
-        public float TotalBeats => clip != null && bpm > 0f ? clip.length / (60f / bpm) : 0f;
+        public float TotalBeats => totalBeats;
         public int MarkerCount => markers?.Count ?? 0;
 
         public int GetMarkersInRange(float startBeat, float endBeat, List<BeatMarker> result)

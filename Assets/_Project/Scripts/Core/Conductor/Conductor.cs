@@ -46,6 +46,13 @@ namespace RhythmRogue.Core
         public event Action<float, float> OnBpmChanged;
         public event Action OnSongFinished;
 
+        /// <summary>Assign the clip the conductor will play. Call before <see cref="Play"/>.</summary>
+        public void SetClip(AudioClip clip)
+        {
+            if (_audioSource == null) _audioSource = GetComponent<AudioSource>();
+            _audioSource.clip = clip;
+        }
+
         protected override void Awake()
         {
             base.Awake();

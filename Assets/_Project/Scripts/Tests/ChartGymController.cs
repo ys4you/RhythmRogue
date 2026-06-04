@@ -1,5 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 using RhythmRogue.Battle;
 using RhythmRogue.Core;
 using RhythmRogue.Data;
@@ -43,6 +46,10 @@ namespace RhythmRogue.Tests
         [Header("Shape System")]
         [Tooltip("Library of lane shapes for the new assembler.")]
         [SerializeField] private ShapeLibrary _shapeLibrary;
+
+        [Tooltip("Which instrument stem the chart follows (press I in play mode to cycle). " +
+                 "Only affects beat maps generated with stems; on others, All is used.")]
+        [SerializeField] private ChartInstrument _chartInstrument = ChartInstrument.All;
 
         [Header("Highways")]
         [SerializeField] private NoteHighway _playerHighway;
@@ -124,71 +131,52 @@ namespace RhythmRogue.Tests
 
         private void HandleInput()
         {
-            if (Input.GetKeyDown(KeyCode.Space))
-                GenerateAndPlay();
+#if ENABLE_INPUT_SYSTEM
+            // This project is Input System Only, so legacy UnityEngine.Input throws at
+            // runtime and cannot be used. Read keys through Keyboard.current instead.
+            var kb = Keyboard.current;
+            if (kb == null) return;
 
-            if (Input.GetKeyDown(KeyCode.S))
-            {
-                _seed++;
-                GenerateAndPlay();
-            }
+            if (kb.spaceKey.wasPressedThisFrame) GenerateAndPlay();
 
-            if (Input.GetKeyDown(KeyCode.A))
-            {
-                _seed = Mathf.Max(1, _seed - 1);
-                GenerateAndPlay();
-            }
+            if (kb.sKey.wasPressedThisFrame) { _seed++; GenerateAndPlay(); }
+            if (kb.aKey.wasPressedThisFrame) { _seed = Mathf.Max(1, _seed - 1); GenerateAndPlay(); }
 
-            if (Input.GetKeyDown(KeyCode.Alpha1))
-            {
-                _difficulty = 0.25f;
-                GenerateAndPlay();
-            }
-
-            if (Input.GetKeyDown(KeyCode.Alpha2))
-            {
-                _difficulty = 0.5f;
-                GenerateAndPlay();
-            }
-
-            if (Input.GetKeyDown(KeyCode.Alpha3))
-            {
-                _difficulty = 0.75f;
-                GenerateAndPlay();
-            }
-
-            if (Input.GetKeyDown(KeyCode.Alpha4))
-            {
-                _difficulty = 1.0f;
-                GenerateAndPlay();
-            }
+            if (kb.digit1Key.wasPressedThisFrame) { _difficulty = 0.25f; GenerateAndPlay(); }
+            if (kb.digit2Key.wasPressedThisFrame) { _difficulty = 0.5f; GenerateAndPlay(); }
+            if (kb.digit3Key.wasPressedThisFrame) { _difficulty = 0.75f; GenerateAndPlay(); }
+            if (kb.digit4Key.wasPressedThisFrame) { _difficulty = 1.0f; GenerateAndPlay(); }
 
             // Scroll speed adjustment
-            if (Input.GetKeyDown(KeyCode.Equals) || Input.GetKeyDown(KeyCode.KeypadPlus))
+            if (kb.equalsKey.wasPressedThisFrame || kb.numpadPlusKey.wasPressedThisFrame)
             {
                 ScrollSpeedSetting.Increase();
                 _scrollSpeed = ScrollSpeedSetting.Multiplier;
             }
-
-            if (Input.GetKeyDown(KeyCode.Minus) || Input.GetKeyDown(KeyCode.KeypadMinus))
+            if (kb.minusKey.wasPressedThisFrame || kb.numpadMinusKey.wasPressedThisFrame)
             {
                 ScrollSpeedSetting.Decrease();
                 _scrollSpeed = ScrollSpeedSetting.Multiplier;
             }
 
-            if (Input.GetKeyDown(KeyCode.P))
+            if (kb.pKey.wasPressedThisFrame)
             {
-                if (_conductor.IsPaused)
-                    _conductor.Resume();
-                else if (_conductor.IsPlaying)
-                    _conductor.Pause();
+                if (_conductor.IsPaused) _conductor.Resume();
+                else if (_conductor.IsPlaying) _conductor.Pause();
             }
 
-            if (Input.GetKeyDown(KeyCode.R))
-                GenerateChart();
+            if (kb.iKey.wasPressedThisFrame) CycleInstrument();
+            if (kb.rKey.wasPressedThisFrame) GenerateChart();
+            if (kb.gKey.wasPressedThisFrame) _showDebugOverlay = !_showDebugOverlay;
+#endif
+        }
 
-            if (Input.GetKeyDown(KeyCode.G))
-                _showDebugOverlay = !_showDebugOverlay;
+        /// <summary>Cycle the followed instrument and regenerate so the change is audible right away.</summary>
+        private void CycleInstrument()
+        {
+            int count = System.Enum.GetValues(typeof(ChartInstrument)).Length;
+            _chartInstrument = (ChartInstrument)(((int)_chartInstrument + 1) % count);
+            GenerateAndPlay();
         }
 
         // =================================================================
@@ -223,7 +211,8 @@ namespace RhythmRogue.Tests
 
             if (_beatMap != null)
             {
-                markers = new List<BeatMarker>(_beatMap.markers);
+                markers = ChartProvider.FilterByInstrument(
+                    new List<BeatMarker>(_beatMap.markers), _chartInstrument);
                 sections = _beatMap.sections != null
                     ? new List<SongSection>(_beatMap.sections)
                     : null;
@@ -319,7 +308,7 @@ namespace RhythmRogue.Tests
             float x = Screen.width - w - 10;
             float y = 10;
 
-            GUI.Box(new Rect(x, y, w, 260), "CHART GYM", boxStyle);
+            GUI.Box(new Rect(x, y, w, 300), "CHART GYM", boxStyle);
             y += 24;
 
             GUI.Label(new Rect(x + 8, y, w - 16, 20), $"<b>Seed:</b> {_seed}  (S/A to change)", labelStyle);
@@ -332,6 +321,9 @@ namespace RhythmRogue.Tests
             y += 18;
 
             GUI.Label(new Rect(x + 8, y, w - 16, 20), $"<b>Source:</b> {(_beatMap != null ? "SongBeatMap" : "Auto-detect")}", labelStyle);
+            y += 18;
+
+            GUI.Label(new Rect(x + 8, y, w - 16, 20), $"<b>Instrument:</b> {_chartInstrument}  (I to cycle)", labelStyle);
             y += 18;
 
             GUI.Label(new Rect(x + 8, y, w - 16, 20), $"<b>Markers:</b> {_markerCount}", labelStyle);
@@ -359,7 +351,7 @@ namespace RhythmRogue.Tests
             y += 24;
 
             GUIStyle smallStyle = new GUIStyle(labelStyle) { fontSize = 11 };
-            GUI.Label(new Rect(x + 8, y, w - 16, 20), "Space=Play  S/A=Seed  1-4=Diff  +/-=Scroll  P=Pause  G=Hide", smallStyle);
+            GUI.Label(new Rect(x + 8, y, w - 16, 20), "Space=Play  S/A=Seed  1-4=Diff  +/-=Scroll  I=Instr  P=Pause  G=Hide", smallStyle);
         }
     }
 }

@@ -6,10 +6,6 @@ namespace RhythmRogue.Data
     [CreateAssetMenu(fileName = "NewEnemy", menuName = "RhythmRogue/EnemyData")]
     public class EnemyData : ScriptableObject
     {
-        [Header("Song")]
-        [Tooltip("Fallback clip for enemies without a SongBeatMap.")]
-        public AudioClip song;
-
         [Header("Chart")]
         public ShapeLibrary shapeLibrary;
         public SongBeatMap songBeatMap;
@@ -38,9 +34,9 @@ namespace RhythmRogue.Data
         [Header("Modifiers")]
         public List<EnemyModifier> modifiers = new();
 
-        /// <summary>Prefers SongBeatMap.clip, falls back to song field.</summary>
-        public AudioClip EffectiveSong =>
-            (songBeatMap != null && songBeatMap.clip != null) ? songBeatMap.clip : song;
+        /// <summary>The battle audio. Lives on the SongBeatMap so the beat map and its song are one
+        /// swappable unit; null if no beat map is assigned.</summary>
+        public AudioClip EffectiveSong => songBeatMap != null ? songBeatMap.clip : null;
 
         public bool IsBoss => maxHP >= 250;
         public bool HasModifiers => modifiers != null && modifiers.Count > 0;

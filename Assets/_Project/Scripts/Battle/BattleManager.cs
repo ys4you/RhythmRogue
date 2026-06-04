@@ -67,12 +67,14 @@ namespace RhythmRogue.Battle
         private float _phaseTimer;
         private bool _battleEnded;
         private bool _isElite;
+        private bool _isBoss;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
         public bool IsPaused => _conductor != null && _conductor.IsPaused;
         public EnemyData CurrentEnemy => _currentEnemy;
         public bool IsElite => _isElite;
+        public bool IsBoss => _isBoss;
         public event System.Action<bool> OnBattleCompleted;
 
         private void Awake()
@@ -87,6 +89,11 @@ namespace RhythmRogue.Battle
 
             _currentEnemy = (_runState?.SelectedNode?.EnemyData) ?? _defaultEnemy;
             _isElite = _runState?.SelectedNode?.Type == NodeType.Elite;
+            // Boss-ness comes from the node type (authoritative), not the enemy's HP. The
+            // EnemyData.IsBoss (maxHP >= 250) heuristic is only a defensive fallback, so a
+            // boss whose HP is tuned below 250 is still labelled correctly.
+            _isBoss = _runState?.SelectedNode?.Type == NodeType.Boss
+                      || (_currentEnemy != null && _currentEnemy.IsBoss);
 
             if (_currentEnemy == null)
             {
@@ -350,7 +357,7 @@ namespace RhythmRogue.Battle
                 TotalNotes = _accuracyTracker.TotalNotes,
                 NotesHit = _accuracyTracker.PerfectCount + _accuracyTracker.GoodCount + _accuracyTracker.BadCount,
                 EnemyName = _currentEnemy.enemyName,
-                WasBoss = _currentEnemy.IsBoss
+                WasBoss = _isBoss
             };
         }
 

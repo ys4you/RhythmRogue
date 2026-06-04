@@ -61,9 +61,8 @@ namespace RhythmRogue.Battle
 
             if (_useLegacyChart) return ResolveLegacy(selectedChart, enemy, bpmModifier);
             if (enemy.songBeatMap != null) return ResolveFromBeatMap(enemy, rng, difficulty, bpmModifier);
-            if (HasAudioClip(conductor)) return ResolveFromAudioAnalysis(enemy, conductor, rng, difficulty, bpmModifier);
 
-            GameLog.Error("[ChartProvider] No chart source! Enemy needs a SongBeatMap or AudioClip.");
+            GameLog.Error("[ChartProvider] No chart source. Assign the enemy a SongBeatMap (or enable legacy chart mode).");
             return default;
         }
 
@@ -72,10 +71,7 @@ namespace RhythmRogue.Battle
             AudioClip clip = enemy.EffectiveSong;
             if (clip == null) { GameLog.Warn("[ChartProvider] Enemy has no song."); return; }
 
-            AudioSource source = conductor.GetComponent<AudioSource>();
-            if (source == null) { GameLog.Error("[ChartProvider] Conductor has no AudioSource!"); return; }
-
-            source.clip = clip;
+            conductor.SetClip(clip);
             GameLog.Info($"[ChartProvider] Song assigned: {clip.name}");
         }
 
@@ -107,14 +103,15 @@ namespace RhythmRogue.Battle
         }
 
         /// <summary>
-        /// Keep only markers from the enemy's selected instrument stem, so the chart
-        /// follows that instrument. <see cref="ChartInstrument.All"/> keeps everything.
-        /// If the selection leaves no markers (an untagged/old beat map, or a stem with
-        /// no onsets), the full list is returned instead so the battle still has notes
-        /// rather than silently producing none. Sections are untouched: instrument
-        /// selection only changes which onsets become notes, not the song structure.
+        /// Keep only markers from the selected instrument stem, so the chart follows that
+        /// instrument. <see cref="ChartInstrument.All"/> keeps everything. If the selection
+        /// leaves no markers (an untagged/old beat map, or a stem with no onsets), the full
+        /// list is returned instead so the chart still has notes rather than silently
+        /// producing none. Sections are untouched: instrument selection only changes which
+        /// onsets become notes, not the song structure. Public so the Chart Gym can audition
+        /// stems through the same path battles use.
         /// </summary>
-        private static List<BeatMarker> FilterByInstrument(List<BeatMarker> markers, ChartInstrument instrument)
+        public static List<BeatMarker> FilterByInstrument(List<BeatMarker> markers, ChartInstrument instrument)
         {
             if (instrument == ChartInstrument.All) return markers;
 
@@ -131,34 +128,6 @@ namespace RhythmRogue.Battle
 
             GameLog.Info($"[ChartProvider] Following {instrument}: {filtered.Count}/{markers.Count} markers.");
             return filtered;
-        }
-
-        private bool HasAudioClip(Conductor conductor)
-        {
-            AudioSource source = conductor.GetComponent<AudioSource>();
-            return source != null && source.clip != null;
-        }
-
-        private ChartResult ResolveFromAudioAnalysis(EnemyData enemy, Conductor conductor, ISeededRandom rng, float difficulty, float bpmModifier)
-        {
-            AudioClip clip = conductor.GetComponent<AudioSource>().clip;
-            ShapeLibrary library = GetShapeLibrary(enemy);
-            float sensitivity = Mathf.Lerp(0.3f, 0.8f, difficulty);
-
-            float baseBPM = enemy.songBeatMap != null ? enemy.songBeatMap.bpm
-                : _defaultChart != null ? ChartLoader.Load(_defaultChart)?.BPM ?? 135f
-                : 135f;
-
-            float effectiveBPM = baseBPM * bpmModifier;
-            var analysis = RuntimeBeatAnalyzer.Analyze(clip, effectiveBPM, sensitivity);
-
-            if (!analysis.Success || analysis.Markers.Count == 0)
-            { GameLog.Error("[ChartProvider] Runtime analysis produced no markers."); return default; }
-
-            BattleChart chart = ShapeAssembler.Assemble(analysis.Markers, analysis.Sections, library, rng, difficulty, effectiveBPM, analysis.TotalBeats);
-            if (chart == null) { GameLog.Error("[ChartProvider] ShapeAssembler returned null (auto-detect)."); return default; }
-
-            return new ChartResult(chart, "auto-detect", effectiveBPM, 0f);
         }
 
         private ShapeLibrary GetShapeLibrary(EnemyData enemy)

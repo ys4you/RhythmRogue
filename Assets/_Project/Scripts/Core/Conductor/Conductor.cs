@@ -19,6 +19,7 @@ namespace RhythmRogue.Core
         private double _dspPauseTime;
         private double _totalPausedDuration;
         private float _songOffset;
+        private float _calibrationSeconds;
 
         // BPM tracking
         private float _bpm;
@@ -80,6 +81,7 @@ namespace RhythmRogue.Core
             if (_audioSource.clip == null) { GameLog.Error("[Conductor] No AudioClip assigned."); return; }
 
             _songOffset = songOffset;
+            _calibrationSeconds = RhythmRogue.Core.Audio.AudioSettings.CalibrationOffsetSeconds;
             _bpm = bpm;
             _secPerBeat = 60f / _bpm;
             _bpmChangeBeatOrigin = 0f;
@@ -135,7 +137,7 @@ namespace RhythmRogue.Core
 
             // Snapshot current position before changing BPM to prevent drift
             _bpmChangeBeatOrigin = SongPositionInBeats;
-            _bpmChangeDspOrigin = AudioSettings.dspTime - _totalPausedDuration;
+            _bpmChangeDspOrigin = AdjustedDspTime();
 
             _bpm = newBpm;
             _secPerBeat = 60f / _bpm;
@@ -143,13 +145,18 @@ namespace RhythmRogue.Core
             OnBpmChanged?.Invoke(oldBpm, newBpm);
         }
 
+        // Combined timing offset (the song's authored offset plus the player's latency
+        // calibration), subtracted from the DSP clock so it shifts note visuals AND hit
+        // detection together, since both read SongPositionInBeats. Snapshotted at Play.
+        private double AdjustedDspTime() => AudioSettings.dspTime - _totalPausedDuration - (_songOffset + _calibrationSeconds);
+
         // Beat position = origin at last BPM change + beats elapsed since
         private void UpdateTiming()
         {
-            double dspNow = AudioSettings.dspTime - _totalPausedDuration;
+            double dspNow = AdjustedDspTime();
             if (dspNow < _dspSongStartTime) return;
 
-            SongPositionInSeconds = (float)(dspNow - _dspSongStartTime) - _songOffset;
+            SongPositionInSeconds = (float)(dspNow - _dspSongStartTime);
             float beatsSinceBpmChange = (float)((dspNow - _bpmChangeDspOrigin) / _secPerBeat);
             SongPositionInBeats = _bpmChangeBeatOrigin + beatsSinceBpmChange;
             CurrentBeat = Mathf.FloorToInt(SongPositionInBeats);

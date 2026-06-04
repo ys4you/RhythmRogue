@@ -101,8 +101,8 @@ namespace RhythmRogue.UI
         {
             if (!_built) return;
             if (KeybindManager.IsRebinding) KeybindManager.CancelRebind();
-            // Audio offset is the only value still on the legacy direct-PlayerPrefs path.
-            if (_offsetSlider != null) { PlayerPrefs.SetFloat("audioOffset", _offsetSlider.value); PlayerPrefs.Save(); }
+            // Audio offset now persists live through AudioSettings.CalibrationOffsetMs (set on the
+            // slider's value-changed), so there is nothing to flush here.
             _root.gameObject.SetActive(false);
         }
 
@@ -271,10 +271,10 @@ namespace RhythmRogue.UI
             _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString;
             _scrollSpeedSlider.onValueChanged.AddListener(v => { float r = Mathf.Round(v * 10f) / 10f; ScrollSpeedSetting.Multiplier = r; _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString; });
 
-            float savedOffset = PlayerPrefs.GetFloat("audioOffset", 0f);
-            _offsetSlider = CreateSliderRow(apRT, "Audio Offset", sliderY - sliderGap, -100f, 100f, savedOffset, out _offsetValue);
+            float savedOffset = AudioSettings.CalibrationOffsetMs;
+            _offsetSlider = CreateSliderRow(apRT, "Audio Offset", sliderY - sliderGap, -200f, 200f, savedOffset, out _offsetValue);
             _offsetSlider.wholeNumbers = true;
-            _offsetSlider.onValueChanged.AddListener(v => _offsetValue.text = $"{v:+0;-0;0} ms");
+            _offsetSlider.onValueChanged.AddListener(v => { AudioSettings.CalibrationOffsetMs = v; _offsetValue.text = $"{v:+0;-0;0} ms"; });
             _offsetValue.text = $"{savedOffset:+0;-0;0} ms";
 
             _masterVolSlider = CreateSliderRow(apRT, "Master Vol", sliderY - sliderGap * 2, 0f, 1f, AudioSettings.MasterVolume, out _);

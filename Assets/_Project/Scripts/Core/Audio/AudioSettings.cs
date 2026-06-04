@@ -64,6 +64,30 @@ namespace RhythmRogue.Core.Audio
             }
         }
 
+        // Audio/input latency calibration in milliseconds, stored under the historical key.
+        private const string KeyOffsetMs = "audioOffset";
+        private static float _offsetMs = float.NaN;
+
+        /// <summary>
+        /// Audio/input latency calibration in milliseconds. The Conductor applies this to the
+        /// beat clock at song start, so it shifts note visuals AND hit detection together.
+        /// Positive shifts the notes later (use if you are being judged late, e.g. with speaker
+        /// or Bluetooth latency); negative shifts them earlier (use if you hit ahead).
+        /// </summary>
+        public static float CalibrationOffsetMs
+        {
+            get { if (float.IsNaN(_offsetMs)) _offsetMs = PlayerPrefs.GetFloat(KeyOffsetMs, 0f); return _offsetMs; }
+            set
+            {
+                _offsetMs = Mathf.Clamp(value, -200f, 200f);
+                PlayerPrefs.SetFloat(KeyOffsetMs, _offsetMs);
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>Calibration offset in seconds. See <see cref="CalibrationOffsetMs"/>.</summary>
+        public static float CalibrationOffsetSeconds => CalibrationOffsetMs / 1000f;
+
         /// <summary>
         /// Convert a perceptual 0-1 slider value into a linear audio gain.
         /// Human loudness perception is logarithmic, so a linear slider feels

@@ -43,6 +43,15 @@ namespace RhythmRogue.Battle
         [SerializeField] private float _introDelay = 1f;
         [SerializeField] private float _endDelay = 2f;
 
+        [Header("Balance")]
+        [Tooltip("Enemy HP is derived from the chart's player-note count, so a fight lasts about the " +
+                 "whole song regardless of song length or chart density. This value is the average " +
+                 "damage the player must deal per note to win: lower means longer fights. Tune by " +
+                 "feel. For reference, a clean run with full combo deals roughly 12-14 per note.")]
+        [SerializeField] private float _enemyHpPerNote = 8f;
+        [Tooltip("Extra HP multiplier for boss fights, on top of the per-note derivation.")]
+        [SerializeField] private float _bossHpMultiplier = 1.5f;
+
         [Header("Systems")]
         [SerializeField] private InputHandler _inputHandler;
         [SerializeField] private HoldTracker _holdTracker;
@@ -155,7 +164,8 @@ namespace RhythmRogue.Battle
 
         private void InitializeBattle()
         {
-            int enemyHP = _currentEnemy.maxHP;
+            int playerNotes = _chart.IsLegacy ? (_chart.LegacyChart?.NoteCount ?? 0) : (_chart.BattleChart?.PlayerNoteCount ?? 0);
+            int enemyHP = ComputeEnemyHP(playerNotes);
             if (_isElite && _eliteConfig != null)
                 enemyHP = _eliteConfig.ScaleHP(enemyHP);
 
@@ -197,6 +207,20 @@ namespace RhythmRogue.Battle
                 GameLog.Info($"[BattleManager] Initialized (legacy){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM");
             else
                 GameLog.Info($"[BattleManager] Initialized ({_chart.Mode}){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM, {_chart.BattleChart.PlayerNoteCount}P + {_chart.BattleChart.EnemyNoteCount}E notes");
+        }
+
+        private int ComputeEnemyHP(int playerNoteCount)
+        {
+            if (playerNoteCount <= 0)
+            {
+                // No chart note data to scale from (failed resolve or empty chart); fall back
+                // to the authored HP value so the fight is at least survivable to play.
+                return Mathf.Max(1, _currentEnemy.maxHP);
+            }
+
+            float hp = playerNoteCount * _enemyHpPerNote;
+            if (_isBoss) hp *= _bossHpMultiplier;
+            return Mathf.Max(1, Mathf.RoundToInt(hp));
         }
 
         private ISeededRandom GetChartRng()

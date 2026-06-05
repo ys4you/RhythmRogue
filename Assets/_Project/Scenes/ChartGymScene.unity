@@ -493,10 +493,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c89a18f7588ed6c49b44b4163532844c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _testClip: {fileID: 8300000, guid: 689a261a23cc9ff43856df21b427fb9e, type: 3}
+  _testClip: {fileID: 8300000, guid: 6761fb89eaee216408ae441cb9487212, type: 3}
   _bpm: 99.38
-  _beatMap: {fileID: 11400000, guid: b63cb33869ef0b6429b9305573ed8324, type: 2}
+  _beatMap: {fileID: 11400000, guid: b571f5ec1dfa13d4caac743959a6e601, type: 2}
   _shapeLibrary: {fileID: 11400000, guid: 19725b64b1f7a8c4d9aff9f6a543172a, type: 2}
+  _chartInstrument: 0
   _playerHighway: {fileID: 1271461585}
   _enemyHighway: {fileID: 336422042}
   _seed: 1337

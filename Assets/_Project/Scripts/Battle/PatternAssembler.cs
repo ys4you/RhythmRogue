@@ -27,8 +27,11 @@ namespace RhythmRogue.Battle
     ///   4. Chart a clean version of the real rhythm. Each bar picks the fragment whose density
     ///      best matches that bar's onsets, so the chart follows the song's groove through
     ///      clean, hittable, authored patterns instead of raw transients.
-    ///   6. Flow in the hands. A fragment is mirrored when that makes its first lane sit closer
-    ///      to the previous fragment's exit lane, so the hand is not flung across the board.
+    ///   6. Flow in the hands, with variety. Each fragment is transformed as a unit, a left/right
+    ///      mirror plus a 0-3 lane rotation, so the same authored shape appears starting on
+    ///      different lanes instead of the same columns every time. The transform is weighted
+    ///      toward keeping the first lane near the previous fragment's exit, so the hand keeps
+    ///      flowing. The lane-to-key mapping never changes within a fragment, only between them.
     ///
     /// Accent alignment (jumps on crashes, holds on sustains) is left for a later pass; it needs
     /// a per-note accent tag on NotePattern. Not thread-safe (static reusable buffers, main
@@ -230,11 +233,10 @@ namespace RhythmRogue.Battle
                     NotePattern frag = PickPattern(library, maxDiff, targetDensity, remaining, ctx, pickRng);
                     if (frag == null) break;
 
-                    bool mirror = ShouldMirror(frag, ctx.PreviousEndLane);
-                    StampFragment(frag, pos, secEnd, mirror, output);
+                    LaneTransform transform = ChooseTransform(frag, ctx.PreviousEndLane, pickRng);
+                    StampFragment(frag, pos, secEnd, transform, output);
 
-                    int endLane = mirror ? Mirror(frag.EndLane) : frag.EndLane;
-                    ctx.Update(frag, endLane);
+                    ctx.Update(frag, transform.Apply(frag.EndLane));
 
                     pos += Mathf.Max(0.25f, frag.lengthBeats);
                     sub++;
@@ -315,7 +317,7 @@ namespace RhythmRogue.Battle
 
         // ---- Stamping + lane flow (point 6) ----
 
-        private static void StampFragment(NotePattern frag, float startBeat, float sectionEnd, bool mirror, List<StampedNote> output)
+        private static void StampFragment(NotePattern frag, float startBeat, float sectionEnd, LaneTransform transform, List<StampedNote> output)
         {
             List<NotePattern.Note> notes = frag.notes;
             if (notes == null) return;
@@ -325,23 +327,68 @@ namespace RhythmRogue.Battle
                 NotePattern.Note n = notes[i];
                 float beat = startBeat + n.offsetBeats;
                 if (beat >= sectionEnd - 0.0001f) continue; // never spill past the section boundary
-
-                int lane = Mathf.Clamp(n.lane, 0, 3);
-                if (mirror) lane = Mirror(lane);
-                output.Add(new StampedNote(lane, beat, n.holdBeats));
+                output.Add(new StampedNote(transform.Apply(n.lane), beat, n.holdBeats));
             }
         }
 
-        /// <summary>Mirror a fragment when that puts its first note closer to the previous exit lane.</summary>
-        private static bool ShouldMirror(NotePattern frag, int previousEndLane)
+        /// <summary>
+        /// A whole-fragment lane remap: an optional left/right mirror, then a 0-3 lane rotation
+        /// (wrap-around shift). Applied identically to every note in the fragment, so the shape is
+        /// preserved and only its position on the board moves. Lanes are 0-3; rotation wraps.
+        /// </summary>
+        private readonly struct LaneTransform
         {
-            if (previousEndLane < 0) return false;
-            int start = frag.StartLane;
-            if (start < 0) return false;
-            return Mathf.Abs(Mirror(start) - previousEndLane) < Mathf.Abs(start - previousEndLane);
+            public readonly bool Mirror;
+            public readonly int Shift;
+            public LaneTransform(bool mirror, int shift) { Mirror = mirror; Shift = shift; }
+
+            public int Apply(int lane)
+            {
+                if (lane < 0) return lane;
+                int l = Mathf.Clamp(lane, 0, 3);
+                if (Mirror) l = 3 - l;
+                return (l + Shift) & 3; // & 3 == mod 4 for non-negative
+            }
         }
 
-        private static int Mirror(int lane) => lane < 0 ? lane : 3 - Mathf.Clamp(lane, 0, 3);
+        /// <summary>
+        /// Choose a lane transform for variety: the same authored fragment should not always land
+        /// on the same columns. Weighted toward transforms whose first lane sits close to the
+        /// previous fragment's exit, so the hand keeps flowing and transitions stay readable.
+        /// With no previous lane (first fragment of a side) every transform is equally likely.
+        /// Drawn from the slot-keyed RNG, so the variety is deterministic for a given seed.
+        /// </summary>
+        private static LaneTransform ChooseTransform(NotePattern frag, int previousEndLane, ISeededRandom rng)
+        {
+            int start = frag.StartLane;
+
+            float total = 0f;
+            for (int mi = 0; mi < 2; mi++)
+                for (int shift = 0; shift < 4; shift++)
+                    total += TransformWeight(start, mi == 1, shift, previousEndLane);
+
+            if (total <= 0f) return new LaneTransform(false, 0);
+
+            float roll = rng.NextFloat() * total;
+            float cum = 0f;
+            for (int mi = 0; mi < 2; mi++)
+                for (int shift = 0; shift < 4; shift++)
+                {
+                    cum += TransformWeight(start, mi == 1, shift, previousEndLane);
+                    if (roll < cum) return new LaneTransform(mi == 1, shift);
+                }
+            return new LaneTransform(false, 0);
+        }
+
+        private static float TransformWeight(int startLane, bool mirror, int shift, int previousEndLane)
+        {
+            // First fragment (no exit lane) or an empty fragment: every transform equally likely.
+            if (previousEndLane < 0 || startLane < 0) return 1f;
+            int sl = Mathf.Clamp(startLane, 0, 3);
+            int transformedStart = (((mirror ? 3 - sl : sl) + shift) & 3);
+            int flowCost = Mathf.Abs(transformedStart - previousEndLane); // 0 (adjacent) .. 3 (far)
+            return 1f / (1f + 2f * flowCost); // smooth transitions favored, jumps still possible
+        }
 
         // ---- Density helpers (points 2 + 4) ----
 

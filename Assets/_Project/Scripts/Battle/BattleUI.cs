@@ -30,6 +30,7 @@ namespace RhythmRogue.Battle
         private Image _enemyHPFill;
         private float _enemyHPBarWidth;
         private Text _enemyNameText, _bossLabel;
+        private Text _enemyHPText;
         private Text _comboText, _multiplierText;
         private RectTransform _comboRect;
         private Text _scoreText;
@@ -103,6 +104,7 @@ namespace RhythmRogue.Battle
                 float newTarget = _enemyHealth.HPPercent;
                 if (newTarget < _enemyHPTarget - 0.001f) _enemyFlash = 1f;
                 _enemyHPTarget = newTarget;
+                if (_enemyHPText != null) _enemyHPText.text = $"{_enemyHealth.CurrentHP}/{_enemyHealth.MaxHP}";
             }
 
             // Lerp displayed HP toward the target. Lerp factor 8 gives a quick but visible
@@ -236,6 +238,14 @@ namespace RhythmRogue.Battle
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -95), new Vector2(600, 30),
                 UIHelpers.RustOrange, out _enemyHPFill, out _enemyHPFillRT);
+
+            // Absolute HP number centered on the enemy bar, mirroring the player's "100/100"
+            // readout. With flat authored HP this is a real, legible value (not a percentage),
+            // so the player can see exactly how close the enemy is to dead.
+            _enemyHPText = CreateText(canvasRT, "EnemyHPText", "",
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0, -95), new Vector2(600, 30), 20, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            _enemyHPText.fontStyle = FontStyle.Bold;
 
             // Player HP (bottom-left, inset from CRT bezel)
             _playerHPText = CreateText(canvasRT, "PlayerHPText", "100/100",

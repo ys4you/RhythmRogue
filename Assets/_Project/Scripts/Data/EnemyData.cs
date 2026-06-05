@@ -31,6 +31,10 @@ namespace RhythmRogue.Data
 
         [Header("Stats")]
         public int maxHP = 100;
+        [Tooltip("Marks this enemy as a boss (boss label + boss reward routing). Set this explicitly; " +
+                 "it is NOT inferred from HP. In a real run the map's Boss node type is authoritative; " +
+                 "this flag is the fallback when a battle is launched directly without a node.")]
+        public bool isBoss = false;
         [Range(0.5f, 2.0f)] public float bpmModifier = 1.0f;
 
         [Header("Visuals")]
@@ -43,7 +47,7 @@ namespace RhythmRogue.Data
         /// swappable unit; null if no beat map is assigned.</summary>
         public AudioClip EffectiveSong => songBeatMap != null ? songBeatMap.clip : null;
 
-        public bool IsBoss => maxHP >= 250;
+        public bool IsBoss => isBoss;
         public bool HasModifiers => modifiers != null && modifiers.Count > 0;
     }
 }

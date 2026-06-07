@@ -22,6 +22,9 @@ namespace RhythmRogue.Battle
         public bool IsProcessed => IsHit || IsMissed;
         public bool IsBeingHeld { get; set; }
 
+        // +1 when downscroll (hold body/tail extend up from the head), -1 when upscroll (extend down).
+        private float _holdSign = 1f;
+
         private static readonly Quaternion[] LaneRotations =
         {
             Quaternion.Euler(0f, 0f, 90f),
@@ -34,6 +37,7 @@ namespace RhythmRogue.Battle
         {
             Data = data;
             NoteIndex = noteIndex;
+            _holdSign = downscroll ? 1f : -1f;
 
             int lane = Mathf.Clamp(data.Lane, 0, LaneRotations.Length - 1);
             if (_headRenderer != null)
@@ -67,8 +71,20 @@ namespace RhythmRogue.Battle
             if (_bodyRenderer == null || _tailRenderer == null) return;
             float bodyLength = remainingDuration * beatHeight;
             _bodyRenderer.transform.localScale = new Vector3(1f, bodyLength, 1f);
-            _bodyRenderer.transform.localPosition = new Vector3(0f, bodyLength * 0.5f, 0f);
-            _tailRenderer.transform.localPosition = new Vector3(0f, bodyLength, 0f);
+            _bodyRenderer.transform.localPosition = new Vector3(0f, _holdSign * bodyLength * 0.5f, 0f);
+            _tailRenderer.transform.localPosition = new Vector3(0f, _holdSign * bodyLength, 0f);
+        }
+
+        /// <summary>
+        /// Re-apply hold orientation when the scroll direction flips mid-battle. Sets the
+        /// body/tail extension sign and the tail arrow rotation. Follow with UpdateHoldBody
+        /// to re-place the body for the new direction.
+        /// </summary>
+        public void ReorientHold(bool downscroll)
+        {
+            _holdSign = downscroll ? 1f : -1f;
+            if (_tailRenderer != null && Data.Type == NoteType.Hold)
+                _tailRenderer.transform.localRotation = downscroll ? Quaternion.Euler(0f, 0f, 180f) : Quaternion.identity;
         }
 
         public override void OnSpawn()

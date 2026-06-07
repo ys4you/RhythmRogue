@@ -27,6 +27,7 @@ namespace RhythmRogue.Battle
 
         private void Update()
         {
+            SyncScrollDirection();
             if (!_conductor.IsPlaying || _conductor.IsPaused) return;
             if (_chart == null && !_useAssembledNotes) return;
 
@@ -89,7 +90,7 @@ namespace RhythmRogue.Battle
 
         private void SpawnUpcomingNotes(float currentBeat)
         {
-            float spawnThreshold = currentBeat + _beatsShownInAdvance;
+            float spawnThreshold = currentBeat + SpawnAheadBeats;
             int noteCount = _useAssembledNotes ? (_assembledNotes?.Count ?? 0) : (_chart?.NoteCount ?? 0);
 
             while (_nextSpawnIndex < noteCount)
@@ -169,5 +170,35 @@ namespace RhythmRogue.Battle
         }
 
         private void OnDestroy() => OnNoteMissedEvent = null;
+
+        /// <summary>
+        /// Flip note travel direction live. Re-places every active note (and re-orients hold
+        /// bodies) so switching upscroll/downscroll mid-song is seamless.
+        /// </summary>
+        public override void ApplyScrollDirection()
+        {
+            base.ApplyScrollDirection();
+            if (_conductor == null) return;
+            float currentBeat = _conductor.SongPositionInBeats;
+
+            foreach (NoteView note in _activeNotes)
+            {
+                note.ReorientHold(_appliedDownscroll);
+                if (note.IsHit && !note.IsBeingHeld) continue;
+
+                if (note.IsBeingHeld)
+                {
+                    int lane = Mathf.Clamp(note.Data.Lane, 0, _laneX.Length - 1);
+                    note.transform.position = new Vector3(_laneX[lane], _receptorY, 0f);
+                    note.UpdateHoldBody(Mathf.Max(0f, note.Data.EndBeatPosition - currentBeat), EffectiveBeatHeight);
+                }
+                else
+                {
+                    PositionNote(note, currentBeat);
+                    if (note.Data.Type == NoteType.Hold)
+                        note.UpdateHoldBody(note.Data.HoldDuration, EffectiveBeatHeight);
+                }
+            }
+        }
     }
 }

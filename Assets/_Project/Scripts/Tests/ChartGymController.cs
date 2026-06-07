@@ -65,9 +65,10 @@ namespace RhythmRogue.Tests
         [Range(0f, 1f)]
         [SerializeField] private float _analysisSensitivity = 0.5f;
 
-        [Range(0.5f, 6.0f)]
-        [Tooltip("Note scroll speed multiplier. Drag to adjust in real time. Persists in PlayerPrefs.")]
-        [SerializeField] private float _scrollSpeed = 1.0f;
+        [Range(2f, 16f)]
+        [Tooltip("Note scroll speed in world units per second (constant, BPM-independent). Drag to " +
+                 "adjust in real time. Persists in PlayerPrefs.")]
+        [SerializeField] private float _scrollSpeed = 5f;
 
         [Header("Debug")]
         [SerializeField] private bool _showDebugOverlay = true;
@@ -99,7 +100,7 @@ namespace RhythmRogue.Tests
         private void Start()
         {
             // Pull saved scroll speed so inspector slider reflects PlayerPrefs
-            _scrollSpeed = ScrollSpeedSetting.Multiplier;
+            _scrollSpeed = ScrollSpeedSetting.UnitsPerSecond;
 
             if (_testClip != null && _conductor != null)
             {
@@ -122,7 +123,7 @@ namespace RhythmRogue.Tests
         /// </summary>
         private void OnValidate()
         {
-            ScrollSpeedSetting.Multiplier = _scrollSpeed;
+            ScrollSpeedSetting.UnitsPerSecond = _scrollSpeed;
         }
 
         // =================================================================
@@ -151,12 +152,12 @@ namespace RhythmRogue.Tests
             if (kb.equalsKey.wasPressedThisFrame || kb.numpadPlusKey.wasPressedThisFrame)
             {
                 ScrollSpeedSetting.Increase();
-                _scrollSpeed = ScrollSpeedSetting.Multiplier;
+                _scrollSpeed = ScrollSpeedSetting.UnitsPerSecond;
             }
             if (kb.minusKey.wasPressedThisFrame || kb.numpadMinusKey.wasPressedThisFrame)
             {
                 ScrollSpeedSetting.Decrease();
-                _scrollSpeed = ScrollSpeedSetting.Multiplier;
+                _scrollSpeed = ScrollSpeedSetting.UnitsPerSecond;
             }
 
             if (kb.pKey.wasPressedThisFrame)

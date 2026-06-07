@@ -46,13 +46,18 @@ namespace RhythmRogue.UI
         private UICancelHandler _cancelHandler;// host-provided cancel router
 
         // Tabs + sub-panels
-        private GameObject _audioPanel, _controlsPanel, _displayPanel;
-        private Button _audioTabBtn, _controlsTabBtn, _displayTabBtn;
+        private GameObject _audioPanel, _controlsPanel, _displayPanel, _gameplayPanel;
+        private Button _audioTabBtn, _controlsTabBtn, _displayTabBtn, _gameplayTabBtn;
         private Button _settingsCloseBtn;
 
         // Audio controls
-        private Slider _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider, _scrollSpeedSlider;
-        private Text _offsetValue, _scrollSpeedValue;
+        private Slider _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider;
+        private Text _offsetValue;
+
+        // Gameplay controls
+        private Button _scrollDirToggle;
+        private Text _scrollDirValue;
+        private InputField _scrollSpeedInput;
 
         // Controls (rebind) widgets
         private Text[] _rebindButtonTexts, _secondaryTexts;
@@ -147,20 +152,26 @@ namespace RhythmRogue.UI
             var st = MakeText(cardRT, "SettingsTitle", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -25), new Vector2(1000, 50), 32, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             st.fontStyle = FontStyle.Bold; st.text = "Settings";
 
-            float tabY = -80f, tabW = 240f, tabH = 50f, tabSpacing = 260f;
-            var audioTabGO = MakePanel(cardRT, "AudioTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-tabSpacing, tabY), new Vector2(tabW, tabH), UIHelpers.BgLight);
+            // Four tabs, centered: Audio | Gameplay | Controls | Display.
+            float tabY = -80f, tabW = 230f, tabH = 50f, tabSpacing = 250f;
+            var audioTabGO = MakePanel(cardRT, "AudioTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-1.5f * tabSpacing, tabY), new Vector2(tabW, tabH), UIHelpers.BgLight);
             _audioTabBtn = audioTabGO.AddComponent<Button>(); _audioTabBtn.onClick.AddListener(ShowAudioTab);
             MakeText(audioTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Audio";
 
-            var ctrlTabGO = MakePanel(cardRT, "ControlsTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, tabY), new Vector2(tabW, tabH), UIHelpers.BgSurface);
+            var gameTabGO = MakePanel(cardRT, "GameplayTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(-0.5f * tabSpacing, tabY), new Vector2(tabW, tabH), UIHelpers.BgSurface);
+            _gameplayTabBtn = gameTabGO.AddComponent<Button>(); _gameplayTabBtn.onClick.AddListener(ShowGameplayTab);
+            MakeText(gameTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Gameplay";
+
+            var ctrlTabGO = MakePanel(cardRT, "ControlsTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f * tabSpacing, tabY), new Vector2(tabW, tabH), UIHelpers.BgSurface);
             _controlsTabBtn = ctrlTabGO.AddComponent<Button>(); _controlsTabBtn.onClick.AddListener(ShowControlsTab);
             MakeText(ctrlTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Controls";
 
-            var dispTabGO = MakePanel(cardRT, "DisplayTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(tabSpacing, tabY), new Vector2(tabW, tabH), UIHelpers.BgSurface);
+            var dispTabGO = MakePanel(cardRT, "DisplayTab", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(1.5f * tabSpacing, tabY), new Vector2(tabW, tabH), UIHelpers.BgSurface);
             _displayTabBtn = dispTabGO.AddComponent<Button>(); _displayTabBtn.onClick.AddListener(ShowDisplayTab);
             MakeText(dispTabGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(tabW, tabH), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Display";
 
             CreateAudioPanel(cardRT);
+            CreateGameplayPanel(cardRT);
             CreateControlsPanel(cardRT);
             CreateDisplayPanel(cardRT);
 
@@ -175,36 +186,50 @@ namespace RhythmRogue.UI
         // Tabs
         // ============================================================
 
+        // Set the active tab's color to BgLight and the rest to BgSurface.
+        private void HighlightTab(Button active)
+        {
+            _audioTabBtn.GetComponent<Image>().color = active == _audioTabBtn ? UIHelpers.BgLight : UIHelpers.BgSurface;
+            _gameplayTabBtn.GetComponent<Image>().color = active == _gameplayTabBtn ? UIHelpers.BgLight : UIHelpers.BgSurface;
+            _controlsTabBtn.GetComponent<Image>().color = active == _controlsTabBtn ? UIHelpers.BgLight : UIHelpers.BgSurface;
+            _displayTabBtn.GetComponent<Image>().color = active == _displayTabBtn ? UIHelpers.BgLight : UIHelpers.BgSurface;
+        }
+
+        // Left/right navigation across the four tab buttons + their selectable styling.
+        private void WireTabRow()
+        {
+            UINavigationHelper.WireHorizontal(_audioTabBtn, _gameplayTabBtn, _controlsTabBtn, _displayTabBtn);
+            UISelectableStyle.Apply(_audioTabBtn); UISelectableStyle.Apply(_gameplayTabBtn);
+            UISelectableStyle.Apply(_controlsTabBtn); UISelectableStyle.Apply(_displayTabBtn);
+        }
+
         private void ShowAudioTab()
         {
-            _audioPanel.SetActive(true); _controlsPanel.SetActive(false); _displayPanel.SetActive(false);
-            _audioTabBtn.GetComponent<Image>().color = UIHelpers.BgLight;
-            _controlsTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
-            _displayTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
-            UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn, _displayTabBtn);
-            UINavigationHelper.AddLink(_audioTabBtn, down: _scrollSpeedSlider);
-            UINavigationHelper.AddLink(_controlsTabBtn, down: _scrollSpeedSlider);
-            UINavigationHelper.AddLink(_displayTabBtn, down: _scrollSpeedSlider);
-            UINavigationHelper.WireVerticalNoWrap(_scrollSpeedSlider, _offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider);
-            UINavigationHelper.AddLink(_scrollSpeedSlider, up: _audioTabBtn);
+            _audioPanel.SetActive(true); _gameplayPanel.SetActive(false); _controlsPanel.SetActive(false); _displayPanel.SetActive(false);
+            HighlightTab(_audioTabBtn);
+            WireTabRow();
+            UINavigationHelper.AddLink(_audioTabBtn, down: _offsetSlider);
+            UINavigationHelper.AddLink(_gameplayTabBtn, down: _offsetSlider);
+            UINavigationHelper.AddLink(_controlsTabBtn, down: _offsetSlider);
+            UINavigationHelper.AddLink(_displayTabBtn, down: _offsetSlider);
+            UINavigationHelper.WireVerticalNoWrap(_offsetSlider, _masterVolSlider, _musicVolSlider, _sfxVolSlider);
+            UINavigationHelper.AddLink(_offsetSlider, up: _audioTabBtn);
             UINavigationHelper.AddLink(_sfxVolSlider, down: _settingsCloseBtn);
             UINavigationHelper.Wire(_settingsCloseBtn, up: _sfxVolSlider);
-            UISelectableStyle.Apply(_audioTabBtn); UISelectableStyle.Apply(_controlsTabBtn); UISelectableStyle.Apply(_displayTabBtn);
-            UISelectableStyle.ApplySlider(_scrollSpeedSlider); UISelectableStyle.ApplySlider(_offsetSlider);
-            UISelectableStyle.ApplySlider(_masterVolSlider); UISelectableStyle.ApplySlider(_musicVolSlider);
-            UISelectableStyle.ApplySlider(_sfxVolSlider); UISelectableStyle.Apply(_settingsCloseBtn);
+            UISelectableStyle.ApplySlider(_offsetSlider); UISelectableStyle.ApplySlider(_masterVolSlider);
+            UISelectableStyle.ApplySlider(_musicVolSlider); UISelectableStyle.ApplySlider(_sfxVolSlider);
+            UISelectableStyle.Apply(_settingsCloseBtn);
             if (_focusSetter != null) _focusSetter.FocusOn(_audioTabBtn.gameObject);
         }
 
         private void ShowControlsTab()
         {
-            _audioPanel.SetActive(false); _controlsPanel.SetActive(true); _displayPanel.SetActive(false);
-            _audioTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
-            _controlsTabBtn.GetComponent<Image>().color = UIHelpers.BgLight;
-            _displayTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
+            _audioPanel.SetActive(false); _gameplayPanel.SetActive(false); _controlsPanel.SetActive(true); _displayPanel.SetActive(false);
+            HighlightTab(_controlsTabBtn);
             RefreshBindingDisplay();
-            UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn, _displayTabBtn);
+            WireTabRow();
             UINavigationHelper.AddLink(_audioTabBtn, down: _rebindButtons[0]);
+            UINavigationHelper.AddLink(_gameplayTabBtn, down: _rebindButtons[0]);
             UINavigationHelper.AddLink(_controlsTabBtn, down: _rebindButtons[0]);
             UINavigationHelper.AddLink(_displayTabBtn, down: _rebindButtons[0]);
             UINavigationHelper.WireVerticalNoWrap(_rebindButtons);
@@ -229,13 +254,12 @@ namespace RhythmRogue.UI
 
         private void ShowDisplayTab()
         {
-            _audioPanel.SetActive(false); _controlsPanel.SetActive(false); _displayPanel.SetActive(true);
-            _audioTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
-            _controlsTabBtn.GetComponent<Image>().color = UIHelpers.BgSurface;
-            _displayTabBtn.GetComponent<Image>().color = UIHelpers.BgLight;
+            _audioPanel.SetActive(false); _gameplayPanel.SetActive(false); _controlsPanel.SetActive(false); _displayPanel.SetActive(true);
+            HighlightTab(_displayTabBtn);
             RefreshDisplayValues();
-            UINavigationHelper.WireHorizontal(_audioTabBtn, _controlsTabBtn, _displayTabBtn);
+            WireTabRow();
             UINavigationHelper.AddLink(_audioTabBtn, down: _resolutionDropdown);
+            UINavigationHelper.AddLink(_gameplayTabBtn, down: _resolutionDropdown);
             UINavigationHelper.AddLink(_controlsTabBtn, down: _resolutionDropdown);
             UINavigationHelper.AddLink(_displayTabBtn, down: _resolutionDropdown);
             UINavigationHelper.AddLink(_resolutionDropdown, up: _displayTabBtn);
@@ -253,6 +277,24 @@ namespace RhythmRogue.UI
             if (_focusSetter != null) _focusSetter.FocusOn(_displayTabBtn.gameObject);
         }
 
+        private void ShowGameplayTab()
+        {
+            _audioPanel.SetActive(false); _gameplayPanel.SetActive(true); _controlsPanel.SetActive(false); _displayPanel.SetActive(false);
+            HighlightTab(_gameplayTabBtn);
+            RefreshGameplayValues();
+            WireTabRow();
+            UINavigationHelper.AddLink(_audioTabBtn, down: _scrollDirToggle);
+            UINavigationHelper.AddLink(_gameplayTabBtn, down: _scrollDirToggle);
+            UINavigationHelper.AddLink(_controlsTabBtn, down: _scrollDirToggle);
+            UINavigationHelper.AddLink(_displayTabBtn, down: _scrollDirToggle);
+            UINavigationHelper.WireVerticalNoWrap(_scrollDirToggle, _scrollSpeedInput);
+            UINavigationHelper.AddLink(_scrollDirToggle, up: _gameplayTabBtn);
+            UINavigationHelper.AddLink(_scrollSpeedInput, down: _settingsCloseBtn);
+            UINavigationHelper.Wire(_settingsCloseBtn, up: _scrollSpeedInput);
+            UISelectableStyle.Apply(_scrollDirToggle); UISelectableStyle.Apply(_scrollSpeedInput); UISelectableStyle.Apply(_settingsCloseBtn);
+            if (_focusSetter != null) _focusSetter.FocusOn(_gameplayTabBtn.gameObject);
+        }
+
         // ============================================================
         // Audio panel
         // ============================================================
@@ -265,26 +307,68 @@ namespace RhythmRogue.UI
             apRT.anchorMin = Vector2.zero; apRT.anchorMax = Vector2.one;
             apRT.offsetMin = Vector2.zero; apRT.offsetMax = Vector2.zero;
 
+            // Scroll speed moved to the Gameplay tab (as a typed field). Audio rows now start
+            // with the calibration offset.
             float sliderY = -220f, sliderGap = 70f;
 
-            _scrollSpeedSlider = CreateSliderRow(apRT, "Scroll Speed", sliderY, 0.5f, 3.0f, ScrollSpeedSetting.Multiplier, out _scrollSpeedValue);
-            _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString;
-            _scrollSpeedSlider.onValueChanged.AddListener(v => { float r = Mathf.Round(v * 10f) / 10f; ScrollSpeedSetting.Multiplier = r; _scrollSpeedValue.text = ScrollSpeedSetting.DisplayString; });
-
             float savedOffset = AudioSettings.CalibrationOffsetMs;
-            _offsetSlider = CreateSliderRow(apRT, "Audio Offset", sliderY - sliderGap, -200f, 200f, savedOffset, out _offsetValue);
+            _offsetSlider = CreateSliderRow(apRT, "Audio Offset", sliderY, -200f, 200f, savedOffset, out _offsetValue);
             _offsetSlider.wholeNumbers = true;
             _offsetSlider.onValueChanged.AddListener(v => { AudioSettings.CalibrationOffsetMs = v; _offsetValue.text = $"{v:+0;-0;0} ms"; });
             _offsetValue.text = $"{savedOffset:+0;-0;0} ms";
 
-            _masterVolSlider = CreateSliderRow(apRT, "Master Vol", sliderY - sliderGap * 2, 0f, 1f, AudioSettings.MasterVolume, out _);
+            _masterVolSlider = CreateSliderRow(apRT, "Master Vol", sliderY - sliderGap, 0f, 1f, AudioSettings.MasterVolume, out _);
             _masterVolSlider.onValueChanged.AddListener(v => AudioSettings.MasterVolume = v);
 
-            _musicVolSlider = CreateSliderRow(apRT, "Music Vol", sliderY - sliderGap * 3, 0f, 1f, AudioSettings.MusicVolume, out _);
+            _musicVolSlider = CreateSliderRow(apRT, "Music Vol", sliderY - sliderGap * 2, 0f, 1f, AudioSettings.MusicVolume, out _);
             _musicVolSlider.onValueChanged.AddListener(v => AudioSettings.MusicVolume = v);
 
-            _sfxVolSlider = CreateSliderRow(apRT, "SFX Vol", sliderY - sliderGap * 4, 0f, 1f, AudioSettings.SfxVolume, out _);
+            _sfxVolSlider = CreateSliderRow(apRT, "SFX Vol", sliderY - sliderGap * 3, 0f, 1f, AudioSettings.SfxVolume, out _);
             _sfxVolSlider.onValueChanged.AddListener(v => AudioSettings.SfxVolume = v);
+        }
+
+        // ============================================================
+        // Gameplay panel
+        // ============================================================
+
+        private void CreateGameplayPanel(RectTransform cardRT)
+        {
+            _gameplayPanel = new GameObject("GameplayPanel", typeof(RectTransform));
+            _gameplayPanel.transform.SetParent(cardRT, false);
+            var gpRT = _gameplayPanel.GetComponent<RectTransform>();
+            gpRT.anchorMin = Vector2.zero; gpRT.anchorMax = Vector2.one;
+            gpRT.offsetMin = Vector2.zero; gpRT.offsetMax = Vector2.zero;
+
+            float rowY = -235f, rowGap = 80f;
+
+            // Scroll direction: one toggle that flips Down/Up. The highways re-read this every
+            // frame (even while paused), so an in-progress battle flips the instant it changes.
+            _scrollDirToggle = CreateToggleRow(gpRT, "Scroll Direction", rowY, out _scrollDirValue,
+                onClick: () => { ScrollDirectionSetting.Toggle(); RefreshGameplayValues(); });
+
+            // Scroll speed: a typed float field instead of a slider (a slider is fiddly to land on
+            // an exact value). This is a constant velocity in world units per second, so notes scroll
+            // the same speed at any BPM. Out-of-range or junk input snaps back on commit.
+            _scrollSpeedInput = CreateFloatInputRow(gpRT, "Scroll Speed", rowY - rowGap, $"{ScrollSpeedSetting.Min:0} to {ScrollSpeedSetting.Max:0} u/s", OnScrollSpeedCommitted);
+
+            _gameplayPanel.SetActive(false);
+        }
+
+        private void RefreshGameplayValues()
+        {
+            if (_scrollDirValue != null) _scrollDirValue.text = ScrollDirectionSetting.DisplayString;
+            if (_scrollSpeedInput != null) _scrollSpeedInput.text = ScrollSpeedSetting.UnitsPerSecond.ToString("0.0");
+        }
+
+        // Commit handler for the scroll-speed field. Normalizes a comma decimal to a dot so it
+        // parses on any locale, writes it (the setter clamps to the 2-16 u/s range), then reflects
+        // the stored value back into the field so bad or out-of-range input visibly corrects itself.
+        private void OnScrollSpeedCommitted(string raw)
+        {
+            string norm = (raw ?? string.Empty).Replace(',', '.').Trim();
+            if (float.TryParse(norm, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
+                ScrollSpeedSetting.UnitsPerSecond = v;
+            RefreshGameplayValues();
         }
 
         // ============================================================
@@ -463,6 +547,34 @@ namespace RhythmRogue.UI
             valueText = MakeText(btnGO.GetComponent<RectTransform>(), $"{label}_Value", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(180, 50), 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             valueText.text = "---";
             return btn;
+        }
+
+        // A single-line numeric text field (label on the left, field on the right). DecimalNumber
+        // content type keeps typing to digits + a decimal separator; the host's onCommit fires on
+        // Enter or focus-loss to parse/clamp the value.
+        private InputField CreateFloatInputRow(RectTransform parent, string label, float y, string placeholder, UnityEngine.Events.UnityAction<string> onCommit)
+        {
+            MakeText(parent, $"{label}_Label", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(75, y), new Vector2(300, 50), 22, TextAnchor.MiddleLeft, UIHelpers.AmberOrange).text = label;
+
+            var fieldGO = MakePanel(parent, $"{label}_Field", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-75, y - 5f), new Vector2(180, 50), UIHelpers.BgLight);
+            var field = fieldGO.AddComponent<InputField>();
+
+            var valueText = MakeText(fieldGO.GetComponent<RectTransform>(), "Text", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            var vtRT = valueText.GetComponent<RectTransform>(); vtRT.offsetMin = new Vector2(12, 0); vtRT.offsetMax = new Vector2(-12, 0);
+            valueText.supportRichText = false;
+
+            var ph = MakeText(fieldGO.GetComponent<RectTransform>(), "Placeholder", new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, 22, TextAnchor.MiddleCenter, new Color(UIHelpers.OffWhite.r, UIHelpers.OffWhite.g, UIHelpers.OffWhite.b, 0.4f));
+            var phRT = ph.GetComponent<RectTransform>(); phRT.offsetMin = new Vector2(12, 0); phRT.offsetMax = new Vector2(-12, 0);
+            ph.text = placeholder; ph.fontStyle = FontStyle.Italic;
+
+            field.textComponent = valueText;
+            field.placeholder = ph;
+            field.targetGraphic = fieldGO.GetComponent<Image>();
+            field.contentType = InputField.ContentType.DecimalNumber;
+            field.lineType = InputField.LineType.SingleLine;
+            field.characterLimit = 4;
+            field.onEndEdit.AddListener(onCommit);
+            return field;
         }
 
         private Dropdown CreateDropdownRow(RectTransform parent, string label, float y, List<string> options, int currentIndex, UnityEngine.Events.UnityAction<int> onValueChanged)

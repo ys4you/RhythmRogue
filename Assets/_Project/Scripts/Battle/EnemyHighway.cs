@@ -29,6 +29,7 @@ namespace RhythmRogue.Battle
 
         private void Update()
         {
+            SyncScrollDirection();
             if (!_isActive || _conductor == null || !_conductor.IsPlaying) return;
 
             float currentBeat = _conductor.SongPositionInBeats;
@@ -55,7 +56,7 @@ namespace RhythmRogue.Battle
         private void SpawnUpcomingNotes(float currentBeat)
         {
             if (_notes == null) return;
-            float spawnThreshold = currentBeat + _beatsShownInAdvance;
+            float spawnThreshold = currentBeat + SpawnAheadBeats;
 
             while (_nextSpawnIndex < _notes.Count && _notes[_nextSpawnIndex].Beat <= spawnThreshold)
             {
@@ -144,6 +145,40 @@ namespace RhythmRogue.Battle
         }
 
         private void OnDestroy() { Clear(); OnAutoHit = null; }
+
+        /// <summary>
+        /// Flip note travel direction live, re-placing every active note so a mid-song switch
+        /// between upscroll and downscroll is seamless on the enemy highway too.
+        /// </summary>
+        public override void ApplyScrollDirection()
+        {
+            base.ApplyScrollDirection();
+            if (_conductor == null) return;
+            float currentBeat = _conductor.SongPositionInBeats;
+
+            for (int i = 0; i < _activeNotes.Count; i++)
+            {
+                ActiveNote a = _activeNotes[i];
+                a.View.ReorientHold(_appliedDownscroll);
+
+                if (a.HoldActive)
+                {
+                    int lane = Mathf.Clamp(a.Lane, 0, _laneX.Length - 1);
+                    a.View.transform.position = new Vector3(_laneX[lane], _receptorY, 0f);
+                    a.View.UpdateHoldBody(Mathf.Max(0f, a.EndBeat - currentBeat), EffectiveBeatHeight);
+                }
+                else if (!a.AutoHit)
+                {
+                    PositionNote(a.View, currentBeat);
+                    if (a.IsHold) a.View.UpdateHoldBody(a.View.Data.HoldDuration, EffectiveBeatHeight);
+                }
+                else
+                {
+                    int lane = Mathf.Clamp(a.Lane, 0, _laneX.Length - 1);
+                    a.View.transform.position = new Vector3(_laneX[lane], _receptorY, 0f);
+                }
+            }
+        }
 
         private struct ActiveNote
         {

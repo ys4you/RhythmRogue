@@ -39,6 +39,8 @@ namespace RhythmRogue.Battle
             Health.Heal(amount);
         }
 
+        // Refill to full AND revive. SetMaxHP clears the death latch when HP ends above 0, so a
+        // fresh run starts alive and able to take damage even if the previous run ended in death.
         public void ResetForNewRun() => Health.SetMaxHP(_maxHP, fillToMax: true);
 
         private void PublishHPChanged(int delta)

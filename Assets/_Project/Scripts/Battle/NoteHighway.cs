@@ -132,6 +132,10 @@ namespace RhythmRogue.Battle
             _pendingDespawn.Clear();
             float despawnBeat = currentBeat - _beatsDespawnBehind;
 
+            // Pass 1: scan only, fire NO events here. A miss event can synchronously end the
+            // battle (fatal miss -> player death -> EndBattle -> ClearAllNotes), which mutates
+            // _activeNotes; firing during this foreach is what threw "collection was modified".
+            // We only classify and mark misses here; the events fire in pass 2.
             foreach (NoteView note in _activeNotes)
             {
                 // A successfully HIT note should disappear at the moment it was hit, not keep
@@ -153,20 +157,31 @@ namespace RhythmRogue.Battle
 
                 if (relevantBeat < despawnBeat)
                 {
-                    if (!note.IsProcessed)
-                    {
-                        note.IsMissed = true;
-                        OnNoteMissedEvent?.Invoke(note);
-                    }
+                    if (!note.IsProcessed) note.IsMissed = true;
                     _pendingDespawn.Add(note);
                 }
             }
 
-            foreach (NoteView note in _pendingDespawn)
+            // Pass 2: fire miss events, before recycling so each note's data is still valid when
+            // its event is handled. A fatal miss may run ClearAllNotes mid-loop, which empties
+            // _pendingDespawn and recycles every note; the Count recheck lets this index loop
+            // stop cleanly. Never foreach here.
+            for (int i = 0; i < _pendingDespawn.Count; i++)
             {
-                _activeNotes.Remove(note);
-                ReturnNoteView(note);
+                NoteView note = _pendingDespawn[i];
+                if (note.IsMissed) OnNoteMissedEvent?.Invoke(note);
             }
+
+            // Pass 3: remove from the active list and return to the pool. If a fatal miss already
+            // tore the battle down, ClearAllNotes did this and _pendingDespawn is now empty, so
+            // this is a no-op and no note is recycled twice.
+            for (int i = 0; i < _pendingDespawn.Count; i++)
+            {
+                _activeNotes.Remove(_pendingDespawn[i]);
+                ReturnNoteView(_pendingDespawn[i]);
+            }
+
+            _pendingDespawn.Clear();
         }
 
         private void OnDestroy() => OnNoteMissedEvent = null;

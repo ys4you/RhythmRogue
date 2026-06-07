@@ -53,6 +53,11 @@ namespace RhythmRogue.Battle
         {
             _maxHP = Mathf.Max(1, newMax);
             _currentHP = fillToMax ? _maxHP : Mathf.Min(_currentHP, _maxHP);
+            // Keep the death latch consistent with HP: you cannot be dead with positive HP.
+            // Without this, a pool that died last run (the player) stays flagged dead after being
+            // refilled here, so IsAlive is false and TakeDamage no-ops forever. That was the
+            // "no damage after retry" bug: full HP bar, total invincibility on the next run.
+            if (_currentHP > 0) _isDead = false;
             OnHPChanged?.Invoke(_currentHP, _maxHP);
         }
 

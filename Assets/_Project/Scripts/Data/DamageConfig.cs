@@ -31,6 +31,11 @@ namespace RhythmRogue.Data
         [Tooltip("Flat damage dealt to player on Miss. Not affected by combo. GDD default: 5.")]
         [Min(0)] public int missDamage = 5;
 
+        [Tooltip("Damage dealt to the player by each enemy note that lands while their guard is " +
+                 "down (after a Miss, until the next successful hit). Kept small on purpose: it " +
+                 "can stack across a dense enemy phrase. Set to 0 to disable enemy attacks.")]
+        [Min(0)] public int enemyNoteDamage = 2;
+
         [Header("Hold Note Damage")]
         [Tooltip("Damage per hold tick. Multiplied by combo multiplier.")]
         [Min(0)] public int holdTickDamage = 1;

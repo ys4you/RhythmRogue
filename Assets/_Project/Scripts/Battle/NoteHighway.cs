@@ -10,17 +10,31 @@ namespace RhythmRogue.Battle
     [DisallowMultipleComponent]
     public class NoteHighway : HighwayBase
     {
+        [Header("Miss Timing")]
+        [Tooltip("How long after a note's beat it stays hittable, in milliseconds. Should match the " +
+                 "NoteMatcher hit window (110). Once a note is older than this without being hit it is " +
+                 "judged a Miss immediately, so the combo break and damage land at the hit line instead " +
+                 "of when the note finishes scrolling off (which read as misses registering too late).")]
+        [SerializeField] private float _missWindowMs = 110f;
+
         private LoadedChart _chart;
         private List<NoteData> _assembledNotes;
         private bool _useAssembledNotes;
         private int _nextSpawnIndex;
         private readonly List<NoteView> _activeNotes = new();
         private readonly List<NoteView> _pendingDespawn = new();
+        private readonly List<NoteView> _newlyMissed = new();
 
         public event Action<NoteView> OnNoteMissedEvent;
         public IReadOnlyList<NoteView> ActiveNotes => _activeNotes;
         public float HitLineY => _receptorY;
         public float BeatHeight => _beatHeight;
+
+        // Hit window in beats at the current BPM. The ms window is a BPM-independent reaction time;
+        // converting it each frame keeps the miss point a constant time past the line at any tempo.
+        private float MissWindowBeats => (_conductor != null && _conductor.SecPerBeat > 0f)
+            ? (_missWindowMs / 1000f) / _conductor.SecPerBeat
+            : 0f;
 
         protected override void Awake() => base.Awake();
         protected override string GetReceptorPrefix() => "Receptor";
@@ -78,6 +92,7 @@ namespace RhythmRogue.Battle
             foreach (NoteView note in _activeNotes) ReturnNoteView(note);
             _activeNotes.Clear();
             _pendingDespawn.Clear();
+            _newlyMissed.Clear();
             _nextSpawnIndex = 0;
         }
 
@@ -130,51 +145,53 @@ namespace RhythmRogue.Battle
         private void DespawnPassedNotes(float currentBeat)
         {
             _pendingDespawn.Clear();
+            _newlyMissed.Clear();
+
+            // A note is a confirmed miss the instant its hit window closes, MissWindowBeats past its
+            // beat. That is far sooner than the despawn distance, so the combo break and the damage
+            // land right at the hit line instead of ~2 beats later when the note is recycled (the old
+            // behaviour, which read as "misses register too late"). The note keeps scrolling and is
+            // recycled later by the despawn pass; only its judgment is brought forward to the line.
+            float missBeat = currentBeat - MissWindowBeats;
             float despawnBeat = currentBeat - _beatsDespawnBehind;
 
-            // Pass 1: scan only, fire NO events here. A miss event can synchronously end the
-            // battle (fatal miss -> player death -> EndBattle -> ClearAllNotes), which mutates
-            // _activeNotes; firing during this foreach is what threw "collection was modified".
-            // We only classify and mark misses here; the events fire in pass 2.
+            // Pass 1: classify only, fire NO events. A miss event can synchronously end the battle
+            // (fatal miss -> player death -> EndBattle -> ClearAllNotes), which mutates _activeNotes;
+            // firing inside this foreach is what threw "collection was modified". Events fire in pass
+            // 2, recycling in pass 3.
             foreach (NoteView note in _activeNotes)
             {
-                // A successfully HIT note should disappear at the moment it was hit, not keep
-                // scrolling past the receptor. Tap notes set IsHit on a successful match;
-                // hold notes set IsHit when the hold completes. While a hold is still being
-                // held (IsBeingHeld), keep it alive so HoldTracker can manage it.
-                if (note.IsHit && !note.IsBeingHeld)
-                {
-                    _pendingDespawn.Add(note);
-                    continue;
-                }
-
+                // A held note is owned by HoldTracker; leave it untouched.
                 if (note.IsBeingHeld) continue;
 
-                // Hold notes despawn based on end beat, not head beat
-                float relevantBeat = note.Data.Type == NoteType.Hold
+                // Miss the moment the window closes without a hit, judged off the HEAD beat for taps
+                // and holds alike (a hold cannot be started once its head is past the window).
+                if (!note.IsProcessed && note.Data.BeatPosition < missBeat)
+                {
+                    note.IsMissed = true;
+                    _newlyMissed.Add(note);
+                }
+
+                // Recycle a hit note at once (so it pops at the receptor, not past it), and any note
+                // once it has scrolled the full despawn distance past the line. Holds measure that
+                // from their end beat so the tail clears the screen first.
+                float despawnRef = note.Data.Type == NoteType.Hold
                     ? note.Data.EndBeatPosition
                     : note.Data.BeatPosition;
 
-                if (relevantBeat < despawnBeat)
-                {
-                    if (!note.IsProcessed) note.IsMissed = true;
+                if ((note.IsHit && !note.IsBeingHeld) || despawnRef < despawnBeat)
                     _pendingDespawn.Add(note);
-                }
             }
 
-            // Pass 2: fire miss events, before recycling so each note's data is still valid when
-            // its event is handled. A fatal miss may run ClearAllNotes mid-loop, which empties
-            // _pendingDespawn and recycles every note; the Count recheck lets this index loop
-            // stop cleanly. Never foreach here.
-            for (int i = 0; i < _pendingDespawn.Count; i++)
-            {
-                NoteView note = _pendingDespawn[i];
-                if (note.IsMissed) OnNoteMissedEvent?.Invoke(note);
-            }
+            // Pass 2: fire the misses that fell due this frame. Index loop with a Count recheck so a
+            // fatal miss that runs ClearAllNotes mid-loop (emptying the list) stops cleanly. Never
+            // foreach here.
+            for (int i = 0; i < _newlyMissed.Count; i++)
+                OnNoteMissedEvent?.Invoke(_newlyMissed[i]);
 
             // Pass 3: remove from the active list and return to the pool. If a fatal miss already
-            // tore the battle down, ClearAllNotes did this and _pendingDespawn is now empty, so
-            // this is a no-op and no note is recycled twice.
+            // tore the battle down, ClearAllNotes did this and both lists are now empty, so this is a
+            // no-op and nothing is recycled twice.
             for (int i = 0; i < _pendingDespawn.Count; i++)
             {
                 _activeNotes.Remove(_pendingDespawn[i]);
@@ -182,6 +199,7 @@ namespace RhythmRogue.Battle
             }
 
             _pendingDespawn.Clear();
+            _newlyMissed.Clear();
         }
 
         private void OnDestroy() => OnNoteMissedEvent = null;

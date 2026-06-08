@@ -986,7 +986,7 @@ MonoBehaviour:
   _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
   _relicEffectHandler: {fileID: 1188628590}
   _introDelay: 0
-  _endDelay: 0
+  _endDelay: 2
   _inputHandler: {fileID: 1599671247}
   _holdTracker: {fileID: 994168258}
   _judgmentSystem: {fileID: 425582198}

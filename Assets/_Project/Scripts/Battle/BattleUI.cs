@@ -17,6 +17,12 @@ namespace RhythmRogue.Battle
         [Header("Enemy Info")]
         [SerializeField] private Data.EnemyData _fallbackEnemyData;
 
+        [Header("Guard")]
+        [Tooltip("Optional shield sprites for the guard indicator. Assign BOTH to show a shield icon " +
+                 "instead of the GUARDED/EXPOSED text box. Up = guard intact, Down = guard broken.")]
+        [SerializeField] private Sprite _guardUpSprite;
+        [SerializeField] private Sprite _guardDownSprite;
+
         private Canvas _canvas;
         // HP bars use direct RectTransform width scaling rather than Image.Type.Filled,
         // because Filled mode has rendering edge cases when no sprite is assigned to the
@@ -33,6 +39,13 @@ namespace RhythmRogue.Battle
         private Text _enemyHPText;
         private Text _comboText, _multiplierText;
         private RectTransform _comboRect;
+        private Text _guardText;
+        private Image _guardBadgeBG;
+        private Image _guardImage;
+        private RectTransform _guardRect;
+        private bool _guardUpVisual = true;
+        private float _guardPopScale = 1f;
+        private Color _guardDownColor;
         private Text _scoreText;
         private int _currentScore, _displayScore;
         private Text _resultText;
@@ -58,7 +71,11 @@ namespace RhythmRogue.Battle
                 _comboSystem.OnComboReset += OnComboReset;
                 _comboSystem.OnComboMilestone += OnComboMilestone;
             }
-            if (_damagePipeline != null) _damagePipeline.OnDamageDealt += OnDamageDealt;
+            if (_damagePipeline != null)
+            {
+                _damagePipeline.OnDamageDealt += OnDamageDealt;
+                _damagePipeline.OnGuardChanged += OnGuardChanged;
+            }
         }
 
         private void Start()
@@ -71,6 +88,7 @@ namespace RhythmRogue.Battle
             // Instead, the enemy HP bar polls _enemyHealth.HPPercent every frame in
             // LateUpdate. The cost is one property access; the gain is no race condition.
             UpdatePlayerHP(); UpdateEnemyHP(); SetCombo(0, 1f); SetScore(0);
+            SetGuardVisual(_damagePipeline == null || _damagePipeline.GuardUp, animate: false);
 
             var enemyData = _battleManager?.CurrentEnemy ?? _fallbackEnemyData;
             if (enemyData != null)
@@ -90,7 +108,11 @@ namespace RhythmRogue.Battle
                 _playerHealth.Health.OnHPChanged -= OnPlayerHPChanged;
             }
             if (_comboSystem != null) { _comboSystem.OnComboChanged -= OnComboChanged; _comboSystem.OnComboReset -= OnComboReset; _comboSystem.OnComboMilestone -= OnComboMilestone; }
-            if (_damagePipeline != null) _damagePipeline.OnDamageDealt -= OnDamageDealt;
+            if (_damagePipeline != null)
+            {
+                _damagePipeline.OnDamageDealt -= OnDamageDealt;
+                _damagePipeline.OnGuardChanged -= OnGuardChanged;
+            }
             // Enemy events were never subscribed (see Start() comment), so nothing to unwire.
         }
 
@@ -125,6 +147,7 @@ namespace RhythmRogue.Battle
             if (_playerFlash > 0f) { _playerFlash -= Time.deltaTime * 4f; _playerHPFill.color = Color.Lerp(_playerHPFill.color, UIHelpers.OffWhite, _playerFlash); }
             if (_enemyFlash > 0f) { _enemyFlash -= Time.deltaTime * 4f; _enemyHPFill.color = Color.Lerp(_enemyHPFill.color, UIHelpers.OffWhite, _enemyFlash); }
             if (_comboPopScale > 1f) { _comboPopScale = Mathf.Lerp(_comboPopScale, 1f, Time.deltaTime * 10f); _comboRect.localScale = Vector3.one * _comboPopScale; }
+            if (_guardPopScale > 1f) { _guardPopScale = Mathf.Lerp(_guardPopScale, 1f, Time.deltaTime * 10f); if (_guardRect != null) _guardRect.localScale = Vector3.one * _guardPopScale; }
 
             if (_displayScore < _currentScore)
             {
@@ -163,6 +186,51 @@ namespace RhythmRogue.Battle
             if (mgr != null) mgr.Play(SfxId.ComboMilestone);
         }
         private void OnDamageDealt(DamageResult result) { if (!result.IsPlayerDamage) _currentScore += result.Amount; }
+
+        private void OnGuardChanged(bool up) => SetGuardVisual(up, animate: true);
+
+        /// <summary>
+        /// Reflect guard state on the bottom-left badge. Guarded reads as a bright, filled badge
+        /// with dark text; exposed flips it to a dim badge with an amber "EXPOSED" warning (no red
+        /// in the palette). The transition pops the badge so a guard break catches the eye even
+        /// while the player is watching the highway.
+        /// </summary>
+        private void SetGuardVisual(bool up, bool animate)
+        {
+            _guardUpVisual = up;
+            bool haveSprites = _guardUpSprite != null && _guardDownSprite != null;
+
+            // Sprite mode: show the shield icon, hide the text box. Text mode: the reverse.
+            if (_guardImage != null)
+            {
+                _guardImage.enabled = haveSprites;
+                if (haveSprites)
+                {
+                    _guardImage.sprite = up ? _guardUpSprite : _guardDownSprite;
+                    _guardImage.color = Color.white;
+                }
+            }
+            if (_guardBadgeBG != null) _guardBadgeBG.enabled = !haveSprites;
+            if (_guardText != null) _guardText.enabled = !haveSprites;
+
+            if (!haveSprites && _guardText != null && _guardBadgeBG != null)
+            {
+                if (up)
+                {
+                    _guardText.text = "GUARDED";
+                    _guardText.color = UIHelpers.BgDeep;
+                    _guardBadgeBG.color = UIHelpers.WarmGold;
+                }
+                else
+                {
+                    _guardText.text = "EXPOSED";
+                    _guardText.color = UIHelpers.AmberOrange;
+                    _guardBadgeBG.color = _guardDownColor;
+                }
+            }
+
+            if (animate) _guardPopScale = 1.4f;
+        }
 
         private void UpdatePlayerHP()
         {
@@ -256,6 +324,37 @@ namespace RhythmRogue.Battle
                 new Vector2(0, 0), new Vector2(0, 0), new Vector2(0, 0),
                 new Vector2(50, 55), new Vector2(400, 25),
                 UIHelpers.WarmGold, out _playerHPFill, out _playerHPFillRT);
+
+            // Guard indicator (top-left, clear of the receptor row so it never covers a lane).
+            // Defaults to a bright gold "GUARDED" box that flips to a dim "EXPOSED" the instant a
+            // Miss drops the guard. If both shield sprites are assigned in the inspector it shows a
+            // shield icon instead (intact vs broken). Rule lives in DamagePipeline (starts up,
+            // drops on Miss, restored on the next hit).
+            _guardDownColor = new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.85f);
+            var guardBadge = CreatePanel(canvasRT, "GuardBadge",
+                new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
+                new Vector2(50, -50), new Vector2(200, 46), UIHelpers.WarmGold);
+            _guardBadgeBG = guardBadge.GetComponent<Image>();
+            _guardRect = guardBadge.GetComponent<RectTransform>();
+
+            _guardText = CreateText(_guardRect, "GuardLabel", "GUARDED",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(200, 46), 24, TextAnchor.MiddleCenter, UIHelpers.BgDeep);
+            _guardText.fontStyle = FontStyle.Bold;
+
+            // Shield icon, shown only when both sprites are wired (otherwise the text box is used).
+            // Anchored to the badge's left edge so it sits in the corner once the box is hidden.
+            var guardIcon = new GameObject("GuardIcon", typeof(RectTransform), typeof(Image));
+            guardIcon.transform.SetParent(_guardRect, false);
+            var guardIconRT = guardIcon.GetComponent<RectTransform>();
+            guardIconRT.anchorMin = new Vector2(0f, 0.5f);
+            guardIconRT.anchorMax = new Vector2(0f, 0.5f);
+            guardIconRT.pivot = new Vector2(0f, 0.5f);
+            guardIconRT.anchoredPosition = Vector2.zero;
+            guardIconRT.sizeDelta = new Vector2(64, 64);
+            _guardImage = guardIcon.GetComponent<Image>();
+            _guardImage.preserveAspect = true;
+            _guardImage.enabled = false;
 
             // Combo (right side, inset from CRT bezel)
             var comboGroup = CreatePanel(canvasRT, "ComboGroup",

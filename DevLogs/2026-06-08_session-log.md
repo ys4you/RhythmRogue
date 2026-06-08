@@ -1,6 +1,6 @@
 # RhythmRogue Dev Log, 2026-06-08
 
-A handoff log for the next chat. This session was the response to Playtest 1: four fixes (after-retry damage, an on-death crash, battle-start music + scroll-in, and miss timing) plus a small inspector tweak. Read the 2026-06-06 log first for the flat-HP, Gameplay settings tab, and constant-velocity scroll work this sits on top of; that work is still uncommitted and ships together with this.
+A handoff log for the next chat. This session was the response to Playtest 1, four fixes (after-retry damage, an on-death crash, battle-start music + scroll-in, and miss timing) plus a small inspector tweak, and then a design-led feature off the same playtest: the guard mechanic that finally gives enemy notes teeth. Read the 2026-06-06 log first for the flat-HP, Gameplay settings tab, and constant-velocity scroll work this sits on top of.
 
 ---
 
@@ -8,7 +8,8 @@ A handoff log for the next chat. This session was the response to Playtest 1: fo
 
 - All bug-fixing off the first external playtest. Four things changed: the after-retry invincibility bug, the on-death crash, start-of-battle behaviour (music is now immediate and the opening notes scroll in), and miss timing (misses now register at the hit line, not a beat later). BattleManager's intro/end delays are now inspector sliders.
 - The user confirmed gameplay feels right in-engine after these: damage works on a second run, battle-start music is immediate with notes sliding in, and misses land on the beat you missed. Treat all four as validated.
-- STILL NOT committed, and the pile is now large: everything from the 2026-06-06 log (flat HP, Gameplay tab, constant-velocity scroll) PLUS these four fixes PLUS both logs. One commit covering all of it is owed; it lives only on the laptop until pushed, so committing is the next concrete step.
+- The 2026-06-06 work (flat HP, Gameplay tab, constant-velocity scroll) and this session's four fixes plus both logs were committed and pushed. The one thing still uncommitted is the guard mechanic below (DamageConfig + DamagePipeline); its commit message was provided in chat.
+- NEW FEATURE this session: the guard mechanic, the first answer to the tester's "the enemy just exists." The enemy's auto-played notes now damage the player, but only while the guard is down: the guard starts up, a Miss drops it, and the next successful hit restores it. Built and wired into BattleScene; not yet validated in-engine for feel or balance-tuned. Full section below.
 - Remaining Playtest 1 backlog, not yet touched: the flat difficulty curve (Cultist feels like Acolyte, then Zealot is a wall), hold-note hit feedback, and the enemy/boss reading as decorative. Hit juice is still the big feel lever (already-built stack, see 06-06 log).
 
 ### Machine paths (call Filesystem:list_allowed_directories first each session)
@@ -82,12 +83,37 @@ A casual rhythm player ran the build. The base loop worked and the vibe landed; 
 
 ---
 
+## ENEMY THREAT: the guard mechanic
+
+This one is a feature, not a Playtest 1 fix, but it comes from the same tester note that the enemy "just exists." The root cause, found by reading the code: the EnemyHighway already auto-plays its notes as pure spectacle (receptor flash, no input, no damage), so the player was only ever fighting the chart, never the enemy. The enemy was a difficulty knob with a health bar.
+
+**Decision.** Give enemy notes teeth through a "guard" model, chosen over call-and-response (too FNF, both turns are the same verb) and over dodge/defence phases (taking the attacking verb away reads as more stressful, not more fun). The guard keeps the player always attacking; the enemy's notes become a fair, telegraphed threat layered on top.
+
+**How it behaves.**
+- The player starts every battle guarded. The opening enemy notes always glance off, before the player has hit anything.
+- A real Miss drops the guard. While it is down, each enemy note that reaches its receptor deals `enemyNoteDamage` (default 2) to the player.
+- The next successful hit (Bad/Good/Perfect) raises the guard again, closing the window. Only a Miss drops it, so gaps in the player's own chart are safe: an empty stretch cannot restore the guard, but it cannot drop it either.
+
+**Why it is fair (the bar it was held to).** Every enemy hit was telegraphed by the note scrolling in; the out is the main verb (hit your next note); the cost is small and self-correcting. The critical case the user raised, an enemy that holds the first notes of a battle, is handled by starting the guard UP: the player can never take damage they had no chance to prevent, including at the very top of the fight. Pair it with the charting habit of keeping the enemy quiet in the opening section as defence in depth.
+
+**Implementation.** All in the damage path, nothing new spun up.
+- `Scripts/Data/DamageConfig.cs`: new `enemyNoteDamage` field (default 2; set 0 to disable enemy attacks). This is the one balance dial.
+- `Scripts/Battle/DamagePipeline.cs`: owns the guard. It already subscribed to judgments, held PlayerHealth, and had god mode plus the OnDamageDealt feedback event, so it was the cohesive home and enemy-note damage routes through the same path (god mode and damage juice cover it for free). A Miss calls SetGuard(false); any successful hit calls SetGuard(true). It subscribes to `EnemyHighway.OnAutoHit` and, only while the guard is down, applies `enemyNoteDamage` to the player. The guard resets up in OnEnable (battle scene objects are fresh per fight). State is exposed via `GuardUp` and `OnGuardChanged` for a future HUD piece.
+
+**Wiring (done this session).** DamagePipeline has a new serialized `_enemyHighway` field; the scene's EnemyHighway is assigned to it on the DamagePipeline GameObject in BattleScene. If it is ever left empty the pipeline logs a warning on battle start and enemy notes go back to harmless.
+
+**Pending on this feature.**
+- In-engine validation of the feel and tuning of `enemyNoteDamage`: it stacks across a dense enemy phrase, so 2 is a cautious start and may want nudging once it is felt. God mode suppresses enemy-note damage, so test with it off.
+- No dedicated guard indicator on the HUD yet. The combo counter is the proxy (combo alive = guarded, plus the player starts guarded), and the drop is felt through the combo break and the existing player-damage juice. A small explicit guard readout is the recommended next step; subscribe it to `OnGuardChanged`.
+
+---
+
 ## Pending / TODO (carry into next chat)
 
-1. **Commit + push.** The owed commit now covers the 2026-06-06 work (flat HP, explicit isBoss, enemy HP number + kill log, Gameplay settings tab, constant-velocity scroll) AND this session (after-retry damage, on-death crash, immediate battle-start music + chart lead-in, miss timing, BattleManager timing sliders) AND both logs. Ask Claude for the message.
+1. **Commit + push the guard mechanic.** The 2026-06-06 work and this session's four fixes + both logs are already pushed. The remaining uncommitted change is the guard mechanic (DamageConfig.enemyNoteDamage, DamagePipeline guard state + EnemyHighway damage subscription). The commit message was given in chat; if a fresh one is needed, ask Claude.
 2. **Difficulty curve** is the top remaining Playtest 1 item: Cultist felt the same as Acolyte, then Zealot was a wall. Now that scroll speed and miss timing are fixed, that flat-then-cliff shape is the clearest signal and it is mostly tuning (DifficultyProfile, per-enemy markerDifficulty / density), not new systems.
 3. **Hold-note feedback** (Playtest 1 bug 3) and the **hit juice** pass go together; the juice stack is already built (see 06-06 log item 4: palette off the no-red warm scheme, wiring check, SFX clips, tuning).
-4. **Enemy / boss aliveness:** the tester read the enemy highway as decorative ("he just exists") and wanted the boss to feel interactive (Undertale-like was the strongest future signal). Bigger feature, later.
+4. **Enemy / boss aliveness:** the guard mechanic (above) is the first concrete step, the enemy now actually threatens the player. Still open: making the boss feel interactive (Undertale-like was the strongest future signal), and a HUD guard indicator so the new mechanic is legible (subscribe to DamagePipeline.OnGuardChanged; combo is the stopgap proxy).
 5. **Protect:** per-enemy music and the event mystery were the strongest positives; do not regress them.
 6. Carried from 06-06: retire the lane-shape path, per-note accent tags, Windows build, get to 3 testers.
 
@@ -95,6 +121,7 @@ A casual rhythm player ran the build. The base loop worked and the vibe landed; 
 
 ## Architecture reminders (new or changed this session; 06-06 and earlier still hold)
 
+- **The enemy damages the player only through the guard.** EnemyHighway auto-plays its notes (display only); DamagePipeline subscribes to its OnAutoHit and applies DamageConfig.enemyNoteDamage to the player only while the guard is down. The guard starts up each battle (reset in OnEnable), drops on a Miss, and is restored by the next successful hit. Enemy-note damage routes through DamagePipeline so god mode and the OnDamageDealt juice cover it. Requires the scene's EnemyHighway wired on the DamagePipeline GameObject. Guard state is on GuardUp / OnGuardChanged.
 - **Misses fire when the hit window closes, not at despawn.** NoteHighway flags a note missed `_missWindowMs` past its head beat and fires there; the note despawns later at `_beatsDespawnBehind`. Judgment and despawn are separate. Hold misses key off the head beat.
 - **The chart owns the opening runway, not the audio.** The song plays immediately; PatternAssembler leaves the first `ComputeLeadInBeats` beats note-free so the opening notes scroll in over the song's intro. Do NOT reintroduce an audio count-in, the user rejected delayed music. Lead-in is scroll-speed dependent and sized to `HighwayBase.DefaultSpawnAheadUnits`.
 - **HealthComponent invariant: not dead while HP > 0.** SetMaxHP clears the `_isDead` latch whenever HP ends positive, which is what makes ResetForNewRun actually revive.

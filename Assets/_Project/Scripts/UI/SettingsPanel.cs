@@ -361,7 +361,7 @@ namespace RhythmRogue.UI
         }
 
         // Commit handler for the scroll-speed field. Normalizes a comma decimal to a dot so it
-        // parses on any locale, writes it (the setter clamps to the 2-16 u/s range), then reflects
+        // parses on any locale, writes it (the setter clamps to the 2-40 u/s range), then reflects
         // the stored value back into the field so bad or out-of-range input visibly corrects itself.
         private void OnScrollSpeedCommitted(string raw)
         {

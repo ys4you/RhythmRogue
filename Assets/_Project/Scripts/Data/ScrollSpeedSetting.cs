@@ -4,7 +4,7 @@ namespace RhythmRogue.Data
 {
     /// <summary>
     /// Global note scroll speed, expressed as a CONSTANT velocity in world units per second.
-    /// Persisted in PlayerPrefs. Range 2 to 16 u/s.
+    /// Persisted in PlayerPrefs. Range 2 to 40 u/s.
     ///
     /// This is BPM-independent on purpose. The highways convert it into a per-beat height using
     /// the song's current BPM (units/beat = UnitsPerSecond * 60 / BPM), so a note travels at the
@@ -17,7 +17,7 @@ namespace RhythmRogue.Data
         private const string PrefsKey = "RhythmRogue_ScrollUnitsPerSecond";
         private const float DefaultSpeed = 5f;
         private const float MinSpeed = 2f;
-        private const float MaxSpeed = 16f;
+        private const float MaxSpeed = 40f;
         private const float StepSize = 0.5f;
 
         private static float _cached = -1f;

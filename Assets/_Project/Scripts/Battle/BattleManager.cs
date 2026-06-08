@@ -37,10 +37,14 @@ namespace RhythmRogue.Battle
         [SerializeField] private RelicEffectHandler _relicEffectHandler;
 
         [Header("Timing")]
-        [Tooltip("Flat pause after the enemy appears before the song starts. Kept short so the " +
-                 "player isn't waiting through dead air every fight; the song's own intro " +
-                 "section provides the 'settle in' beat before player notes arrive.")]
+        [Tooltip("Silent pause after the enemy appears before the song starts, in seconds. The song " +
+                 "then plays immediately, and the chart's own note-free intro gives the opening notes " +
+                 "their scroll-in runway. Set to 0 for the song to start the instant the fight does; " +
+                 "raise it for a longer enemy-reveal beat before the music.")]
+        [Range(0f, 5f)]
         [SerializeField] private float _introDelay = 1f;
+        [Tooltip("Pause on the result (Victory/Defeat) before the scene transitions out, in seconds.")]
+        [Range(0f, 5f)]
         [SerializeField] private float _endDelay = 2f;
 
         [Header("Systems")]
@@ -237,6 +241,9 @@ namespace RhythmRogue.Battle
                 enter: _ =>
                 {
                     _conductor.OnSongFinished += OnSongEnded;
+                    // Song starts immediately. The opening runway comes from the chart's own
+                    // note-free lead-in (see PatternAssembler / ChartProvider), so the music plays
+                    // from the first frame while the opening notes scroll in over the intro bars.
                     _conductor.Play(_chart.EffectiveBPM, _chart.AudioOffset);
                     GameLog.Info("[BattleManager] PLAYING - song started!");
                 },

@@ -107,8 +107,9 @@ namespace RhythmRogue.Battle
             NotePatternLibrary patternLib = enemy.patternLibrary != null ? enemy.patternLibrary : _defaultPatternLibrary;
             if (patternLib != null && patternLib.patterns.Count > 0)
             {
+                float leadInBeats = ComputeLeadInBeats(effectiveBPM);
                 BattleChart patternChart = PatternAssembler.Assemble(
-                    allMarkers, sections, patternLib, enemy.chartInstrument, rng, difficulty, effectiveBPM, totalBeats);
+                    allMarkers, sections, patternLib, enemy.chartInstrument, rng, difficulty, effectiveBPM, totalBeats, leadInBeats);
                 if (patternChart == null) { GameLog.Error("[ChartProvider] PatternAssembler returned null (beat map)."); return default; }
                 return new ChartResult(patternChart, "pattern", effectiveBPM, beatMap.audioOffsetSeconds);
             }
@@ -170,6 +171,20 @@ namespace RhythmRogue.Battle
             float m = enemy.bpmModifier;
             if (isElite && _eliteConfig != null) m = _eliteConfig.ScaleBPMModifier(m);
             return m;
+        }
+
+        // Beats of note-free intro at the very start of the chart. The song plays immediately, so the
+        // opening notes need a runway to scroll in from off-screen rather than popping in on the
+        // receptor. That runway is how long a note takes to cross the off-screen spawn distance at the
+        // current scroll speed (distance / speed), converted to beats at this song's BPM. The
+        // PatternAssembler leaves the first this-many beats note-free and the song's intro covers them.
+        // Scroll-speed dependent: a slower scroll moves notes slower, so it needs a longer runway.
+        private static float ComputeLeadInBeats(float bpm)
+        {
+            if (bpm <= 0f) return 0f;
+            float scroll = Mathf.Max(0.1f, ScrollSpeedSetting.UnitsPerSecond);
+            float travelSeconds = HighwayBase.DefaultSpawnAheadUnits / scroll;
+            return Mathf.Ceil(travelSeconds * bpm / 60f);
         }
     }
 }

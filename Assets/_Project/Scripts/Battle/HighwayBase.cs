@@ -22,7 +22,7 @@ namespace RhythmRogue.Battle
         [Tooltip("How far above/below the receptor, in WORLD UNITS, notes spawn. Keep this at least " +
                  "the visible height of the highway so notes never pop in on-screen. With constant-speed " +
                  "scrolling a note is then visible for (this / speed) seconds before it reaches the receptor.")]
-        [SerializeField] protected float _spawnAheadUnits = 18f;
+        [SerializeField] protected float _spawnAheadUnits = DefaultSpawnAheadUnits;
         [Tooltip("How far past the receptor, in beats, a note travels before it is recycled.")]
         [SerializeField] protected float _beatsDespawnBehind = 2f;
 
@@ -77,6 +77,11 @@ namespace RhythmRogue.Battle
         // Spawn lead converted from a fixed world distance into beats for the current speed and BPM,
         // so notes always appear the same distance off-screen (no pop-in at low speeds or high BPM).
         protected float SpawnAheadBeats => _spawnAheadUnits / Mathf.Max(0.01f, EffectiveBeatHeight);
+
+        // Default off-screen spawn distance in world units (matches the _spawnAheadUnits default).
+        // Exposed so chart assembly can size the opening note-free lead-in to match it: the first
+        // note must start at least this far out so it scrolls in cleanly instead of popping in.
+        public const float DefaultSpawnAheadUnits = 18f;
 
         public IReadOnlyList<float> LanePositions => _laneX;
         public float ReceptorY => _receptorY;

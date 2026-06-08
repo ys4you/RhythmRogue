@@ -89,7 +89,9 @@ namespace RhythmRogue.Core
             _lastReportedBeat = -1;
             _lastReportedHalfBeat = -1;
 
-            // PlayScheduled aligns to the audio buffer boundary for precise start
+            // PlayScheduled aligns to the audio buffer boundary for precise start. The song begins
+            // immediately; the opening runway is provided by the chart itself (a short note-free
+            // intro, see PatternAssembler lead-in), not by delaying the audio.
             double startDsp = AudioSettings.dspTime + 0.1;
             _dspSongStartTime = startDsp;
             _bpmChangeDspOrigin = _dspSongStartTime;

@@ -105,10 +105,10 @@ namespace RhythmRogue.Battle
 
                     if (doPlayer)
                         FillSide(secMarkers, sec.type, sec.startBeat, sec.endBeat, library, globalMaxDiff,
-                                 sec.intensityScale, playerRng, ref playerCtx, playerNotes);
+                                 sec.intensityScale, leadInBeats, playerRng, ref playerCtx, playerNotes);
                     if (doEnemy)
                         FillSide(secMarkers, sec.type, sec.startBeat, sec.endBeat, library, globalMaxDiff,
-                                 sec.intensityScale, enemyRng, ref enemyCtx, enemyNotes);
+                                 sec.intensityScale, leadInBeats, enemyRng, ref enemyCtx, enemyNotes);
 
                     chartSections.Add(new ChartSection(sec.highway, sec.startBeat, sec.DurationBeats, enemyNotes, playerNotes, null, null));
                 }
@@ -118,7 +118,7 @@ namespace RhythmRogue.Battle
                 // No section data: one player section across the whole song.
                 List<BeatMarker> secMarkers = MarkersInRange(markers, 0f, totalBeats, ChartInstrument.All);
                 var playerNotes = new List<StampedNote>();
-                FillSide(secMarkers, SongSectionType.Verse, 0f, totalBeats, library, globalMaxDiff, 0f, playerRng, ref playerCtx, playerNotes);
+                FillSide(secMarkers, SongSectionType.Verse, 0f, totalBeats, library, globalMaxDiff, 0f, leadInBeats, playerRng, ref playerCtx, playerNotes);
                 chartSections.Add(new ChartSection(SectionType.PlayerOnly, 0f, totalBeats, new List<StampedNote>(), playerNotes, null, null));
             }
 
@@ -192,7 +192,7 @@ namespace RhythmRogue.Battle
 
         private static void FillSide(
             List<BeatMarker> secMarkers, SongSectionType secType, float secStart, float secEnd,
-            NotePatternLibrary library, int globalMaxDiff, float intensityScale,
+            NotePatternLibrary library, int globalMaxDiff, float intensityScale, float leadInBeats,
             ISeededRandom sideRng, ref PickContext ctx, List<StampedNote> output)
         {
             int bar = 0;
@@ -234,7 +234,7 @@ namespace RhythmRogue.Battle
                     if (frag == null) break;
 
                     LaneTransform transform = ChooseTransform(frag, ctx.PreviousEndLane, pickRng);
-                    StampFragment(frag, pos, secEnd, transform, output);
+                    StampFragment(frag, pos, secEnd, leadInBeats, transform, output);
 
                     ctx.Update(frag, transform.Apply(frag.EndLane));
 
@@ -317,7 +317,7 @@ namespace RhythmRogue.Battle
 
         // ---- Stamping + lane flow (point 6) ----
 
-        private static void StampFragment(NotePattern frag, float startBeat, float sectionEnd, LaneTransform transform, List<StampedNote> output)
+        private static void StampFragment(NotePattern frag, float startBeat, float sectionEnd, float leadInBeats, LaneTransform transform, List<StampedNote> output)
         {
             List<NotePattern.Note> notes = frag.notes;
             if (notes == null) return;
@@ -326,6 +326,8 @@ namespace RhythmRogue.Battle
             {
                 NotePattern.Note n = notes[i];
                 float beat = startBeat + n.offsetBeats;
+                if (beat < leadInBeats) continue;           // note-free intro: the song's opening plays
+                                                            // immediately while these first notes scroll in
                 if (beat >= sectionEnd - 0.0001f) continue; // never spill past the section boundary
                 output.Add(new StampedNote(transform.Apply(n.lane), beat, n.holdBeats));
             }

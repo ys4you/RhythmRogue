@@ -985,8 +985,8 @@ MonoBehaviour:
   _enemyHighway: {fileID: 1671159282}
   _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
   _relicEffectHandler: {fileID: 1188628590}
-  _introDelay: 2
-  _endDelay: 2
+  _introDelay: 0
+  _endDelay: 0
   _inputHandler: {fileID: 1599671247}
   _holdTracker: {fileID: 994168258}
   _judgmentSystem: {fileID: 425582198}
@@ -1027,6 +1027,7 @@ MonoBehaviour:
   _useLegacyChart: 0
   _defaultChart: {fileID: 0}
   _defaultShapeLibrary: {fileID: 11400000, guid: 19725b64b1f7a8c4d9aff9f6a543172a, type: 2}
+  _defaultPatternLibrary: {fileID: 0}
   _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
 --- !u!1 &1188628589
 GameObject:
@@ -1300,8 +1301,6 @@ MonoBehaviour:
   _badShakeIntensity: 0
   _perfectShakeIntensity: 0.5
   _shakeDuration: 0.1
-  _hitSound: {fileID: 8300000, guid: 346fd3a869d78dc44a6e42056157d3be, type: 3}
-  _hitVolume: 0.1
   _textPoolSize: 8
 --- !u!114 &1794601934
 MonoBehaviour:
@@ -1403,6 +1402,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b71da778e0d011c41abadd4b00d34a8f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _titleText: PAUSED
 --- !u!4 &1869796272
 Transform:
   m_ObjectHideFlags: 0

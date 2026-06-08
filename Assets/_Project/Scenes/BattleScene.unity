@@ -168,6 +168,8 @@ MonoBehaviour:
   _damagePipeline: {fileID: 435255123}
   _enemyHealth: {fileID: 1009257967}
   _fallbackEnemyData: {fileID: 0}
+  _guardUpSprite: {fileID: 8714566961431623855, guid: d63bf96fe3683e144950f18878f82eb0, type: 3}
+  _guardDownSprite: {fileID: 7859793734720806855, guid: d63bf96fe3683e144950f18878f82eb0, type: 3}
 --- !u!114 &312867617 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7509701747963032061, guid: 353041e05960c9240903c4e1687b663a, type: 3}
@@ -468,6 +470,7 @@ MonoBehaviour:
   _comboSystem: {fileID: 1147190660}
   _enemyHealth: {fileID: 1009257967}
   _holdTracker: {fileID: 994168258}
+  _enemyHighway: {fileID: 0}
 --- !u!20 &519420031 stripped
 Camera:
   m_CorrespondingSourceObject: {fileID: 1855433783062302011, guid: 7159857ab22b0104d9c0e76d5881e986, type: 3}

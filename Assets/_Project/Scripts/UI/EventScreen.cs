@@ -151,6 +151,9 @@ namespace RhythmRogue.UI
             // Subtle central glow, cooler/eerier than the rest screen's campfire: use BgLight purple.
             MakePanel(_canvasRT, "Glow", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1500, 1000), new Color(UIHelpers.BgLight.r, UIHelpers.BgLight.g, UIHelpers.BgLight.b, 0.18f));
 
+            // Live currency total (events can change it), shown top-right like the map and shop.
+            CurrencyReadout.Create(_canvasRT, _runState);
+
             if (_event == null)
             {
                 // Graceful fallback if the pool is empty/unassigned: a neutral non-event.

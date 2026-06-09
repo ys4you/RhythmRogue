@@ -8,8 +8,8 @@ A handoff log for the next chat. This session was the response to Playtest 1, fo
 
 - All bug-fixing off the first external playtest. Four things changed: the after-retry invincibility bug, the on-death crash, start-of-battle behaviour (music is now immediate and the opening notes scroll in), and miss timing (misses now register at the hit line, not a beat later). BattleManager's intro/end delays are now inspector sliders.
 - The user confirmed gameplay feels right in-engine after these: damage works on a second run, battle-start music is immediate with notes sliding in, and misses land on the beat you missed. Treat all four as validated.
-- The 2026-06-06 work (flat HP, Gameplay tab, constant-velocity scroll) and this session's four fixes plus both logs were committed and pushed. The one thing still uncommitted is the guard mechanic below (DamageConfig + DamagePipeline); its commit message was provided in chat.
-- NEW FEATURE this session: the guard mechanic, the first answer to the tester's "the enemy just exists." The enemy's auto-played notes now damage the player, but only while the guard is down: the guard starts up, a Miss drops it, and the next successful hit restores it. Built and wired into BattleScene; not yet validated in-engine for feel or balance-tuned. Full section below.
+- The 2026-06-06 work (flat HP, Gameplay tab, constant-velocity scroll) and this session's four fixes plus both logs were committed and pushed. Still uncommitted: the guard mechanic (DamageConfig + DamagePipeline), the guard HUD indicator (BattleUI), and the scroll-speed cap raise (ScrollSpeedSetting). Commit messages for all three were provided in chat.
+- NEW FEATURE this session: the guard mechanic, the first answer to the tester's "the enemy just exists." The enemy's auto-played notes now damage the player, but only while the guard is down: the guard starts up, a Miss drops it, and the next successful hit restores it. It has a HUD indicator (top-left GUARDED/EXPOSED badge, sprite-ready) so the state is legible. Built and wired into BattleScene; not yet validated in-engine for feel or balance-tuned. Full sections below.
 - Remaining Playtest 1 backlog, not yet touched: the flat difficulty curve (Cultist feels like Acolyte, then Zealot is a wall), hold-note hit feedback, and the enemy/boss reading as decorative. Hit juice is still the big feel lever (already-built stack, see 06-06 log).
 
 ### Machine paths (call Filesystem:list_allowed_directories first each session)
@@ -104,16 +104,34 @@ This one is a feature, not a Playtest 1 fix, but it comes from the same tester n
 
 **Pending on this feature.**
 - In-engine validation of the feel and tuning of `enemyNoteDamage`: it stacks across a dense enemy phrase, so 2 is a cautious start and may want nudging once it is felt. God mode suppresses enemy-note damage, so test with it off.
-- No dedicated guard indicator on the HUD yet. The combo counter is the proxy (combo alive = guarded, plus the player starts guarded), and the drop is felt through the combo break and the existing player-damage juice. A small explicit guard readout is the recommended next step; subscribe it to `OnGuardChanged`.
+- The guard now has a HUD indicator (next section), so it is legible. The combo counter remains a secondary proxy.
+
+---
+
+## GUARD HUD: the indicator
+
+The guard had no visible state at first (only the combo break and the HP tick hinted at it), so it got a dedicated readout in BattleUI. It reads `DamagePipeline.GuardUp` / `OnGuardChanged`, which BattleUI already held a reference for, so there was no new wiring.
+
+- Default (text mode): a small badge, bright gold **GUARDED** that flips to a dim amber **EXPOSED** the instant a Miss drops the guard, popping once on the transition to pull the eye. It shows GUARDED from the first frame even at zero combo, which is the start-guarded state the combo counter could not convey.
+- Placement: top-left corner, mirroring the score top-right. It was first placed bottom-left by the HP, but the 200px text box overlapped the leftmost lane receptor, so it moved to the clear top-left. A compact icon could sit bottom-left in the margin if ever wanted; that is a one-line position change in `CreateUI`.
+- Sprite-ready: BattleUI has optional `_guardUpSprite` / `_guardDownSprite` fields (Guard header). Assign BOTH and it switches to a swapping shield icon (intact vs broken) and hides the text box; leave either empty and the text is the fallback. The user is considering drawing two shields (intact + cracked); import them Point filter, no compression, on the warm palette, no red.
+
+`Scripts/Battle/BattleUI.cs` only.
+
+---
+
+## SCROLL SPEED: cap raised
+
+The player wanted faster scroll than the old ceiling allowed. `ScrollSpeedSetting.MaxSpeed` went 16 -> 40 u/s. The Gameplay tab field, the clamp, and the highways all read this const, so the higher ceiling propagates with no UI change (the field hint now reads "2 to 40 u/s"). Default (5) and min (2) unchanged. Safe by design: scroll speed is a constant velocity and notes still spawn a fixed distance out, so a higher value just moves them faster over the same runway, no pop-in. `Scripts/Data/ScrollSpeedSetting.cs` (plus a stale comment fixed in SettingsPanel).
 
 ---
 
 ## Pending / TODO (carry into next chat)
 
-1. **Commit + push the guard mechanic.** The 2026-06-06 work and this session's four fixes + both logs are already pushed. The remaining uncommitted change is the guard mechanic (DamageConfig.enemyNoteDamage, DamagePipeline guard state + EnemyHighway damage subscription). The commit message was given in chat; if a fresh one is needed, ask Claude.
+1. **Commit + push.** Three uncommitted changes from this session: the guard mechanic (DamageConfig.enemyNoteDamage, DamagePipeline guard state + EnemyHighway subscription), the guard HUD indicator (BattleUI), and the scroll-speed cap raise (ScrollSpeedSetting). Commit messages for each were given in chat; ask Claude for fresh ones if needed.
 2. **Difficulty curve** is the top remaining Playtest 1 item: Cultist felt the same as Acolyte, then Zealot was a wall. Now that scroll speed and miss timing are fixed, that flat-then-cliff shape is the clearest signal and it is mostly tuning (DifficultyProfile, per-enemy markerDifficulty / density), not new systems.
 3. **Hold-note feedback** (Playtest 1 bug 3) and the **hit juice** pass go together; the juice stack is already built (see 06-06 log item 4: palette off the no-red warm scheme, wiring check, SFX clips, tuning).
-4. **Enemy / boss aliveness:** the guard mechanic (above) is the first concrete step, the enemy now actually threatens the player. Still open: making the boss feel interactive (Undertale-like was the strongest future signal), and a HUD guard indicator so the new mechanic is legible (subscribe to DamagePipeline.OnGuardChanged; combo is the stopgap proxy).
+4. **Enemy / boss aliveness:** the guard mechanic (above), now with its HUD indicator, is the first concrete step; the enemy actually threatens the player and the state is legible. Still open: tuning enemyNoteDamage in-engine, deciding on the shield sprites, and the bigger one, making the boss feel interactive (Undertale-like was the strongest future signal).
 5. **Protect:** per-enemy music and the event mystery were the strongest positives; do not regress them.
 6. Carried from 06-06: retire the lane-shape path, per-note accent tags, Windows build, get to 3 testers.
 
@@ -122,6 +140,8 @@ This one is a feature, not a Playtest 1 fix, but it comes from the same tester n
 ## Architecture reminders (new or changed this session; 06-06 and earlier still hold)
 
 - **The enemy damages the player only through the guard.** EnemyHighway auto-plays its notes (display only); DamagePipeline subscribes to its OnAutoHit and applies DamageConfig.enemyNoteDamage to the player only while the guard is down. The guard starts up each battle (reset in OnEnable), drops on a Miss, and is restored by the next successful hit. Enemy-note damage routes through DamagePipeline so god mode and the OnDamageDealt juice cover it. Requires the scene's EnemyHighway wired on the DamagePipeline GameObject. Guard state is on GuardUp / OnGuardChanged.
+- **The guard's HUD readout lives in BattleUI**, driven by DamagePipeline.OnGuardChanged / GuardUp (BattleUI already references the pipeline, no extra wiring). Text mode by default (GUARDED gold / EXPOSED amber, top-left); assigning both `_guardUpSprite` and `_guardDownSprite` switches it to a shield icon and hides the text.
+- **Scroll speed is capped at 40 u/s** (ScrollSpeedSetting.MaxSpeed), min 2, default 5. The Gameplay field, clamp, and highways all read these consts; change the const, not the UI. It is a constant world-units/second velocity, BPM-independent.
 - **Misses fire when the hit window closes, not at despawn.** NoteHighway flags a note missed `_missWindowMs` past its head beat and fires there; the note despawns later at `_beatsDespawnBehind`. Judgment and despawn are separate. Hold misses key off the head beat.
 - **The chart owns the opening runway, not the audio.** The song plays immediately; PatternAssembler leaves the first `ComputeLeadInBeats` beats note-free so the opening notes scroll in over the song's intro. Do NOT reintroduce an audio count-in, the user rejected delayed music. Lead-in is scroll-speed dependent and sized to `HighwayBase.DefaultSpawnAheadUnits`.
 - **HealthComponent invariant: not dead while HP > 0.** SetMaxHP clears the `_isDead` latch whenever HP ends positive, which is what makes ResetForNewRun actually revive.

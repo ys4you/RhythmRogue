@@ -149,17 +149,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c60f85b25de6ccf4a9bf15b03b66d008, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _mapPadding: 200
-  _mapPaddingBottom: 160
-  _mapPaddingTop: 120
+  _layerSpacing: 280
+  _mapWidth: 1500
+  _topPadding: 250
+  _bottomPadding: 250
   _nodeSize: 20
   _bossNodeSize: 26
+  _focusViewportRatio: 0.4
+  _scrollLerpSpeed: 10
+  _glowPulseSpeed: 3
+  _glowPulseMinAlpha: 0.4
+  _glowPulseScale: 0.08
+  _bossPulseSpeed: 1.5
+  _bossPulseMinAlpha: 0.5
+  _bossPulseScale: 0.1
+  _markerBobSpeed: 2.5
+  _markerBobAmplitude: 6
   _iconEnemy: {fileID: 21300000, guid: 6497ba977ba00964d8952d401868c42c, type: 3}
   _iconRest: {fileID: 21300000, guid: 11293f519019ad442a845414e9458512, type: 3}
   _iconBoss: {fileID: 21300000, guid: 7845cd87b0212c148a612fff4e4fe56e, type: 3}
   _iconElite: {fileID: 21300000, guid: f23685dfabf77a74fac435ab948134ff, type: 3}
   _iconShop: {fileID: 21300000, guid: a94938855cd74674e83ab4a738008c19, type: 3}
   _iconEvent: {fileID: 21300000, guid: 4a144c198f3d3df40a212153f3d7f8c6, type: 3}
+  _currencyIcon: {fileID: 21300000, guid: 49dc8c61198ba724b858e4a744dcca08, type: 3}
 --- !u!114 &712571397
 MonoBehaviour:
   m_ObjectHideFlags: 0

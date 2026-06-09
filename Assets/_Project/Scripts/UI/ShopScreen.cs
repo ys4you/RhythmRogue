@@ -44,7 +44,6 @@ namespace RhythmRogue.UI
 
         private Canvas _canvas;
         private RectTransform _canvasRT;
-        private Text _currencyText;
         private Button _leaveButton;
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
@@ -150,7 +149,6 @@ namespace RhythmRogue.UI
             GameLog.Info($"[ShopScreen] Bought {item.Relic.relicName} for {item.Price}. Remaining: {_runState.Currency}.");
 
             MarkSold(item);
-            RefreshCurrency();
             RefreshAffordability();
         }
 
@@ -183,13 +181,6 @@ namespace RhythmRogue.UI
                 if (item.PriceText != null)
                     item.PriceText.color = canAfford ? UIHelpers.WarmGold : UIHelpers.Shadow;
             }
-        }
-
-        private void RefreshCurrency()
-        {
-            if (_currencyText == null) return;
-            string name = _runState.Economy != null ? _runState.Economy.CurrencyName : "Beats";
-            _currencyText.text = $"{name}: {_runState.Currency}";
         }
 
         private void OnLeave()
@@ -229,11 +220,9 @@ namespace RhythmRogue.UI
             title.fontStyle = FontStyle.Bold;
             title.text = "MERCHANT";
 
-            // Currency readout under the title.
-            _currencyText = MakeText(_canvasRT, "Currency", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -140), new Vector2(1500, 50), 26, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
-            _currencyText.fontStyle = FontStyle.Bold;
-            RefreshCurrency();
+            // Currency: shared top-right readout (coin + amount), consistent with the map.
+            // It subscribes to RunState.OnCurrencyChanged, so buying updates it automatically.
+            CurrencyReadout.Create(_canvasRT, _runState);
 
             if (_items.Count == 0)
             {

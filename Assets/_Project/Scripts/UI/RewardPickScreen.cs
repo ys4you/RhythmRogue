@@ -107,8 +107,10 @@ namespace RhythmRogue.UI
 
             var sub = MakeText(_canvasRT, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
                 new Vector2(0, -140), new Vector2(1500, 50), 22, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
-            string currencyName = _runState.Economy != null ? _runState.Economy.CurrencyName : "Beats";
-            sub.text = $"Relics: {_runState.ActiveRelics.Count}    {currencyName}: {_runState.Currency}";
+            sub.text = $"Relics: {_runState.ActiveRelics.Count}";
+
+            // Currency shown by the shared top-right readout (coin + amount), matching the map and shop.
+            CurrencyReadout.Create(_canvasRT, _runState);
 
             if (_options.Count == 0)
             {

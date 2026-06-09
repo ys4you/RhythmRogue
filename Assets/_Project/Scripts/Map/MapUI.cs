@@ -84,6 +84,12 @@ namespace RhythmRogue.Map
         [SerializeField] private Sprite _iconShop;
         [SerializeField] private Sprite _iconEvent;
 
+        [Header("Currency Icon (optional)")]
+        [Tooltip("Coin glyph shown beside the run currency amount, top-right of the map HUD. " +
+                 "Assign your currency.png here (it lives in Art/HUD). If left null, auto-loads " +
+                 "Resources/HUD/currency; if that is missing too, the amount shows as text only.")]
+        [SerializeField] private Sprite _currencyIcon;
+
         public event Action<MapNode> OnNodeConfirmed;
 
         /// <summary>
@@ -116,6 +122,7 @@ namespace RhythmRogue.Map
 
         // HUD + info
         private Text _seedText, _hpText, _currencyText;
+        private Image _currencyIconImage; // optional coin glyph drawn next to the currency amount
         // HP bar uses direct RectTransform width scaling (same approach as BattleUI). The
         // fill panel has pivot (0, 0.5) so its sizeDelta.x is the literal rendered width.
         // No Image.fillAmount, no ghost trail - just a clean bar that shrinks visibly.
@@ -174,6 +181,9 @@ namespace RhythmRogue.Map
             if (_iconElite == null) _iconElite = Resources.Load<Sprite>("MapIcons/node_elite");
             if (_iconShop == null) _iconShop = Resources.Load<Sprite>("MapIcons/node_shop");
             if (_iconEvent == null) _iconEvent = Resources.Load<Sprite>("MapIcons/node_event");
+
+            // Currency coin glyph: Inspector reference preferred; Resources fallback if present.
+            if (_currencyIcon == null) _currencyIcon = Resources.Load<Sprite>("HUD/currency");
         }
 
         private void Update()
@@ -390,9 +400,35 @@ namespace RhythmRogue.Map
                 24, TextAnchor.MiddleLeft, UIHelpers.OffWhite);
 
             // Currency readout: top-right of canvas, mirroring the seed text top-left.
-            // Shown only if a RunState was provided. Uses the configurable currency name.
+            // Coin icon (if assigned) sits in the corner with the amount to its left. The
+            // coin carries the "currency" meaning, so the amount shows as a bare number.
+            // Shown only if a RunState was provided.
+            const float curMargin = 50f;
+            const float curIconSize = 44f;
+            const float curGap = 10f;
+
+            float textRightInset = curMargin;
+            if (_currencyIcon != null)
+            {
+                var curIconGO = new GameObject("CurrencyIcon", typeof(RectTransform), typeof(Image));
+                curIconGO.transform.SetParent(_canvasRT, false);
+                var curIconRT = curIconGO.GetComponent<RectTransform>();
+                curIconRT.anchorMin = curIconRT.anchorMax = new Vector2(1, 1);
+                curIconRT.pivot = new Vector2(1, 1);
+                curIconRT.anchoredPosition = new Vector2(-curMargin, -curMargin);
+                curIconRT.sizeDelta = new Vector2(curIconSize, curIconSize);
+                _currencyIconImage = curIconGO.GetComponent<Image>();
+                _currencyIconImage.sprite = _currencyIcon;
+                _currencyIconImage.color = UIHelpers.OffWhite;
+                _currencyIconImage.raycastTarget = false;
+                _currencyIconImage.preserveAspect = true;
+                textRightInset = curMargin + curIconSize + curGap;
+            }
+
+            // Amount text. Right-aligned so it ends just left of the coin, and nudged down so
+            // its centre lines up with the coin centre (icon top at -curMargin, 44 tall).
             _currencyText = MakeText(_canvasRT, "CurrencyText", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1),
-                new Vector2(-50, -50), new Vector2(500, 50), 26, TextAnchor.MiddleRight, UIHelpers.WarmGold);
+                new Vector2(-textRightInset, -(curMargin + 2f)), new Vector2(400, 40), 26, TextAnchor.MiddleRight, UIHelpers.WarmGold);
             _currencyText.fontStyle = FontStyle.Bold;
             UpdateCurrencyText();
         }
@@ -407,11 +443,23 @@ namespace RhythmRogue.Map
             if (_runState == null)
             {
                 _currencyText.gameObject.SetActive(false);
+                if (_currencyIconImage != null) _currencyIconImage.gameObject.SetActive(false);
                 return;
             }
             _currencyText.gameObject.SetActive(true);
-            string name = _runState.Economy != null ? _runState.Economy.CurrencyName : "Beats";
-            _currencyText.text = $"{name}: {_runState.Currency}";
+            if (_currencyIconImage != null) _currencyIconImage.gameObject.SetActive(true);
+
+            // Icon present: the coin already says "currency", so show just the amount.
+            // No icon: prefix the configurable name so the bare number is not ambiguous.
+            if (_currencyIconImage != null)
+            {
+                _currencyText.text = _runState.Currency.ToString();
+            }
+            else
+            {
+                string name = _runState.Economy != null ? _runState.Economy.CurrencyName : "Beats";
+                _currencyText.text = $"{name}: {_runState.Currency}";
+            }
         }
 
         private void UpdateHUD()

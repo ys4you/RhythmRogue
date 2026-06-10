@@ -187,7 +187,8 @@ namespace RhythmRogue.DevTools
             GUILayout.Space(4);
             GUILayout.Label("RELICS  (own / disown)", _header);
             var pool = RelicPoolRef;
-            if (rs == null || pool == null) { GUILayout.Label("no RunState / RelicPool"); return; }
+            if (rs == null) { GUILayout.Label("no RunState"); return; }
+            if (pool == null) { GUILayout.Label("no RelicPool asset found"); return; }
 
             GUILayout.Label($"owned: {rs.ActiveRelics.Count}   (effects apply next battle)");
             _relicScroll = GUILayout.BeginScrollView(_relicScroll, GUILayout.Height(150));

@@ -24,7 +24,8 @@ namespace RhythmRogue.DevTools
     ///
     /// How it reaches state without scene references (intentional, and only acceptable because
     /// this is an excluded-from-build dev tool):
-    ///   - RunState and RelicPool are ScriptableObjects -> located via FindObjectsOfTypeAll.
+    ///   - RunState and RelicPool are ScriptableObjects -> located via DevAssets (a loaded instance,
+    ///     or the project asset in-editor), so they resolve even on scenes that do not reference them.
     ///   - PlayerHealth / EnemyHealth -> FindFirstObjectByType (NON-creating: PlayerHealth.Instance
     ///     would auto-spawn a stray singleton in scenes that have no battle, so it is avoided here).
     ///   - Any cheat whose target is absent simply shows a note instead of a button.
@@ -73,11 +74,7 @@ namespace RhythmRogue.DevTools
         {
             get
             {
-                if (_runState == null)
-                {
-                    var all = Resources.FindObjectsOfTypeAll<RunState>();
-                    if (all != null && all.Length > 0) _runState = all[0];
-                }
+                if (_runState == null) _runState = DevAssets.FindScriptableObject<RunState>();
                 return _runState;
             }
         }
@@ -86,11 +83,7 @@ namespace RhythmRogue.DevTools
         {
             get
             {
-                if (_relicPool == null)
-                {
-                    var all = Resources.FindObjectsOfTypeAll<RelicPool>();
-                    if (all != null && all.Length > 0) _relicPool = all[0];
-                }
+                if (_relicPool == null) _relicPool = DevAssets.FindScriptableObject<RelicPool>();
                 return _relicPool;
             }
         }

@@ -11,10 +11,11 @@ namespace RhythmRogue.DevTools.Console
     /// repeat the lookups. Injected into commands at construction (dependency injection), which
     /// keeps the Util console framework free of any game knowledge.
     ///
-    /// RunState and RelicPool are ScriptableObjects, found among loaded assets. PlayerHealth and
-    /// EnemyHealth are scene objects, found non-destructively via FindFirstObjectByType (never via
-    /// the auto-creating Singleton.Instance, which would spawn a stray PlayerHealth in scenes that
-    /// have no battle). Anything absent returns null and the commands report that.
+    /// RunState and RelicPool are ScriptableObjects, located via DevAssets (a loaded instance, or
+    /// the project asset in-editor) so they resolve even on scenes that do not reference them.
+    /// PlayerHealth and EnemyHealth are scene objects, found non-destructively via FindFirstObjectByType
+    /// (never via the auto-creating Singleton.Instance, which would spawn a stray PlayerHealth in
+    /// scenes that have no battle). Anything absent returns null and the commands report that.
     /// </summary>
     public class DevConsoleContext
     {
@@ -25,11 +26,7 @@ namespace RhythmRogue.DevTools.Console
         {
             get
             {
-                if (_runState == null)
-                {
-                    var all = Resources.FindObjectsOfTypeAll<RunState>();
-                    if (all != null && all.Length > 0) _runState = all[0];
-                }
+                if (_runState == null) _runState = DevAssets.FindScriptableObject<RunState>();
                 return _runState;
             }
         }
@@ -38,11 +35,7 @@ namespace RhythmRogue.DevTools.Console
         {
             get
             {
-                if (_relicPool == null)
-                {
-                    var all = Resources.FindObjectsOfTypeAll<RelicPool>();
-                    if (all != null && all.Length > 0) _relicPool = all[0];
-                }
+                if (_relicPool == null) _relicPool = DevAssets.FindScriptableObject<RelicPool>();
                 return _relicPool;
             }
         }

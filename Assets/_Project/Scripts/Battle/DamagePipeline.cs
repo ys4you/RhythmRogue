@@ -44,9 +44,23 @@ namespace RhythmRogue.Battle
         /// </summary>
         public bool GuardUp => _guardUp;
 
+        /// <summary>
+        /// Raised when the Sound Barrier shield charges change (consumed on a Miss, or reset at
+        /// battle start). Args: (remaining charges, max charges). A HUD can show pips from this.
+        /// </summary>
+        public event Action<int, int> OnShieldChanged;
+
+        /// <summary>Remaining Sound Barrier shield charges this battle (0 if none / spent).</summary>
+        public int ShieldCharges => _shieldCharges;
+
+        /// <summary>Max Sound Barrier shield charges this battle (0 if the relic isn't held).</summary>
+        public int ShieldChargesMax => _shieldChargesMax;
+
         private PlayerHealth _playerHealth;
         private float _relicBonusPerfectDmg;
         private int _relicMissDmgReduction;
+        private int _shieldChargesMax;
+        private int _shieldCharges;
         private bool _guardUp = true;
 
         private void Awake()
@@ -76,13 +90,24 @@ namespace RhythmRogue.Battle
             if (_enemyHighway != null) _enemyHighway.OnAutoHit -= HandleEnemyAutoHit;
         }
 
-        public void ApplyRelicModifiers(float bonusPerfectDmg, int missDmgReduction)
+        public void ApplyRelicModifiers(float bonusPerfectDmg, int missDmgReduction, int missShieldCharges)
         {
             _relicBonusPerfectDmg = bonusPerfectDmg;
             _relicMissDmgReduction = missDmgReduction;
+            // Sound Barrier charges refresh at the start of every battle (they do not carry over).
+            _shieldChargesMax = Mathf.Max(0, missShieldCharges);
+            _shieldCharges = _shieldChargesMax;
+            OnShieldChanged?.Invoke(_shieldCharges, _shieldChargesMax);
         }
 
-        public void ClearRelicModifiers() { _relicBonusPerfectDmg = 0f; _relicMissDmgReduction = 0; }
+        public void ClearRelicModifiers()
+        {
+            _relicBonusPerfectDmg = 0f;
+            _relicMissDmgReduction = 0;
+            _shieldChargesMax = 0;
+            _shieldCharges = 0;
+            OnShieldChanged?.Invoke(0, 0);
+        }
 
         private void HandleJudgment(JudgmentResult result)
         {
@@ -96,8 +121,10 @@ namespace RhythmRogue.Battle
             else
             {
                 // Any successful hit (Bad, Good or Perfect) restores the guard immediately, so a
-                // single recovery note closes the window the miss opened.
+                // single recovery note closes the window the miss opened. That same clean note also
+                // fully repairs the Sound Barrier shield, so it behaves like a second, rechargeable guard.
                 SetGuard(true);
+                RestoreShield();
                 ApplyEnemyDamage(result);
             }
         }
@@ -107,6 +134,17 @@ namespace RhythmRogue.Battle
             if (_guardUp == up) return;
             _guardUp = up;
             OnGuardChanged?.Invoke(_guardUp);
+        }
+
+        /// <summary>
+        /// Fully repair the Sound Barrier shield, mirroring the guard: one clean hit brings it back
+        /// to max charges. No-op when the relic isn't held or the shield is already full.
+        /// </summary>
+        private void RestoreShield()
+        {
+            if (_shieldChargesMax <= 0 || _shieldCharges >= _shieldChargesMax) return;
+            _shieldCharges = _shieldChargesMax;
+            OnShieldChanged?.Invoke(_shieldCharges, _shieldChargesMax);
         }
 
         /// <summary>
@@ -136,10 +174,24 @@ namespace RhythmRogue.Battle
             if (_playerHealth == null || !_playerHealth.IsAlive || _config == null) return;
             int missDamage = Mathf.Max(1, _config.missDamage - _relicMissDmgReduction);
 
+            // Sound Barrier: spend a shield charge to soften this miss. Each non-final charge halves
+            // the hit; the final charge fully blocks it; then the shield is spent for the rest of
+            // the battle. Guard still drops as normal (the shield only cushions the HP hit).
+            if (_shieldCharges > 0)
+            {
+                _shieldCharges--;
+                bool fullBlock = _shieldCharges == 0;
+                missDamage = fullBlock ? 0 : Mathf.Max(1, missDamage / 2);
+                OnShieldChanged?.Invoke(_shieldCharges, _shieldChargesMax);
+            }
+
+            if (missDamage > 0)
+            {
 #if UNITY_EDITOR
-            if (!_godMode)
+                if (!_godMode)
 #endif
-                _playerHealth.TakeDamage(missDamage);
+                    _playerHealth.TakeDamage(missDamage);
+            }
 
             OnDamageDealt?.Invoke(new DamageResult(missDamage, Judgment.Miss, true, 1f, result.Lane));
         }
@@ -175,6 +227,7 @@ namespace RhythmRogue.Battle
         {
             OnDamageDealt = null;
             OnGuardChanged = null;
+            OnShieldChanged = null;
         }
     }
 }

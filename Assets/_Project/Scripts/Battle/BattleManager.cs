@@ -191,7 +191,7 @@ namespace RhythmRogue.Battle
             RelicModifiers mods = RelicEffectAggregator.Aggregate(_runState?.ActiveRelics);
             _judgmentSystem.ApplyRelicModifiers(mods.BonusPerfectWindowMs);
             _comboSystem.ApplyRelicModifiers(mods.ComboRateBoost, mods.ComboCapBoost);
-            _damagePipeline.ApplyRelicModifiers(mods.BonusPerfectDamage, mods.MissDamageReduction);
+            _damagePipeline.ApplyRelicModifiers(mods.BonusPerfectDamage, mods.MissDamageReduction, mods.MissShieldCharges);
 
             if (_relicEffectHandler != null)
                 _relicEffectHandler.Initialize(mods);

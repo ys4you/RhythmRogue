@@ -34,6 +34,9 @@ namespace RhythmRogue.Data
         /// <summary>Currency earned multiplier. Multiplicative (base 1.0).</summary>
         public readonly float CurrencyMultiplier;
 
+        /// <summary>Shield charges per battle that absorb Miss damage (non-final halve, final blocks). Additive.</summary>
+        public readonly int MissShieldCharges;
+
         /// <summary>Whether any relics are active at all.</summary>
         public bool HasAnyEffect =>
             BonusPerfectWindowMs != 0f ||
@@ -42,7 +45,8 @@ namespace RhythmRogue.Data
             ComboCapBoost != 0f ||
             HealOnMilestoneHP != 0 ||
             MissDamageReduction != 0 ||
-            CurrencyMultiplier != 1f;
+            CurrencyMultiplier != 1f ||
+            MissShieldCharges != 0;
 
         public RelicModifiers(
             float bonusPerfectWindowMs,
@@ -51,7 +55,8 @@ namespace RhythmRogue.Data
             float comboCapBoost,
             int healOnMilestoneHP,
             int missDamageReduction,
-            float currencyMultiplier)
+            float currencyMultiplier,
+            int missShieldCharges)
         {
             BonusPerfectWindowMs = bonusPerfectWindowMs;
             BonusPerfectDamage = bonusPerfectDamage;
@@ -60,10 +65,11 @@ namespace RhythmRogue.Data
             HealOnMilestoneHP = healOnMilestoneHP;
             MissDamageReduction = missDamageReduction;
             CurrencyMultiplier = currencyMultiplier;
+            MissShieldCharges = missShieldCharges;
         }
 
         /// <summary>No bonuses. Used when no relics are active.</summary>
-        public static readonly RelicModifiers None = new(0f, 0f, 0f, 0f, 0, 0, 1f);
+        public static readonly RelicModifiers None = new(0f, 0f, 0f, 0f, 0, 0, 1f, 0);
 
         public override string ToString()
         {
@@ -76,7 +82,8 @@ namespace RhythmRogue.Data
                    (ComboCapBoost != 0f ? $"Cap+{ComboCapBoost} " : "") +
                    (HealOnMilestoneHP != 0 ? $"MileHP+{HealOnMilestoneHP} " : "") +
                    (MissDamageReduction != 0 ? $"MissRed-{MissDamageReduction} " : "") +
-                   (CurrencyMultiplier != 1f ? $"Curr×{CurrencyMultiplier:F2}" : "") +
+                   (CurrencyMultiplier != 1f ? $"Curr×{CurrencyMultiplier:F2} " : "") +
+                   (MissShieldCharges != 0 ? $"Shield×{MissShieldCharges}" : "") +
                    "]";
         }
     }

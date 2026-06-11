@@ -22,6 +22,10 @@ namespace RhythmRogue.Battle
                  "instead of the GUARDED/EXPOSED text box. Up = guard intact, Down = guard broken.")]
         [SerializeField] private Sprite _guardUpSprite;
         [SerializeField] private Sprite _guardDownSprite;
+        [Tooltip("Optional middle 'cracked' shield frame. When the Sound Barrier relic is active the " +
+                 "badge shows the shield by charges: full (Up) at max, this Cracked frame in between, " +
+                 "Broken (Down) at zero. If empty, the in-between state falls back to the broken frame.")]
+        [SerializeField] private Sprite _guardCrackedSprite;
 
         private Canvas _canvas;
         // HP bars use direct RectTransform width scaling rather than Image.Type.Filled,
@@ -46,6 +50,8 @@ namespace RhythmRogue.Battle
         private bool _guardUpVisual = true;
         private float _guardPopScale = 1f;
         private Color _guardDownColor;
+        private int _shieldCharges;
+        private int _shieldChargesMax;
         private Text _scoreText;
         private int _currentScore, _displayScore;
         private Text _resultText;
@@ -75,6 +81,7 @@ namespace RhythmRogue.Battle
             {
                 _damagePipeline.OnDamageDealt += OnDamageDealt;
                 _damagePipeline.OnGuardChanged += OnGuardChanged;
+                _damagePipeline.OnShieldChanged += OnShieldChanged;
             }
         }
 
@@ -112,6 +119,7 @@ namespace RhythmRogue.Battle
             {
                 _damagePipeline.OnDamageDealt -= OnDamageDealt;
                 _damagePipeline.OnGuardChanged -= OnGuardChanged;
+                _damagePipeline.OnShieldChanged -= OnShieldChanged;
             }
             // Enemy events were never subscribed (see Start() comment), so nothing to unwire.
         }
@@ -190,15 +198,56 @@ namespace RhythmRogue.Battle
         private void OnGuardChanged(bool up) => SetGuardVisual(up, animate: true);
 
         /// <summary>
+        /// Sound Barrier charge changed (consumed on a Miss, or reset at battle start). While the
+        /// relic is active this badge shows the shield cracking instead of the guard state, so store
+        /// the charges and refresh.
+        /// </summary>
+        private void OnShieldChanged(int current, int max)
+        {
+            bool wasActive = _shieldChargesMax > 0;
+            _shieldCharges = current;
+            _shieldChargesMax = max;
+            SetGuardVisual(_guardUpVisual, animate: wasActive || max > 0);
+        }
+
+        /// <summary>
         /// Reflect guard state on the bottom-left badge. Guarded reads as a bright, filled badge
         /// with dark text; exposed flips it to a dim badge with an amber "EXPOSED" warning (no red
         /// in the palette). The transition pops the badge so a guard break catches the eye even
         /// while the player is watching the highway.
+        ///
+        /// When the Sound Barrier relic is active (max charges &gt; 0) the shield takes over this
+        /// badge: full frame at max charges, the cracked frame in between, the broken frame at zero,
+        /// so spending a charge visibly cracks the shield.
         /// </summary>
         private void SetGuardVisual(bool up, bool animate)
         {
             _guardUpVisual = up;
+            bool shieldActive = _shieldChargesMax > 0;
             bool haveSprites = _guardUpSprite != null && _guardDownSprite != null;
+
+            if (shieldActive)
+            {
+                if (_guardImage != null)
+                {
+                    _guardImage.enabled = haveSprites;
+                    if (haveSprites) { _guardImage.sprite = ShieldChargeSprite(); _guardImage.color = Color.white; }
+                }
+                if (_guardBadgeBG != null) _guardBadgeBG.enabled = !haveSprites;
+                if (_guardText != null)
+                {
+                    _guardText.enabled = !haveSprites;
+                    if (!haveSprites && _guardBadgeBG != null)
+                    {
+                        bool intact = _shieldCharges > 0;
+                        _guardText.text = intact ? $"SHIELD {_shieldCharges}" : "BROKEN";
+                        _guardText.color = intact ? UIHelpers.BgDeep : UIHelpers.AmberOrange;
+                        _guardBadgeBG.color = intact ? UIHelpers.WarmGold : _guardDownColor;
+                    }
+                }
+                if (animate) _guardPopScale = 1.4f;
+                return;
+            }
 
             // Sprite mode: show the shield icon, hide the text box. Text mode: the reverse.
             if (_guardImage != null)
@@ -230,6 +279,17 @@ namespace RhythmRogue.Battle
             }
 
             if (animate) _guardPopScale = 1.4f;
+        }
+
+        /// <summary>
+        /// Which shield frame to show for the current Sound Barrier charges: full at max, broken at
+        /// zero, the cracked frame in between (falls back to the broken frame if none is wired).
+        /// </summary>
+        private Sprite ShieldChargeSprite()
+        {
+            if (_shieldCharges <= 0) return _guardDownSprite;
+            if (_shieldCharges >= _shieldChargesMax) return _guardUpSprite;
+            return _guardCrackedSprite != null ? _guardCrackedSprite : _guardDownSprite;
         }
 
         private void UpdatePlayerHP()

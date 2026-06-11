@@ -39,6 +39,7 @@ namespace RhythmRogue.Data
             int healOnMilestoneHP = 0;
             int missDamageReduction = 0;
             float currencyMultiplier = 1f;
+            int missShieldCharges = 0;
 
             for (int i = 0; i < relics.Count; i++)
             {
@@ -80,6 +81,10 @@ namespace RhythmRogue.Data
                         // Multiplicative stacking: 1.0 × (1 + 0.25) × (1 + 0.25) = 1.5625
                         currencyMultiplier *= (1f + relic.floatValue);
                         break;
+
+                    case RelicEffect.MissShield:
+                        missShieldCharges += relic.intValue;
+                        break;
                 }
             }
 
@@ -90,7 +95,8 @@ namespace RhythmRogue.Data
                 comboCapBoost,
                 healOnMilestoneHP,
                 missDamageReduction,
-                currencyMultiplier);
+                currencyMultiplier,
+                missShieldCharges);
         }
     }
 }

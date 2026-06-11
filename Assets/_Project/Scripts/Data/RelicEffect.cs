@@ -37,6 +37,13 @@ namespace RhythmRogue.Data
         MaxHPBoost,
 
         /// <summary>Multiplies currency earned by (1 + floatValue).</summary>
-        CurrencyMultiplier
+        CurrencyMultiplier,
+
+        /// <summary>
+        /// Grants intValue shield charges per battle that absorb Miss damage: each non-final charge
+        /// halves the hit, the final charge fully blocks it, then the shield is spent until the next
+        /// battle. Read by DamagePipeline.
+        /// </summary>
+        MissShield
     }
 }

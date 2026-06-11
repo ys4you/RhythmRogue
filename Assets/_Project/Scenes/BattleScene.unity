@@ -170,6 +170,7 @@ MonoBehaviour:
   _fallbackEnemyData: {fileID: 0}
   _guardUpSprite: {fileID: 8714566961431623855, guid: d63bf96fe3683e144950f18878f82eb0, type: 3}
   _guardDownSprite: {fileID: 7859793734720806855, guid: d63bf96fe3683e144950f18878f82eb0, type: 3}
+  _guardCrackedSprite: {fileID: -308525854134629867, guid: d63bf96fe3683e144950f18878f82eb0, type: 3}
 --- !u!114 &312867617 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 7509701747963032061, guid: 353041e05960c9240903c4e1687b663a, type: 3}

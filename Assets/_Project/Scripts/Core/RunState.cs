@@ -98,6 +98,26 @@ namespace RhythmRogue.Core
             GameLog.Info($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} Battles:{BattlesWon} Score:{TotalScore} Currency:{Currency}");
         }
 
+        /// <summary>
+        /// Acquire a relic (reward pick or shop purchase): add it to the active relics and apply
+        /// any one-time on-pickup effects (e.g. Max HP) through the given context. Centralizes
+        /// pickup so reward and shop share one path. Null relics are ignored.
+        /// </summary>
+        public void AcquireRelic(RelicData relic, IRelicAcquireContext acquireContext)
+        {
+            if (relic == null) return;
+            ActiveRelics.Add(relic);
+
+            var effects = relic.Effects;
+            if (effects != null && acquireContext != null)
+            {
+                for (int i = 0; i < effects.Count; i++)
+                    effects[i]?.OnAcquired(acquireContext);
+            }
+
+            GameLog.Info($"[RunState] Acquired relic: {relic.relicName}");
+        }
+
         /// <summary>Add currency (e.g. battle reward). Negative amounts are ignored; use TrySpendCurrency to spend.</summary>
         public void AddCurrency(int amount)
         {

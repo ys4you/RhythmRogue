@@ -131,9 +131,9 @@ namespace RhythmRogue.UI
         {
             if (!_built || relic == null) return;
 
-            Color rarityColor = RarityColor(relic.rarity);
+            Color rarityColor = RelicRarityPalette.Accent(relic.rarity);
             _rarityBorder.color = new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.5f);
-            _iconSwatch.color = relic.cardColor;
+            _iconSwatch.color = RelicRarityPalette.IconSwatch(relic.rarity);
 
             // Icon sprite: relic's own art, else the shared placeholder. Hidden if neither
             // exists (the coloured swatch alone still represents the relic).
@@ -148,7 +148,7 @@ namespace RhythmRogue.UI
             _rarityText.text = relic.rarity.ToString().ToUpper();
             _rarityText.color = rarityColor;
             _nameText.text = relic.relicName;
-            _effectText.text = FormatEffectValue(relic);
+            _effectText.text = relic.ShortEffectSummary;
             _descText.text = relic.description;
 
             if (!string.IsNullOrWhiteSpace(relic.flavorText))
@@ -171,31 +171,6 @@ namespace RhythmRogue.UI
         }
 
         public bool IsOpen => _built && _root != null && _root.activeSelf;
-
-        private static Color RarityColor(RelicRarity rarity) => rarity switch
-        {
-            RelicRarity.Common => UIHelpers.RustOrange,
-            RelicRarity.Uncommon => UIHelpers.AmberOrange,
-            RelicRarity.Rare => UIHelpers.WarmGold,
-            _ => UIHelpers.RustOrange
-        };
-
-        // Mirrors the reward/shop value badge so the effect reads consistently everywhere.
-        private static string FormatEffectValue(RelicData relic)
-        {
-            switch (relic.effect)
-            {
-                case RelicEffect.WiderPerfectWindow: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##} ms Perfect window" : "";
-                case RelicEffect.BonusPerfectDamage: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##} Perfect damage" : "";
-                case RelicEffect.ComboRateBoost: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##} combo/hit" : "";
-                case RelicEffect.ComboCapBoost: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}x combo cap" : "";
-                case RelicEffect.HealOnComboMilestone: return relic.intValue != 0 ? $"Heal +{relic.intValue} HP at combo milestones" : "";
-                case RelicEffect.ReduceMissDamage: return relic.intValue != 0 ? $"-{relic.intValue} Miss damage" : "";
-                case RelicEffect.MaxHPBoost: return relic.intValue != 0 ? $"+{relic.intValue} max HP" : "";
-                case RelicEffect.CurrencyMultiplier: return relic.floatValue != 0f ? $"+{relic.floatValue * 100:0}% currency" : "";
-                default: return "";
-            }
-        }
 
         private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
         {

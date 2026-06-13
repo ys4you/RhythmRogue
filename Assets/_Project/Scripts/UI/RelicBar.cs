@@ -121,7 +121,7 @@ namespace RhythmRogue.UI
             rt.sizeDelta = new Vector2(IconSize, IconSize);
 
             // Rarity ring behind the icon.
-            var ring = MakePanel(rt, "Ring", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, RarityColor(relic.rarity));
+            var ring = MakePanel(rt, "Ring", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero, RelicRarityPalette.Accent(relic.rarity));
             var ringRT = ring.GetComponent<RectTransform>();
             ringRT.offsetMin = new Vector2(-3, -3); ringRT.offsetMax = new Vector2(3, 3);
             ringRT.SetAsFirstSibling();
@@ -131,7 +131,7 @@ namespace RhythmRogue.UI
             // placeholder), that sprite is drawn on top via a child Image. This way a relic
             // with art shows the art, and one without still shows a coloured, clickable tile.
             var bgImage = iconGO.GetComponent<Image>();
-            bgImage.color = relic.cardColor;
+            bgImage.color = RelicRarityPalette.IconSwatch(relic.rarity);
 
             Sprite resolved = relic.ResolvedIcon; // assigned icon, else shared event placeholder
             if (resolved != null)
@@ -172,14 +172,6 @@ namespace RhythmRogue.UI
         {
             if (_tooltip != null) _tooltip.gameObject.SetActive(false);
         }
-
-        private static Color RarityColor(RelicRarity rarity) => rarity switch
-        {
-            RelicRarity.Common => UIHelpers.RustOrange,
-            RelicRarity.Uncommon => UIHelpers.AmberOrange,
-            RelicRarity.Rare => UIHelpers.WarmGold,
-            _ => UIHelpers.RustOrange
-        };
 
         private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
         {

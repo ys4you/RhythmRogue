@@ -60,14 +60,6 @@ namespace RhythmRogue.UI
         }
         private readonly List<ShopItem> _items = new();
 
-        // Rarity colors from warm palette (identical mapping to the reward screen).
-        private static Color CommonBG => UIHelpers.BgSurface;
-        private static Color UncommonBG => UIHelpers.Shadow;
-        private static Color RareBG => UIHelpers.BgLight;
-        private static Color CommonBorder => UIHelpers.RustOrange;
-        private static Color UncommonBorder => UIHelpers.AmberOrange;
-        private static Color RareBorder => UIHelpers.WarmGold;
-
         private void Start()
         {
             if (_runState == null) { GameLog.Error("[ShopScreen] No RunState assigned."); return; }
@@ -134,14 +126,10 @@ namespace RhythmRogue.UI
                 return;
             }
 
-            // Purchase succeeds: grant the relic, mirroring the reward screen's pickup logic.
+            // Purchase succeeds: grant the relic through the shared acquire path (adds it and
+            // applies any one-time on-pickup effects, e.g. Max HP).
             item.Purchased = true;
-            _runState.ActiveRelics.Add(item.Relic);
-            if (item.Relic.effect == RelicEffect.MaxHPBoost)
-            {
-                var ph = PlayerHealth.Instance;
-                if (ph != null) ph.IncreaseMaxHP(item.Relic.intValue);
-            }
+            _runState.AcquireRelic(item.Relic, PlayerHealthAcquireContext.Default);
 
             var mgr = AudioManager.Instance;
             if (mgr != null) mgr.PlayIfRegistered(SfxId.UiConfirm);
@@ -252,8 +240,8 @@ namespace RhythmRogue.UI
         private void CreateShopCard(ShopItem item, int index, float x, float cardW, float cardH)
         {
             RelicData relic = item.Relic;
-            Color bgColor = relic.rarity switch { RelicRarity.Common => CommonBG, RelicRarity.Uncommon => UncommonBG, RelicRarity.Rare => RareBG, _ => CommonBG };
-            Color borderColor = relic.rarity switch { RelicRarity.Common => CommonBorder, RelicRarity.Uncommon => UncommonBorder, RelicRarity.Rare => RareBorder, _ => CommonBorder };
+            Color bgColor = RelicRarityPalette.Background(relic.rarity);
+            Color borderColor = RelicRarityPalette.Accent(relic.rarity);
 
             // Card body sits a little above center to leave room for the buy button below it.
             var cardGO = MakePanel(_canvasRT, $"ShopCard_{index}", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 20), new Vector2(cardW, cardH), bgColor);
@@ -265,7 +253,7 @@ namespace RhythmRogue.UI
 
             MakeText(cardRT, "Rarity", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -25), new Vector2(cardW - 40, 36), 18, TextAnchor.MiddleCenter, borderColor).text = relic.rarity.ToString().ToUpper();
 
-            var iconBG = MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120), new Vector2(140, 140), relic.cardColor);
+            var iconBG = MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -120), new Vector2(140, 140), RelicRarityPalette.IconSwatch(relic.rarity));
             // Icon sprite over the colour swatch: relic art if assigned, else shared placeholder.
             Sprite resolvedIcon = relic.ResolvedIcon;
             if (resolvedIcon != null)
@@ -287,7 +275,7 @@ namespace RhythmRogue.UI
 
             MakeText(cardRT, "Desc", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -310), new Vector2(cardW - 60, 150), 19, TextAnchor.UpperCenter, UIHelpers.AmberOrange).text = relic.description;
 
-            string valueStr = FormatEffectValue(relic);
+            string valueStr = relic.ShortEffectSummary;
             if (!string.IsNullOrEmpty(valueStr))
             {
                 var vt = MakeText(cardRT, "Value", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 90), new Vector2(cardW - 40, 40), 22, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
@@ -366,24 +354,6 @@ namespace RhythmRogue.UI
         // ============================================================
         // Shared helpers (same style as RewardPickScreen / RestScreen)
         // ============================================================
-
-        // Builds the value badge string. Returns empty when the relevant value is zero so a
-        // misconfigured relic shows no badge. Mirrors RewardPickScreen.FormatEffectValue.
-        private static string FormatEffectValue(RelicData relic)
-        {
-            switch (relic.effect)
-            {
-                case RelicEffect.WiderPerfectWindow: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}ms" : "";
-                case RelicEffect.BonusPerfectDamage: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##} dmg" : "";
-                case RelicEffect.ComboRateBoost: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}/hit" : "";
-                case RelicEffect.ComboCapBoost: return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}x cap" : "";
-                case RelicEffect.HealOnComboMilestone: return relic.intValue != 0 ? $"+{relic.intValue} HP" : "";
-                case RelicEffect.ReduceMissDamage: return relic.intValue != 0 ? $"-{relic.intValue} dmg" : "";
-                case RelicEffect.MaxHPBoost: return relic.intValue != 0 ? $"+{relic.intValue} max HP" : "";
-                case RelicEffect.CurrencyMultiplier: return relic.floatValue != 0f ? $"+{relic.floatValue * 100:0}%" : "";
-                default: return "";
-            }
-        }
 
         private static GameObject MakePanel(RectTransform parent, string name, Vector2 ancMin, Vector2 ancMax, Vector2 pivot, Vector2 pos, Vector2 size, Color color)
         {

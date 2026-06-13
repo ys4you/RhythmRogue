@@ -28,17 +28,6 @@ namespace RhythmRogue.UI
         private bool _picked;
         private UIFocusSetter _focusSetter;
 
-        // Rarity colors from warm palette.
-        // Common = neutral (BgSurface bg, RustOrange border)
-        // Uncommon = warmer (Shadow bg, AmberOrange border)
-        // Rare = special (BgLight bg, WarmGold border)
-        private static Color CommonBG => UIHelpers.BgSurface;
-        private static Color UncommonBG => UIHelpers.Shadow;
-        private static Color RareBG => UIHelpers.BgLight;
-        private static Color CommonBorder => UIHelpers.RustOrange;
-        private static Color UncommonBorder => UIHelpers.AmberOrange;
-        private static Color RareBorder => UIHelpers.WarmGold;
-
         private void Start()
         {
             GenerateOptions();
@@ -64,9 +53,8 @@ namespace RhythmRogue.UI
             if (_picked || index < 0 || index >= _options.Count) return;
             _picked = true;
             RelicData chosen = _options[index];
-            _runState.ActiveRelics.Add(chosen);
-            if (chosen.effect == RelicEffect.MaxHPBoost) { var ph = PlayerHealth.Instance; if (ph != null) ph.IncreaseMaxHP(chosen.intValue); }
-            GameLog.Info($"[RewardPick] Picked: {chosen.relicName} ({chosen.effect})");
+            _runState.AcquireRelic(chosen, PlayerHealthAcquireContext.Default);
+            GameLog.Info($"[RewardPick] Picked: {chosen.relicName}");
             foreach (var btn in _optionButtons) btn.interactable = false;
             _optionButtons[index].GetComponent<Image>().color = UIHelpers.WarmGold;
             StartCoroutine(TransitionAfterDelay(0.5f));
@@ -153,8 +141,8 @@ namespace RhythmRogue.UI
 
         private void CreateRelicCard(RelicData relic, int index, float x, float cardW, float cardH)
         {
-            Color bgColor = relic.rarity switch { RelicRarity.Common => CommonBG, RelicRarity.Uncommon => UncommonBG, RelicRarity.Rare => RareBG, _ => CommonBG };
-            Color borderColor = relic.rarity switch { RelicRarity.Common => CommonBorder, RelicRarity.Uncommon => UncommonBorder, RelicRarity.Rare => RareBorder, _ => CommonBorder };
+            Color bgColor = RelicRarityPalette.Background(relic.rarity);
+            Color borderColor = RelicRarityPalette.Accent(relic.rarity);
 
             var cardGO = MakePanel(_canvasRT, $"Card_{index}", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, -40), new Vector2(cardW, cardH), bgColor);
             Button btn = cardGO.AddComponent<Button>();
@@ -192,7 +180,7 @@ namespace RhythmRogue.UI
 
             MakeText(cardRT, "Rarity", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -30), new Vector2(cardW - 40, 40), 18, TextAnchor.MiddleCenter, borderColor).text = relic.rarity.ToString().ToUpper();
 
-            var iconBG = MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(150, 150), relic.cardColor);
+            var iconBG = MakePanel(cardRT, "IconBG", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -140), new Vector2(150, 150), RelicRarityPalette.IconSwatch(relic.rarity));
             // Icon sprite on top of the colour swatch: the relic's own art if assigned, else
             // the shared placeholder (the map's event '?' sprite). Always shows something.
             Sprite resolvedIcon = relic.ResolvedIcon;
@@ -215,41 +203,11 @@ namespace RhythmRogue.UI
 
             MakeText(cardRT, "Desc", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -360), new Vector2(cardW - 60, 200), 20, TextAnchor.UpperCenter, UIHelpers.AmberOrange).text = relic.description;
 
-            string valueStr = FormatEffectValue(relic);
+            string valueStr = relic.ShortEffectSummary;
             if (!string.IsNullOrEmpty(valueStr))
             {
                 var vt = MakeText(cardRT, "Value", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0, 40), new Vector2(cardW - 40, 50), 24, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
                 vt.fontStyle = FontStyle.Bold; vt.text = valueStr;
-            }
-        }
-
-        // Builds the value badge string (e.g. "+5ms", "-2 dmg"). Returns empty when the
-        // relevant value is zero so a misconfigured relic shows no badge rather than a
-        // meaningless "+0". Each effect reads exactly one value field, matching the
-        // canonical mapping in RelicEffectAggregator: float-backed effects read floatValue,
-        // int-backed effects read intValue.
-        private static string FormatEffectValue(RelicData relic)
-        {
-            switch (relic.effect)
-            {
-                case RelicEffect.WiderPerfectWindow:
-                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}ms" : "";
-                case RelicEffect.BonusPerfectDamage:
-                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##} dmg" : "";
-                case RelicEffect.ComboRateBoost:
-                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}/hit" : "";
-                case RelicEffect.ComboCapBoost:
-                    return relic.floatValue != 0f ? $"+{relic.floatValue:0.##}x cap" : "";
-                case RelicEffect.HealOnComboMilestone:
-                    return relic.intValue != 0 ? $"+{relic.intValue} HP" : "";
-                case RelicEffect.ReduceMissDamage:
-                    return relic.intValue != 0 ? $"-{relic.intValue} dmg" : "";
-                case RelicEffect.MaxHPBoost:
-                    return relic.intValue != 0 ? $"+{relic.intValue} max HP" : "";
-                case RelicEffect.CurrencyMultiplier:
-                    return relic.floatValue != 0f ? $"+{relic.floatValue * 100:0}%" : "";
-                default:
-                    return "";
             }
         }
 

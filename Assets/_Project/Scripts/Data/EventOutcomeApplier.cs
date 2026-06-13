@@ -8,9 +8,9 @@ using RhythmRogue.Util.Random;
 namespace RhythmRogue.Data
 {
     /// <summary>
-    /// Applies an event choice's effects to run state. Stateless static utility, the same
-    /// pattern as RelicApplier: all the "what does this do to the game" logic lives here,
-    /// so EventData stays pure data and EventScreen stays pure presentation.
+    /// Applies an event choice's effects to run state. Stateless static utility: all the
+    /// "what does this do to the game" logic lives here, so EventData stays pure data and
+    /// EventScreen stays pure presentation.
     ///
     /// Returns a short summary string of the concrete changes (e.g. "+50 Beats, -10 HP")
     /// so the screen can show the player exactly what happened, in addition to any authored
@@ -144,20 +144,15 @@ namespace RhythmRogue.Data
         }
 
         /// <summary>
-        /// Add a relic to the run and apply any immediate effect it has (currently only
-        /// MaxHPBoost needs an instant apply; other relics are read passively by the
-        /// aggregator during battle). Mirrors the reward/shop pickup logic.
+        /// Add a relic to the run through the shared acquire path, which also applies any
+        /// one-time on-pickup effect it has (e.g. Max HP). Identical to the reward and shop
+        /// screens, so pickup behaves the same wherever a relic is granted.
         /// </summary>
         private static void GrantRelic(RelicData relic, RunState runState, List<string> parts)
         {
             if (relic == null) return;
-            runState.ActiveRelics.Add(relic);
 
-            if (relic.effect == RelicEffect.MaxHPBoost)
-            {
-                var ph = PlayerHealth.Instance;
-                if (ph != null) ph.IncreaseMaxHP(relic.intValue);
-            }
+            runState.AcquireRelic(relic, PlayerHealthAcquireContext.Default);
 
             parts.Add($"Relic: {relic.relicName}");
             GameLog.Info($"[EventOutcomeApplier] Granted relic {relic.relicName}.");

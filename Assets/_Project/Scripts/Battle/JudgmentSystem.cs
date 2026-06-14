@@ -20,6 +20,9 @@ namespace RhythmRogue.Battle
         private IEventBus _eventBus;
         private float _calibrationOffsetMs;
         private float _relicBonusPerfectMs;
+        // Run forgiveness tier: multiplies every hit window. Relaxed widens (>1), Hard tightens
+        // (<1), Normal leaves it at 1. Set once at battle start from RunState.Tier.
+        private float _tierWindowScale = 1f;
 
         private void Awake()
         {
@@ -44,13 +47,16 @@ namespace RhythmRogue.Battle
         public void ApplyRelicModifiers(float bonusPerfectMs) => _relicBonusPerfectMs = bonusPerfectMs;
         public void ClearRelicModifiers() => _relicBonusPerfectMs = 0f;
 
+        /// <summary>Apply the run's forgiveness tier as a multiplier on all hit windows.</summary>
+        public void ApplyTier(DifficultyTier tier) => _tierWindowScale = DifficultyTierConfig.WindowScale(tier);
+
         public Judgment Judge(float rawDeltaMs)
         {
             float adjusted = Mathf.Abs(rawDeltaMs - _calibrationOffsetMs);
             if (_config == null) return Judgment.Miss;
-            if (adjusted <= _config.perfectWindowMs + _relicBonusPerfectMs) return Judgment.Perfect;
-            if (adjusted <= _config.goodWindowMs) return Judgment.Good;
-            if (adjusted <= _config.badWindowMs) return Judgment.Bad;
+            if (adjusted <= (_config.perfectWindowMs + _relicBonusPerfectMs) * _tierWindowScale) return Judgment.Perfect;
+            if (adjusted <= _config.goodWindowMs * _tierWindowScale) return Judgment.Good;
+            if (adjusted <= _config.badWindowMs * _tierWindowScale) return Judgment.Bad;
             return Judgment.Miss;
         }
 
@@ -82,9 +88,9 @@ namespace RhythmRogue.Battle
         public float CalibrationOffsetMs => _calibrationOffsetMs;
         public JudgmentConfig Config => _config;
         public void SetConfig(JudgmentConfig config) => _config = config;
-        public float PerfectWindowMs => (_config != null ? _config.perfectWindowMs : 35f) + _relicBonusPerfectMs;
-        public float GoodWindowMs => _config != null ? _config.goodWindowMs : 70f;
-        public float BadWindowMs => _config != null ? _config.badWindowMs : 110f;
+        public float PerfectWindowMs => ((_config != null ? _config.perfectWindowMs : 35f) + _relicBonusPerfectMs) * _tierWindowScale;
+        public float GoodWindowMs => (_config != null ? _config.goodWindowMs : 70f) * _tierWindowScale;
+        public float BadWindowMs => (_config != null ? _config.badWindowMs : 110f) * _tierWindowScale;
 
         private void OnDestroy() => OnJudgment = null;
     }

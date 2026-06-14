@@ -55,14 +55,14 @@ namespace RhythmRogue.Battle
             }
         }
 
-        public ChartResult Resolve(EnemyData enemy, bool isElite, ISeededRandom rng, TextAsset selectedChart = null)
+        public ChartResult Resolve(EnemyData enemy, bool isElite, ISeededRandom rng, TextAsset selectedChart = null, DifficultyContext ctx = default)
         {
             if (enemy == null) { GameLog.Error("[ChartProvider] No enemy data."); return default; }
 
             Conductor conductor = Conductor.Instance;
             AssignSong(enemy, conductor);
 
-            float difficulty = GetEffectiveDifficulty(enemy, isElite);
+            float difficulty = GetEffectiveDifficulty(enemy, isElite, ctx);
             float bpmModifier = GetEffectiveBPMModifier(enemy, isElite);
 
             if (_useLegacyChart) return ResolveLegacy(selectedChart, enemy, bpmModifier);
@@ -159,12 +159,11 @@ namespace RhythmRogue.Battle
             return library;
         }
 
-        private float GetEffectiveDifficulty(EnemyData enemy, bool isElite)
-        {
-            float d = enemy.markerDifficulty;
-            if (isElite && _eliteConfig != null) d = Mathf.Clamp01(d + _eliteConfig.difficultyBoost * 0.1f);
-            return d;
-        }
+        // Chart difficulty (0-1) for the assembler. Delegates to the central DifficultyCurve so
+        // the area band, node depth, enemy flavour, elite boost, and run tier are combined in one
+        // place. With no run context (default ctx) the curve falls back to the enemy's own value.
+        private float GetEffectiveDifficulty(EnemyData enemy, bool isElite, in DifficultyContext ctx)
+            => DifficultyCurve.ChartDifficulty(ctx, enemy, isElite, _eliteConfig);
 
         private float GetEffectiveBPMModifier(EnemyData enemy, bool isElite)
         {

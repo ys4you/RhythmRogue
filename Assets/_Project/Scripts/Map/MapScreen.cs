@@ -47,6 +47,10 @@ namespace RhythmRogue.Map
                 return;
             }
 
+            // Make the area available to battles this run: DifficultyCurve reads it (together with
+            // node depth) to set each fight's difficulty band and HP.
+            _runState.CurrentArea = _area;
+
             if (!_runState.IsRunActive || _runState.MapData == null)
             {
                 string seed = !string.IsNullOrWhiteSpace(_forcedSeed)

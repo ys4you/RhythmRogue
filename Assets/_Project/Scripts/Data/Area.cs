@@ -3,12 +3,17 @@ using UnityEngine;
 namespace RhythmRogue.Data
 {
     /// <summary>
-    /// Represents one area/biome of a run. Contains the enemy pools,
-    /// the boss pool, theme color, and any area-wide difficulty knobs.
+    /// Represents one area/biome of a run. Contains the enemy pools, the boss pool, theme color,
+    /// and the area's difficulty band.
     ///
-    /// Each Area is a self-contained piece of run content. Adding a new
-    /// area = adding a new ScriptableObject. MapScreen takes an Area
-    /// reference instead of individual EnemyData references.
+    /// Difficulty model: the area is a band. Every Enemy node's chart difficulty is interpolated
+    /// between <see cref="difficultyFloor"/> (the opener) and <see cref="difficultyCeil"/> (the
+    /// last pre-boss node) by how deep the node sits, then nudged by the enemy's small flavour
+    /// tilt and the run's tier (see DifficultyCurve). Enemies carry character, the slot sets the
+    /// level. Fight length (HP) ramps the same way from <see cref="baseEnemyHP"/>.
+    ///
+    /// Each Area is a self-contained piece of run content. Adding a new area = adding a new
+    /// ScriptableObject; a harder area just uses higher floor/ceil/HP numbers.
     /// </summary>
     [CreateAssetMenu(fileName = "Area", menuName = "RhythmRogue/Data/Area")]
     public class Area : ScriptableObject
@@ -28,11 +33,27 @@ namespace RhythmRogue.Data
         [Tooltip("Pool of possible bosses for the area. One is picked per run.")]
         public EnemyPool bosses;
 
-        [Header("Difficulty")]
-        [Tooltip("Applied to enemy HP for this area (1.0 = baseline).")]
-        [Range(0.5f, 3f)] public float hpMultiplier = 1f;
+        [Header("Difficulty band (chart density, 0-1)")]
+        [Tooltip("Chart difficulty at the area's opening node (shallowest). This is the first thing " +
+                 "a new player meets, so for area 1 keep it low. Beginners' on-ramp.")]
+        [Range(0f, 1f)] public float difficultyFloor = 0.15f;
 
-        [Tooltip("Applied to chart difficulty for this area (0.0 - 1.0 range bias).")]
-        [Range(-0.3f, 0.3f)] public float difficultyBias = 0f;
+        [Tooltip("Chart difficulty at the area's last pre-boss node (deepest). The area's ceiling.")]
+        [Range(0f, 1f)] public float difficultyCeil = 0.42f;
+
+        [Tooltip("Chart difficulty for this area's boss.")]
+        [Range(0f, 1f)] public float bossDifficulty = 0.48f;
+
+        [Header("Fight length (enemy HP)")]
+        [Tooltip("Enemy HP at the area's opening node. Higher = longer fights. Short early fights " +
+                 "give fast wins and reduce rage-quit, so keep area 1 low.")]
+        [Min(1)] public int baseEnemyHP = 150;
+
+        [Tooltip("Fractional HP growth from the opener to the last pre-boss node. " +
+                 "0.6 = the deepest basic fight has 60% more HP than the opener.")]
+        [Range(0f, 3f)] public float hpDepthGain = 0.6f;
+
+        [Tooltip("Boss HP for this area.")]
+        [Min(1)] public int bossHP = 380;
     }
 }

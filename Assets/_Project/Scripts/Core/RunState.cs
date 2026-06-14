@@ -32,6 +32,13 @@ namespace RhythmRogue.Core
         [System.NonSerialized] public MapData MapData;
         [System.NonSerialized] public MapNode SelectedNode;
         [System.NonSerialized] public TextAsset SelectedChart;
+
+        /// <summary>The Area the current map was generated from. Set by MapScreen. Drives the
+        /// difficulty band and HP for battles in this area (see DifficultyCurve).</summary>
+        [System.NonSerialized] public Area CurrentArea;
+
+        /// <summary>Run-level forgiveness tier (chosen at run start). Defaults to Normal.</summary>
+        [System.NonSerialized] public DifficultyTier Tier = DifficultyTier.Normal;
         [System.NonSerialized] public IRunSeed RunSeed;
         [System.NonSerialized] public List<RelicData> ActiveRelics = new();
         [System.NonSerialized] public bool LastBattleWasElite;
@@ -89,6 +96,19 @@ namespace RhythmRogue.Core
             CurrentNodeId = SelectedNode.Id;
             SelectedNode = null;
             SelectedChart = null;
+        }
+
+        /// <summary>
+        /// Normalized depth of the selected node within the current map: 0 at the opening layer,
+        /// 1 at the boss layer. The difficulty curve uses this to ramp a fight by how deep it
+        /// sits. Returns 0 if there is no map/selection (e.g. a direct battle-scene launch).
+        /// </summary>
+        public float SelectedNodeDepthT()
+        {
+            if (SelectedNode == null || MapData == null) return 0f;
+            int layers = MapData.LayerCount;
+            if (layers <= 1) return 0f;
+            return Mathf.Clamp01(SelectedNode.Layer / (float)(layers - 1));
         }
 
         public void EndRun(bool victory)

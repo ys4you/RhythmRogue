@@ -72,6 +72,7 @@ namespace RhythmRogue.Battle
         private bool _battleEnded;
         private bool _isElite;
         private bool _isBoss;
+        private DifficultyContext _difficulty;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
@@ -106,7 +107,19 @@ namespace RhythmRogue.Battle
             }
 
             ISeededRandom rng = GetChartRng();
-            _chart = _chartProvider.Resolve(_currentEnemy, _isElite, rng, _runState?.SelectedChart);
+
+            // Build the difficulty context once: which area, how deep the node sits, the run's
+            // forgiveness tier, and whether this is the boss. Chart difficulty and enemy HP both
+            // derive from this via DifficultyCurve, so a fight's intensity follows its slot in the
+            // run rather than being baked into the enemy. With no node/area (a direct battle-scene
+            // launch) this defaults to the enemy's own fallback values.
+            _difficulty = new DifficultyContext(
+                _runState != null ? _runState.CurrentArea : null,
+                _runState != null ? _runState.SelectedNodeDepthT() : 0f,
+                _runState != null ? _runState.Tier : DifficultyTier.Normal,
+                _isBoss);
+
+            _chart = _chartProvider.Resolve(_currentEnemy, _isElite, rng, _runState?.SelectedChart, _difficulty);
 
             if (!_chart.Success)
                 GameLog.Error("[BattleManager] Chart resolution failed.");
@@ -159,12 +172,10 @@ namespace RhythmRogue.Battle
 
         private void InitializeBattle()
         {
-            // Flat authored HP per enemy (EnemyData.maxHP), like the player's fixed pool. Elite
-            // encounters scale it up. The fight lasts a fixed number of notes-to-kill, so each hit
-            // is a meaningful chunk of a small bar and reaching 0 reads as dead immediately.
-            int enemyHP = Mathf.Max(1, _currentEnemy.maxHP);
-            if (_isElite && _eliteConfig != null)
-                enemyHP = _eliteConfig.ScaleHP(enemyHP);
+            // HP (fight length) comes from the area + node depth via DifficultyCurve, with the
+            // enemy contributing only a relative hpFlavor and elites scaling up inside the curve.
+            // Deeper nodes and later areas mean longer fights; the enemy's slot sets the length.
+            int enemyHP = DifficultyCurve.EnemyHP(_difficulty, _currentEnemy, _isElite, _eliteConfig);
 
             _enemyHealth.InitForBattle(enemyHP);
             _enemyHealth.Health.OnDeath += OnEnemyDied;
@@ -190,6 +201,7 @@ namespace RhythmRogue.Battle
 
             RelicModifiers mods = RelicEffectAggregator.Aggregate(_runState?.ActiveRelics);
             _judgmentSystem.ApplyRelicModifiers(mods.BonusPerfectWindowMs);
+            _judgmentSystem.ApplyTier(_difficulty.Tier);
             _comboSystem.ApplyRelicModifiers(mods.ComboRateBoost, mods.ComboCapBoost);
             _damagePipeline.ApplyRelicModifiers(mods.BonusPerfectDamage, mods.MissDamageReduction, mods.MissShieldCharges);
 

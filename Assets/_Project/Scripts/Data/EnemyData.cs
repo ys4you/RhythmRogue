@@ -22,20 +22,48 @@ namespace RhythmRogue.Data
                  "regeneration needed.")]
         public ChartInstrument chartInstrument = ChartInstrument.All;
 
-        [Range(0f, 1f)]
-        public float markerDifficulty = 0.5f;
+        [Header("Difficulty flavour (relative to the slot)")]
+        [Tooltip("Small tilt added to the position-driven chart difficulty. + = a bit denser than " +
+                 "the node's baseline, - = a bit sparser. Keep it small (roughly -0.15..0.15): the " +
+                 "Area and node depth set the actual difficulty, this only gives the enemy character. " +
+                 "The same enemy is gentle at an area's opener and tough deep in a later area.")]
+        [Range(-0.3f, 0.3f)] public float difficultyFlavor = 0f;
+
+        [Tooltip("Relative fight length. 1 = the area's normal HP for this depth; >1 tankier, " +
+                 "<1 quicker to kill.")]
+        [Range(0.25f, 3f)] public float hpFlavor = 1f;
+
+        [Tooltip("Earliest normalized map depth (0 = opener, 1 = pre-boss) at which this enemy may " +
+                 "appear on a node. Gate harder-feeling enemies to later layers so the opener can't " +
+                 "roll them. 0 = can appear anywhere. (Difficulty is depth-driven anyway, so this is " +
+                 "mostly for controlling where each enemy's flavour shows up.)")]
+        [Range(0f, 1f)] public float minDepthT = 0f;
 
         [Header("Identity")]
         public string enemyName = "Enemy";
         [TextArea] public string description;
 
-        [Header("Stats")]
-        public int maxHP = 100;
         [Tooltip("Marks this enemy as a boss (boss label + boss reward routing). Set this explicitly; " +
                  "it is NOT inferred from HP. In a real run the map's Boss node type is authoritative; " +
                  "this flag is the fallback when a battle is launched directly without a node.")]
         public bool isBoss = false;
-        [Range(0.5f, 2.0f)] public float bpmModifier = 1.0f;
+
+        [Range(0.5f, 2.0f)]
+        [Tooltip("Enemy tempo character: multiplies the song BPM. Higher floods more notes per second " +
+                 "(reaction time is fixed by scroll speed). Keep area-1 enemies at or below ~1.0 so " +
+                 "the opening fights stay readable for new players.")]
+        public float bpmModifier = 1.0f;
+
+        [Header("Fallback (used only with NO area/run context)")]
+        [Tooltip("Chart difficulty used ONLY when there is no Area context, e.g. launching the Battle " +
+                 "scene directly to test. In a real run the Area + node depth drive difficulty via " +
+                 "DifficultyCurve and this is ignored. Set difficultyFlavor above for run behaviour.")]
+        [Range(0f, 1f)] public float markerDifficulty = 0.4f;
+
+        [Tooltip("Enemy HP used ONLY when there is no Area context (direct battle-scene launch). In a " +
+                 "real run the Area + node depth drive HP and this is ignored. Set hpFlavor above for " +
+                 "run behaviour.")]
+        public int maxHP = 150;
 
         [Header("Visuals")]
         public Sprite sprite;

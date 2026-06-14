@@ -66,14 +66,14 @@ namespace RhythmRogue.Map
             int midLayerCount = totalLayers - 3; // minus start, opener, boss
 
             // Start layer (always 1 node, entry point)
-            AddLayer(map, StartLayer, area, rng, enemyRng, ref nextId);
+            AddLayer(map, StartLayer, area, rng, enemyRng, totalLayers, ref nextId);
 
             // Opener layer (3-4 nodes, basic enemies only)
-            AddLayer(map, OpenerLayer, area, rng, enemyRng, ref nextId);
+            AddLayer(map, OpenerLayer, area, rng, enemyRng, totalLayers, ref nextId);
 
             // Mid layers (2-4 nodes, mixed types)
             for (int i = 0; i < midLayerCount; i++)
-                AddLayer(map, MidLayer, area, rng, enemyRng, ref nextId);
+                AddLayer(map, MidLayer, area, rng, enemyRng, totalLayers, ref nextId);
 
             // Boss layer (always 1 node, end point)
             var boss = area.bosses != null ? area.bosses.Pick(enemyRng) : null;
@@ -103,16 +103,22 @@ namespace RhythmRogue.Map
         /// Centralises the per-slot loop so the main Generate() reads as the overall shape only.
         /// </summary>
         private static void AddLayer(MapData map, LayerConfig config, Area area,
-                                     ISeededRandom rng, ISeededRandom enemyRng, ref int nextId)
+                                     ISeededRandom rng, ISeededRandom enemyRng, int totalLayers, ref int nextId)
         {
             int nodeCount = rng.Range(config.MinNodes, config.MaxNodes + 1);
             var layer = new List<MapNode>();
 
+            // Normalized depth of this layer: 0 at the opener, 1 at the boss layer. Drives which
+            // enemies are eligible here and (via DifficultyCurve at battle time) how hard the
+            // fight is. The layer index is the count before this layer is appended.
+            int layerIndex = map.Layers.Count;
+            float depthT = totalLayers > 1 ? Mathf.Clamp01(layerIndex / (float)(totalLayers - 1)) : 0f;
+
             for (int col = 0; col < nodeCount; col++)
             {
                 NodeType type = PickNodeType(config, rng);
-                var node = new MapNode(nextId++, map.Layers.Count, col, type);
-                node.EnemyData = ResolveEnemyForNode(type, area, enemyRng);
+                var node = new MapNode(nextId++, layerIndex, col, type);
+                node.EnemyData = ResolveEnemyForNode(type, area, enemyRng, depthT);
                 layer.Add(node);
                 map.AllNodes.Add(node);
             }
@@ -120,12 +126,15 @@ namespace RhythmRogue.Map
             map.Layers.Add(layer);
         }
 
-        private static EnemyData ResolveEnemyForNode(NodeType type, Area area, ISeededRandom rng) => type switch
+        // Enemy nodes pull from the area pool by depth: harder-feeling enemies (higher minDepthT)
+        // are kept out of the opening layers, so the opener can't roll a wall. Difficulty itself
+        // is depth-driven at battle time; this just controls where each enemy's flavour appears.
+        private static EnemyData ResolveEnemyForNode(NodeType type, Area area, ISeededRandom rng, float depthT) => type switch
         {
-            NodeType.Enemy => area.basicEnemies != null ? area.basicEnemies.Pick(rng) : null,
+            NodeType.Enemy => area.basicEnemies != null ? area.basicEnemies.PickEligible(rng, depthT) : null,
             NodeType.Elite => (area.eliteEnemies != null && !area.eliteEnemies.IsEmpty)
-                                ? area.eliteEnemies.Pick(rng)
-                                : (area.basicEnemies != null ? area.basicEnemies.Pick(rng) : null),
+                                ? area.eliteEnemies.PickEligible(rng, depthT)
+                                : (area.basicEnemies != null ? area.basicEnemies.PickEligible(rng, depthT) : null),
             _ => null
         };
 

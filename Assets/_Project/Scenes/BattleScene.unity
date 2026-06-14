@@ -471,7 +471,7 @@ MonoBehaviour:
   _comboSystem: {fileID: 1147190660}
   _enemyHealth: {fileID: 1009257967}
   _holdTracker: {fileID: 994168258}
-  _enemyHighway: {fileID: 0}
+  _enemyHighway: {fileID: 1671159282}
 --- !u!20 &519420031 stripped
 Camera:
   m_CorrespondingSourceObject: {fileID: 1855433783062302011, guid: 7159857ab22b0104d9c0e76d5881e986, type: 3}

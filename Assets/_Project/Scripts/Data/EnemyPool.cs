@@ -38,5 +38,32 @@ namespace RhythmRogue.Data
 
             return builder.Done().Pick(rng);
         }
+
+        /// <summary>
+        /// Pick a single enemy, seeded, considering only enemies allowed at the given normalized
+        /// map depth (0 = opener, 1 = pre-boss). An enemy is eligible when its
+        /// <see cref="EnemyData.minDepthT"/> is at or below <paramref name="depthT"/>, so harder-
+        /// feeling enemies can be kept out of the opening layers. If nothing is eligible yet
+        /// (every enemy gated above this depth), falls back to the full weighted pick so a node
+        /// always gets an enemy.
+        /// </summary>
+        public EnemyData PickEligible(ISeededRandom rng, float depthT)
+        {
+            if (IsEmpty) return null;
+
+            var builder = WeightedTable<EnemyData>.Build();
+            int eligible = 0;
+            foreach (var entry in _entries)
+            {
+                if (entry.enemy == null) continue;
+                if (entry.enemy.minDepthT > depthT) continue;
+                float w = entry.weight > 0f ? entry.weight : 1f;
+                builder.Add(entry.enemy, w);
+                eligible++;
+            }
+
+            if (eligible == 0) return Pick(rng);
+            return builder.Done().Pick(rng);
+        }
     }
 }

@@ -32,9 +32,16 @@ namespace RhythmRogue.Data
         [Min(0)] public int missDamage = 5;
 
         [Tooltip("Damage dealt to the player by each enemy note that lands while their guard is " +
-                 "down (after a Miss, until the next successful hit). Kept small on purpose: it " +
-                 "can stack across a dense enemy phrase. Set to 0 to disable enemy attacks.")]
+                 "down (after a Miss, until the guard is recovered). Kept small on purpose: it " +
+                 "stacks across a dense enemy phrase while you are exposed. Set to 0 to disable " +
+                 "enemy attacks.")]
         [Min(0)] public int enemyNoteDamage = 2;
+
+        [Tooltip("How many successful hits it takes to bring the guard back up after a Miss. " +
+                 "1 = the guard returns on your very next hit (very forgiving); higher keeps you " +
+                 "exposed across several notes so the enemy's phrase can actually land and sting. " +
+                 "The exposure window resets on each new Miss.")]
+        [Min(1)] public int guardRecoveryHits = 3;
 
         [Header("Hold Note Damage")]
         [Tooltip("Damage per hold tick. Multiplied by combo multiplier.")]

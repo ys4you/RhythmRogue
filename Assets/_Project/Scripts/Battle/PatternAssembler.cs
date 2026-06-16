@@ -42,6 +42,14 @@ namespace RhythmRogue.Battle
         private const float BarBeats = 4f;          // assumes 4/4; the only time-signature the prototype targets
         private const float Epsilon = 0.01f;
 
+        // Difficulty (0..1) maps linearly to a target notes-per-second for the whole chart. These
+        // are the master difficulty dials now: raise MaxNps for a harder ceiling, MinNps for a
+        // tougher floor. Difficulty also still gates pattern COMPLEXITY (tier) separately. Realized
+        // NPS lands a little under these because most sections follow a single instrument (fewer
+        // onsets than the full mix), so tune these by watching the [PatternAssembler] log.
+        private const float MinNps = 1.5f;
+        private const float MaxNps = 7f;
+
         // Reused per call to avoid GC. Main thread only.
         private static readonly List<NotePattern> _queryBuffer = new(32);
         private static readonly List<float> _scoreBuffer = new(32);
@@ -82,6 +90,14 @@ namespace RhythmRogue.Battle
             int globalMaxDiff = Mathf.Clamp(Mathf.CeilToInt(difficulty * 10f), 1, 10);
             bool hasStems = AnyTagged(markers);
 
+            // Difficulty sets a target notes-per-second; the per-bar density is derived from this
+            // and the song BPM (in FillSide), so tempo no longer leaks into difficulty. A fast and
+            // a slow song at the same difficulty play at the same NPS. songAvgPerBeat is the song's
+            // natural busyness, the reference the per-bar density is normalized against.
+            float bpmSafe = Mathf.Max(1f, bpm);
+            float targetNps = Mathf.Lerp(MinNps, MaxNps, difficulty);
+            float songAvgPerBeat = SongOnsetDensity(markers, totalBeats);
+
             ISeededRandom playerRng = rng.Fork("pattern_player");
             ISeededRandom enemyRng = rng.Fork("pattern_enemy");
             PickContext playerCtx = PickContext.Fresh;
@@ -105,10 +121,12 @@ namespace RhythmRogue.Battle
 
                     if (doPlayer)
                         FillSide(secMarkers, sec.type, sec.startBeat, sec.endBeat, library, globalMaxDiff,
-                                 sec.intensityScale, leadInBeats, playerRng, ref playerCtx, playerNotes);
+                                 bpmSafe, targetNps, songAvgPerBeat, sec.intensityScale, leadInBeats,
+                                 playerRng, ref playerCtx, playerNotes);
                     if (doEnemy)
                         FillSide(secMarkers, sec.type, sec.startBeat, sec.endBeat, library, globalMaxDiff,
-                                 sec.intensityScale, leadInBeats, enemyRng, ref enemyCtx, enemyNotes);
+                                 bpmSafe, targetNps, songAvgPerBeat, sec.intensityScale, leadInBeats,
+                                 enemyRng, ref enemyCtx, enemyNotes);
 
                     chartSections.Add(new ChartSection(sec.highway, sec.startBeat, sec.DurationBeats, enemyNotes, playerNotes, null, null));
                 }
@@ -118,13 +136,14 @@ namespace RhythmRogue.Battle
                 // No section data: one player section across the whole song.
                 List<BeatMarker> secMarkers = MarkersInRange(markers, 0f, totalBeats, ChartInstrument.All);
                 var playerNotes = new List<StampedNote>();
-                FillSide(secMarkers, SongSectionType.Verse, 0f, totalBeats, library, globalMaxDiff, 0f, leadInBeats, playerRng, ref playerCtx, playerNotes);
+                FillSide(secMarkers, SongSectionType.Verse, 0f, totalBeats, library, globalMaxDiff,
+                         bpmSafe, targetNps, songAvgPerBeat, 0f, leadInBeats, playerRng, ref playerCtx, playerNotes);
                 chartSections.Add(new ChartSection(SectionType.PlayerOnly, 0f, totalBeats, new List<StampedNote>(), playerNotes, null, null));
             }
 
             var chart = new BattleChart(bpm, leadInBeats, leadInBeats + totalBeats + tailBeats, chartSections);
-            GameLog.Info($"[PatternAssembler] diff={difficulty:F2} stems={hasStems} | {markers.Count} markers -> " +
-                         $"{chart.PlayerNoteCount}P + {chart.EnemyNoteCount}E notes across {chartSections.Count} sections");
+            GameLog.Info($"[PatternAssembler] diff={difficulty:F2} target~{targetNps:F1}nps@{bpmSafe:F0}bpm stems={hasStems} | " +
+                         $"{markers.Count} markers -> {chart.PlayerNoteCount}P + {chart.EnemyNoteCount}E notes across {chartSections.Count} sections");
             return chart;
         }
 
@@ -192,7 +211,8 @@ namespace RhythmRogue.Battle
 
         private static void FillSide(
             List<BeatMarker> secMarkers, SongSectionType secType, float secStart, float secEnd,
-            NotePatternLibrary library, int globalMaxDiff, float intensityScale, float leadInBeats,
+            NotePatternLibrary library, int globalMaxDiff, float bpm, float targetNps, float songAvgPerBeat,
+            float intensityScale, float leadInBeats,
             ISeededRandom sideRng, ref PickContext ctx, List<StampedNote> output)
         {
             int bar = 0;
@@ -215,7 +235,15 @@ namespace RhythmRogue.Battle
                     continue;
                 }
 
-                float targetDensity = Mathf.Clamp(scaledOnsets / Mathf.Max(0.5f, barLen), 0.1f, 3f);
+                // Target notes-per-second (from difficulty) -> notes-per-beat for THIS song's BPM,
+                // so tempo cancels out: realized NPS = targetNps * barRelative, independent of BPM.
+                // The song's onsets only shape the relative dynamics: barRelative ~1 is an average
+                // bar, >1 a busy one, so the chart still breathes (and section energy rides on top
+                // via intensityScale baked into scaledOnsets). Ceiling raised to 6 so slow songs
+                // can still reach high density.
+                float baseDensity = targetNps * 60f / bpm;
+                float barRelative = (scaledOnsets / Mathf.Max(0.5f, barLen)) / songAvgPerBeat;
+                float targetDensity = Mathf.Clamp(baseDensity * barRelative, 0.1f, 6f);
                 int maxDiff = Mathf.Clamp(Mathf.RoundToInt(Mathf.Lerp(2f, globalMaxDiff, bucket / 4f)), 1, globalMaxDiff);
 
                 float pos = barStart;
@@ -400,6 +428,21 @@ namespace RhythmRogue.Battle
             for (int i = 0; i < markers.Count; i++)
                 if (markers[i].beat >= start && markers[i].beat < end) count++;
             return count;
+        }
+
+        /// <summary>
+        /// The song's natural onset density (non-Break markers per beat across the whole song).
+        /// Used as the reference the per-bar density is normalized against, so a transient-heavy
+        /// track and a sparse one both resolve to the chart's target NPS instead of inheriting the
+        /// song's raw busyness. BPM-independent, so it never reintroduces tempo into difficulty.
+        /// </summary>
+        private static float SongOnsetDensity(List<BeatMarker> markers, float totalBeats)
+        {
+            if (totalBeats <= 0f) return 1f;
+            int usable = 0;
+            for (int i = 0; i < markers.Count; i++)
+                if (markers[i].type != MarkerType.Break) usable++;
+            return Mathf.Max(0.01f, usable / totalBeats);
         }
 
         /// <summary>

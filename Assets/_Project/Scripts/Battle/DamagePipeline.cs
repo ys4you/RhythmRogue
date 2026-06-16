@@ -62,6 +62,10 @@ namespace RhythmRogue.Battle
         private int _shieldChargesMax;
         private int _shieldCharges;
         private bool _guardUp = true;
+        // Successful hits still owed before the guard comes back up after a Miss (0 = guarded).
+        // Set from DamageConfig.guardRecoveryHits on each Miss, widening the exposure window so
+        // enemy notes can land across the gap instead of for a single note.
+        private int _hitsToRecover;
 
         private void Awake()
         {
@@ -75,6 +79,7 @@ namespace RhythmRogue.Battle
             // Every battle begins with the player guarded, so the opening enemy notes always
             // glance off. The guard only opens once the player actually misses (HandleJudgment).
             _guardUp = true;
+            _hitsToRecover = 0;
 
             if (_judgmentSystem != null) _judgmentSystem.OnJudgment += HandleJudgment;
             if (_holdTracker != null) _holdTracker.OnHoldTick += HandleHoldTick;
@@ -113,17 +118,23 @@ namespace RhythmRogue.Battle
         {
             if (result.Judgment == Judgment.Miss)
             {
-                // A real miss drops the guard. Until the next successful hit lands, every enemy
-                // note that reaches its receptor deals damage (see HandleEnemyAutoHit).
+                // A real miss drops the guard and opens a recovery debt: the guard stays down
+                // until this many clean hits land, so enemy notes keep biting across the gap
+                // rather than for just a single note. Each new miss refreshes the debt.
+                _hitsToRecover = _config != null ? Mathf.Max(1, _config.guardRecoveryHits) : 1;
                 SetGuard(false);
                 ApplyPlayerDamage(result);
             }
             else
             {
-                // Any successful hit (Bad, Good or Perfect) restores the guard immediately, so a
-                // single recovery note closes the window the miss opened. That same clean note also
-                // fully repairs the Sound Barrier shield, so it behaves like a second, rechargeable guard.
-                SetGuard(true);
+                // A successful hit (Bad, Good or Perfect) pays down the recovery debt; the guard
+                // only returns once it is cleared. The Sound Barrier shield still repairs on any
+                // clean hit, staying the more forgiving, premium layer on top of the guard.
+                if (!_guardUp)
+                {
+                    _hitsToRecover--;
+                    if (_hitsToRecover <= 0) SetGuard(true);
+                }
                 RestoreShield();
                 ApplyEnemyDamage(result);
             }

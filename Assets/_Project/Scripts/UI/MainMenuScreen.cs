@@ -32,6 +32,15 @@ namespace RhythmRogue.UI
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
 
+        // Run difficulty (forgiveness) tier selector. Display order is Relaxed / Normal / Hard;
+        // the chosen tier is written to RunState.Tier when a run starts. Defaults to Normal.
+        private static readonly DifficultyTier[] TierOrder =
+            { DifficultyTier.Relaxed, DifficultyTier.Normal, DifficultyTier.Hard };
+        private DifficultyTier _selectedTier = DifficultyTier.Normal;
+        private Button[] _tierButtons;
+        private Text[] _tierButtonLabels;
+        private Text _tierDescription;
+
         private void Start()
         {
             if (_rhythmActions != null) KeybindManager.Initialize(_rhythmActions);
@@ -50,6 +59,20 @@ namespace RhythmRogue.UI
             UISelectableStyle.Apply(_newRunBtn); UISelectableStyle.Apply(_seedGoBtn);
             UISelectableStyle.Apply(_settingsBtn); UISelectableStyle.Apply(_quitBtn);
             UISelectableStyle.Apply(_seedInput);
+
+            // Tier selector navigation: horizontal row; each tier drops to New Run, and New Run
+            // rises to the middle (Normal) tier. UISelectableStyle gives focus visuals + SFX.
+            if (_tierButtons != null && _tierButtons.Length == 3)
+            {
+                UINavigationHelper.WireHorizontalNoWrap(_tierButtons[0], _tierButtons[1], _tierButtons[2]);
+                for (int i = 0; i < _tierButtons.Length; i++)
+                {
+                    UINavigationHelper.AddLink(_tierButtons[i], down: _newRunBtn);
+                    UISelectableStyle.Apply(_tierButtons[i]);
+                }
+                UINavigationHelper.AddLink(_newRunBtn, up: _tierButtons[1]);
+            }
+
             _focusSetter = gameObject.AddComponent<UIFocusSetter>();
             _focusSetter.SetDefault(_newRunBtn.gameObject);
             _cancelHandler = gameObject.AddComponent<UICancelHandler>();
@@ -72,6 +95,7 @@ namespace RhythmRogue.UI
         {
             if (_runState == null) { GameLog.Error("[MainMenu] No RunState!"); return; }
             if (SceneTransitionManager.Instance != null && SceneTransitionManager.Instance.IsTransitioning) return;
+            _runState.Tier = _selectedTier;
             _runState.StartNewRun(seed);
             var ph = PlayerHealth.Instance; if (ph != null) ph.ResetForNewRun();
             GameLog.Info($"[MainMenu] Starting run. Seed: {_runState.Seed}");
@@ -115,15 +139,18 @@ namespace RhythmRogue.UI
             bgGO.GetComponent<RectTransform>().offsetMin = Vector2.zero;
             bgGO.GetComponent<RectTransform>().offsetMax = Vector2.zero;
 
-            MakePanel(_canvasRT, "AccentLine", new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.55f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000, 2), new Color(UIHelpers.BgLight.r, UIHelpers.BgLight.g, UIHelpers.BgLight.b, 0.5f));
-
             var title = MakeText(_canvasRT, "Title", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -150), new Vector2(1500, 120), 64, TextAnchor.MiddleCenter, UIHelpers.WarmGold);
             title.fontStyle = FontStyle.Bold; title.text = "RHYTHM ROGUE";
 
             var subtitle = MakeText(_canvasRT, "Subtitle", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0, -230), new Vector2(1000, 50), 22, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
             subtitle.text = "a rhythm roguelike";
 
-            float btnW = 400f, btnH = 80f, startY = -340f, gap = 100f;
+            MakePanel(_canvasRT, "AccentLine", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0, -268), new Vector2(560, 2), new Color(UIHelpers.BgLight.r, UIHelpers.BgLight.g, UIHelpers.BgLight.b, 0.5f));
+
+            // Difficulty (forgiveness) tier selector sits between the subtitle and the run buttons.
+            CreateTierSelector(labelY: -302f, rowY: -350f, descY: -396f);
+
+            float btnW = 400f, btnH = 80f, startY = -462f, gap = 98f;
             _newRunBtn = MakeMenuButton("New Run", startY, btnW, btnH, UIHelpers.RustOrange, OnNewRun);
             CreateSeedEntry(startY - gap, btnW, btnH);
             _settingsBtn = MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, UIHelpers.BgLight, OnSettings);
@@ -188,6 +215,74 @@ namespace RhythmRogue.UI
             var goText = MakeText(goBtnGO.GetComponent<RectTransform>(), "GoText", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(140, btnH), 28, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             goText.fontStyle = FontStyle.Bold; goText.text = "Go";
         }
+
+        // ---- Difficulty tier selector ----
+
+        private void CreateTierSelector(float labelY, float rowY, float descY)
+        {
+            if (_runState != null) _selectedTier = _runState.Tier;
+
+            var label = MakeText(_canvasRT, "TierLabel", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0, labelY), new Vector2(600, 34), 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            label.text = "DIFFICULTY";
+
+            _tierButtons = new Button[TierOrder.Length];
+            _tierButtonLabels = new Text[TierOrder.Length];
+
+            float bW = 150f, bH = 56f, step = bW + 14f;
+            float x0 = -step; // three buttons, middle one centered at x = 0
+
+            for (int i = 0; i < TierOrder.Length; i++)
+            {
+                DifficultyTier tier = TierOrder[i];
+                var go = MakePanel(_canvasRT, $"Tier_{tier}", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(x0 + i * step, rowY), new Vector2(bW, bH), UIHelpers.BgLight);
+                var btn = go.AddComponent<Button>();
+                btn.onClick.AddListener(() => SelectTier(tier));
+                var txt = MakeText(go.GetComponent<RectTransform>(), "Text", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(bW, bH), 26, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+                txt.fontStyle = FontStyle.Bold; txt.text = TierLabel(tier);
+                _tierButtons[i] = btn;
+                _tierButtonLabels[i] = txt;
+            }
+
+            _tierDescription = MakeText(_canvasRT, "TierDesc", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0, descY), new Vector2(820, 28), 20, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
+            _tierDescription.fontStyle = FontStyle.Italic;
+
+            RefreshTierVisuals();
+        }
+
+        private void SelectTier(DifficultyTier tier)
+        {
+            _selectedTier = tier;
+            if (_runState != null) _runState.Tier = tier;
+            RefreshTierVisuals();
+        }
+
+        private void RefreshTierVisuals()
+        {
+            if (_tierButtons == null) return;
+            for (int i = 0; i < _tierButtons.Length; i++)
+            {
+                bool selected = TierOrder[i] == _selectedTier;
+                var img = _tierButtons[i] != null ? _tierButtons[i].GetComponent<Image>() : null;
+                if (img != null) img.color = selected ? UIHelpers.WarmGold : UIHelpers.BgLight;
+                if (_tierButtonLabels[i] != null)
+                    _tierButtonLabels[i].color = selected ? UIHelpers.BgDeep : UIHelpers.OffWhite;
+            }
+            if (_tierDescription != null) _tierDescription.text = TierDescriptionText(_selectedTier);
+        }
+
+        private static string TierLabel(DifficultyTier tier) => tier switch
+        {
+            DifficultyTier.Relaxed => "Relaxed",
+            DifficultyTier.Hard => "Hard",
+            _ => "Normal"
+        };
+
+        private static string TierDescriptionText(DifficultyTier tier) => tier switch
+        {
+            DifficultyTier.Relaxed => "Wider timing windows and a lighter chart. A gentler way in.",
+            DifficultyTier.Hard => "Tighter timing and a denser chart. For when Normal feels easy.",
+            _ => "The intended balance of timing and note density."
+        };
 
         private Button MakeMenuButton(string label, float y, float w, float h, Color bgColor, UnityEngine.Events.UnityAction onClick)
         {

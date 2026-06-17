@@ -55,6 +55,9 @@ namespace RhythmRogue.Map
                 return new MapData { Seed = seed };
             }
 
+            if (area.onboarding != null && area.onboarding.nodes != null && area.onboarding.nodes.Length > 0)
+                return GenerateScripted(rng, seed, area, area.onboarding);
+
             var map = new MapData { Seed = seed };
             int nextId = 0;
 
@@ -95,6 +98,50 @@ namespace RhythmRogue.Map
             foreach (var node in map.Layers[0]) node.IsAccessible = true;
 
             GameLog.Info($"[MapGenerator] Generated map for '{area.areaName}': {map.AllNodes.Count} nodes, {map.LayerCount} layers");
+            return map;
+        }
+
+        /// <summary>
+        /// Build a map from a scripted onboarding sequence instead of the default branching shape:
+        /// a single-file path with one node per layer, in the sequence's order. Every node shares
+        /// the sequence's enemy/song and carries its own authored chart, teaching card, and optional
+        /// reward relic. The final node is a Boss so the run completes through the normal victory flow.
+        /// </summary>
+        private static MapData GenerateScripted(ISeededRandom rng, string seed, Area area, OnboardingSequence sequence)
+        {
+            var map = new MapData { Seed = seed };
+            int nextId = 0;
+
+            if (sequence.enemy == null)
+                GameLog.Warn($"[MapGenerator] Onboarding sequence on '{area.areaName}' has no enemy set; " +
+                             "battles will fall back to the scene's default enemy.");
+
+            OnboardingSequence.LessonNode[] lessons = sequence.nodes;
+            int totalLayers = lessons.Length; // one node per layer; the last node is the finale
+
+            for (int layerIndex = 0; layerIndex < totalLayers; layerIndex++)
+            {
+                bool isFinal = layerIndex == totalLayers - 1;
+                OnboardingSequence.LessonNode lesson = lessons[layerIndex];
+
+                var node = new MapNode(nextId++, layerIndex, 0, isFinal ? NodeType.Boss : NodeType.Enemy)
+                {
+                    EnemyData = sequence.enemy,
+                    TeachingText = lesson != null ? lesson.lesson : null,
+                    ChartAsset = lesson != null ? lesson.chart : null,
+                    RewardRelic = lesson != null ? lesson.rewardRelic : null
+                };
+
+                map.Layers.Add(new List<MapNode> { node });
+                map.AllNodes.Add(node);
+            }
+
+            AssignPositions(map, rng.Fork("jitter"));
+            for (int i = 0; i < map.Layers.Count - 1; i++)
+                ConnectLayers(map.Layers[i], map.Layers[i + 1], rng);
+            foreach (var node in map.Layers[0]) node.IsAccessible = true;
+
+            GameLog.Info($"[MapGenerator] Generated onboarding sequence for '{area.areaName}': {map.AllNodes.Count} nodes");
             return map;
         }
 

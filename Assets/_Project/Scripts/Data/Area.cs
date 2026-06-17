@@ -55,5 +55,16 @@ namespace RhythmRogue.Data
 
         [Tooltip("Boss HP for this area.")]
         [Min(1)] public int bossHP = 380;
+
+        [Header("Onboarding (optional)")]
+        [Tooltip("If set, this area is a scripted onboarding sequence (a straight, hand-authored " +
+                 "teaching path) instead of a procedural map. The generator builds the sequence's " +
+                 "nodes in order, and battles run in practice mode if the sequence requests it. All " +
+                 "the scripted content lives on the OnboardingSequence asset. Leave null for normal areas.")]
+        public OnboardingSequence onboarding;
+
+        /// <summary>True when this area is a scripted onboarding sequence running in practice mode
+        /// (fights cannot be lost and the reward screen is skipped). False for normal areas.</summary>
+        public bool IsPracticeRun => onboarding != null && onboarding.practiceMode;
     }
 }

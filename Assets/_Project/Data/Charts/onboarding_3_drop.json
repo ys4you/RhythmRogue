@@ -1,0 +1,30 @@
+{
+    "songName": "Training 3 - Drop",
+    "bpm": 99,
+    "offset": 0.0,
+    "audioFile": "stellar_saga",
+    "chartAuthor": "Tutorial",
+    "notes": [
+        { "beat": 4.06,  "lane": 0, "type": "tap" },
+        { "beat": 4.56,  "lane": 1, "type": "tap" },
+        { "beat": 5.29,  "lane": 2, "type": "tap" },
+        { "beat": 6.28,  "lane": 3, "type": "tap" },
+        { "beat": 6.78,  "lane": 2, "type": "tap" },
+        { "beat": 7.28,  "lane": 1, "type": "tap" },
+        { "beat": 7.78,  "lane": 0, "type": "tap" },
+
+        { "beat": 10.0,  "lane": 0, "type": "tap" },
+        { "beat": 11.99, "lane": 3, "type": "tap" },
+
+        { "beat": 14.44, "lane": 0, "type": "tap" },
+        { "beat": 15.71, "lane": 1, "type": "tap" },
+        { "beat": 16.44, "lane": 2, "type": "tap" },
+        { "beat": 16.93, "lane": 3, "type": "tap" },
+        { "beat": 17.43, "lane": 2, "type": "tap" },
+        { "beat": 17.93, "lane": 1, "type": "tap" },
+        { "beat": 18.43, "lane": 0, "type": "tap" },
+        { "beat": 18.93, "lane": 1, "type": "tap" },
+        { "beat": 19.42, "lane": 2, "type": "tap" },
+        { "beat": 19.92, "lane": 3, "type": "tap" }
+    ]
+}

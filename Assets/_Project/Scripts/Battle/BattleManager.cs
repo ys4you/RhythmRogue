@@ -73,6 +73,10 @@ namespace RhythmRogue.Battle
         private bool _isElite;
         private bool _isBoss;
         private DifficultyContext _difficulty;
+        private string _lessonText;
+        private bool _waitingForLesson;
+        private bool _practice;
+        private float _practiceEndBeat = float.MaxValue;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
@@ -100,6 +104,10 @@ namespace RhythmRogue.Battle
             _isBoss = _runState?.SelectedNode?.Type == NodeType.Boss
                       || (_currentEnemy != null && _currentEnemy.IsBoss);
 
+            // Onboarding paths attach a lesson to each node; if present it's shown during Intro
+            // (before the song) and the fight waits on a keypress. Null on normal nodes.
+            _lessonText = _runState?.SelectedNode?.TeachingText;
+
             if (_currentEnemy == null)
             {
                 GameLog.Error("[BattleManager] No enemy data! Assign a default in Inspector.");
@@ -124,12 +132,30 @@ namespace RhythmRogue.Battle
             if (!_chart.Success)
                 GameLog.Error("[BattleManager] Chart resolution failed.");
 
+            // Practice (onboarding) mode: the fight can't be lost and ends in a win shortly after
+            // the last chart note, so a first-timer always succeeds no matter how many notes they
+            // hit. Driven by the area flag; the last-note beat comes from the resolved chart.
+            _practice = _runState != null && _runState.CurrentArea != null && _runState.CurrentArea.IsPracticeRun;
+            if (_practice)
+            {
+                float lastBeat = (_chart.IsLegacy && _chart.LegacyChart != null && _chart.LegacyChart.NoteCount > 0)
+                    ? _chart.LegacyChart.Notes[_chart.LegacyChart.NoteCount - 1].BeatPosition
+                    : 0f;
+                _practiceEndBeat = lastBeat > 0f ? lastBeat + 2f : float.MaxValue;
+            }
+
             SetupFSM();
         }
 
         private void Start()
         {
             InitializeBattle();
+
+            // Relic bar on its own overlay canvas, so held relics stay visible during the fight
+            // (and the onboarding's relic lesson has something to point at). Self-contained; shows
+            // nothing when the player holds no relics.
+            if (_runState != null) RhythmRogue.UI.RelicBar.Create(_runState);
+
             _fsm.Start(BattlePhase.Intro);
         }
 
@@ -187,6 +213,18 @@ namespace RhythmRogue.Battle
             if (_chart.IsLegacy)
             {
                 _highway.LoadChart(_chart.LegacyChart);
+
+                // Authored charts may carry enemy notes (an "enemyNotes" array in the JSON). Feed
+                // them to the enemy highway so the guard has something real to block, just like a
+                // procedural fight. Charts without them (most) load nothing here.
+                if (_enemyHighway != null && _chart.LegacyChart != null && _chart.LegacyChart.EnemyNoteCount > 0)
+                {
+                    var enemyStamped = new System.Collections.Generic.List<StampedNote>(_chart.LegacyChart.EnemyNoteCount);
+                    var en = _chart.LegacyChart.EnemyNotes;
+                    for (int i = 0; i < en.Count; i++)
+                        enemyStamped.Add(new StampedNote(en[i].Lane, en[i].BeatPosition, en[i].HoldDuration));
+                    _enemyHighway.LoadNotes(enemyStamped);
+                }
             }
             else if (_chart.BattleChart != null)
             {
@@ -237,11 +275,28 @@ namespace RhythmRogue.Battle
                 {
                     _phaseTimer = _introDelay;
                     _battleEnded = false;
+
+                    // If this node carries a lesson (onboarding), show it now and wait for a key
+                    // before counting down. The song hasn't started and no notes move during Intro,
+                    // so the player reads it with the fight frozen behind.
+                    _waitingForLesson = _battleUI != null && !string.IsNullOrWhiteSpace(_lessonText);
+                    if (_waitingForLesson)
+                        _battleUI.ShowLesson(_lessonText);
+
                     string eliteTag = _isElite ? " [ELITE]" : "";
                     GameLog.Info($"[BattleManager] INTRO{eliteTag} - {_currentEnemy.enemyName} appears!");
                 },
                 update: () =>
                 {
+                    if (_waitingForLesson)
+                    {
+                        if (!AnyAdvancePressedThisFrame()) return;
+                        _waitingForLesson = false;
+                        if (_battleUI != null) _battleUI.HideLesson();
+                        _phaseTimer = _introDelay; // let the reveal beat + note runway play after dismissing
+                        return;
+                    }
+
                     _phaseTimer -= Time.deltaTime;
                     if (_phaseTimer <= 0f)
                         _fsm.TransitionTo(BattlePhase.Playing);
@@ -259,13 +314,24 @@ namespace RhythmRogue.Battle
                     _conductor.Play(_chart.EffectiveBPM, _chart.AudioOffset);
                     GameLog.Info("[BattleManager] PLAYING - song started!");
                 },
+                update: () =>
+                {
+                    // Practice mode auto-wins shortly after the last note so the fight always ends
+                    // in victory without waiting out the rest of the song.
+                    if (_practice && _conductor.IsPlaying &&
+                        _conductor.SongPositionInBeats >= _practiceEndBeat)
+                    {
+                        GameLog.Info("[BattleManager] Practice chart complete - auto win.");
+                        EndBattle(true);
+                    }
+                },
                 exit: _ =>
                 {
                     _conductor.OnSongFinished -= OnSongEnded;
                     if (_conductor.IsPlaying) _conductor.Stop();
                     _highway.ClearAllNotes();
                     _holdTracker.ClearAll();
-                    if (!_chart.IsLegacy && _enemyHighway != null) _enemyHighway.Clear();
+                    if (_enemyHighway != null) _enemyHighway.Clear();
                 }
             ));
 
@@ -321,6 +387,20 @@ namespace RhythmRogue.Battle
 #endif
         }
 
+        // Any-key advance, used to dismiss the onboarding lesson overlay during Intro.
+        private static bool AnyAdvancePressedThisFrame()
+        {
+#if ENABLE_INPUT_SYSTEM
+            var kb = Keyboard.current;
+            if (kb != null && kb.anyKey.wasPressedThisFrame) return true;
+            var gp = Gamepad.current;
+            if (gp != null && (gp.buttonSouth.wasPressedThisFrame || gp.startButton.wasPressedThisFrame)) return true;
+            return false;
+#else
+            return Input.anyKeyDown;
+#endif
+        }
+
         private void PauseBattle()
         {
             _conductor.Pause();
@@ -353,7 +433,7 @@ namespace RhythmRogue.Battle
             LogKillTiming();
             EndBattle(true);
         }
-        private void OnPlayerDied() { if (!_battleEnded) EndBattle(false); }
+        private void OnPlayerDied() { if (!_battleEnded && !_practice) EndBattle(false); }
 
         // Dev aid for HP tuning: reports how far into the song the enemy died. Aim for the kill to
         // land around 80% for an average player, leaving a short decisive tail. If it dies very
@@ -370,6 +450,12 @@ namespace RhythmRogue.Battle
         private void OnSongEnded()
         {
             if (_battleEnded) return;
+            if (_practice)
+            {
+                GameLog.Info("[BattleManager] Song ended in practice mode - win.");
+                EndBattle(true);
+                return;
+            }
             if (_enemyHealth.IsAlive)
             {
                 GameLog.Info("[BattleManager] Song ended - enemy survived!");

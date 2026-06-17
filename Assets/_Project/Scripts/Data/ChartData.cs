@@ -51,6 +51,14 @@ namespace RhythmRogue.Data
         public RawNoteData[] notes;
 
         /// <summary>
+        /// Optional enemy-side notes. These play automatically on the enemy highway and damage
+        /// the player only while their guard is down (after a Miss). Same shape as notes[]. Most
+        /// charts leave this empty; the onboarding's shield lesson uses it to show the guard
+        /// blocking and then taking hits. Omit the field entirely for a player-only chart.
+        /// </summary>
+        public RawNoteData[] enemyNotes;
+
+        /// <summary>
         /// Raw note data matching the JSON structure.
         /// Validated and converted to NoteData by ChartLoader.
         /// </summary>

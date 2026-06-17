@@ -51,6 +51,19 @@ namespace RhythmRogue.Map
         /// <summary>Enemy data for battle nodes. Null for non-battle nodes.</summary>
         public EnemyData EnemyData { get; set; }
 
+        /// <summary>Optional teaching text shown before this fight (onboarding paths only). Null on
+        /// normally generated nodes; set by the shaped generator from the area's lesson list.</summary>
+        public string TeachingText { get; set; }
+
+        /// <summary>Optional hand-authored chart for this fight (onboarding paths only). Null on
+        /// normally generated nodes; set by the shaped generator from the area's chart list.</summary>
+        public TextAsset ChartAsset { get; set; }
+
+        /// <summary>Optional relic granted when this node is completed (onboarding paths only).
+        /// Null on normally generated nodes; set by the shaped generator from the area's reward
+        /// list. The onboarding uses this so the shield node hands the player their first relic.</summary>
+        public RelicData RewardRelic { get; set; }
+
         public MapNode(int id, int layer, int column, NodeType type)
         {
             Id = id;

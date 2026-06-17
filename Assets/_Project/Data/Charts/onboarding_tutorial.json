@@ -1,0 +1,18 @@
+{
+    "songName": "Training",
+    "bpm": 99,
+    "offset": 0.0,
+    "audioFile": "stellar_saga",
+    "chartAuthor": "Tutorial",
+    "notes": [
+        { "beat": 4.06,  "lane": 0, "type": "tap" },
+        { "beat": 6.78,  "lane": 0, "type": "tap" },
+        { "beat": 8.01,  "lane": 0, "type": "tap" },
+        { "beat": 10.0,  "lane": 0, "type": "tap" },
+        { "beat": 11.99, "lane": 0, "type": "tap" },
+
+        { "beat": 14.44, "lane": 1, "type": "tap" },
+        { "beat": 16.93, "lane": 1, "type": "tap" },
+        { "beat": 18.93, "lane": 1, "type": "tap" }
+    ]
+}

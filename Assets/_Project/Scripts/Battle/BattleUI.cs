@@ -56,6 +56,8 @@ namespace RhythmRogue.Battle
         private int _currentScore, _displayScore;
         private Text _resultText;
         private Image _resultBG;
+        private Image _lessonBG;
+        private Text _lessonText;
         private float _playerHPTarget = 1f, _playerHPDisplay = 1f;
         private float _enemyHPTarget = 1f, _enemyHPDisplay = 1f;
         private float _comboPopScale = 1f, _playerFlash, _enemyFlash;
@@ -337,6 +339,23 @@ namespace RhythmRogue.Battle
             rt.localScale = Vector3.one;
         }
 
+        /// <summary>True while the onboarding lesson overlay is on screen.</summary>
+        public bool LessonVisible => _lessonBG != null && _lessonBG.gameObject.activeSelf;
+
+        /// <summary>Show the onboarding lesson overlay with the given text. No-op if text is empty.</summary>
+        public void ShowLesson(string text)
+        {
+            if (_lessonBG == null || string.IsNullOrWhiteSpace(text)) return;
+            if (_lessonText != null) _lessonText.text = text;
+            _lessonBG.gameObject.SetActive(true);
+        }
+
+        /// <summary>Hide the onboarding lesson overlay.</summary>
+        public void HideLesson()
+        {
+            if (_lessonBG != null) _lessonBG.gameObject.SetActive(false);
+        }
+
         private void CreateUI()
         {
             var canvasGO = new GameObject("BattleCanvas");
@@ -449,6 +468,36 @@ namespace RhythmRogue.Battle
                 Vector2.zero, new Vector2(1000, 150), 72, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             _resultText.fontStyle = FontStyle.Bold;
             resultBGObj.SetActive(false);
+
+            // Lesson overlay (onboarding paths only). A dim fullscreen panel with a centered card of
+            // teaching text. BattleManager shows it during the Intro phase - before the song and
+            // before any notes move - and holds there until the player presses a key. Hidden by
+            // default; nodes on normal maps never set teaching text so it simply never appears.
+            var lessonBGObj = CreatePanel(canvasRT, "LessonBG",
+                new Vector2(0, 0), new Vector2(1, 1), new Vector2(0.5f, 0.5f),
+                Vector2.zero, Vector2.zero, new Color(UIHelpers.BgDeep.r, UIHelpers.BgDeep.g, UIHelpers.BgDeep.b, 0.92f));
+            _lessonBG = lessonBGObj.GetComponent<Image>();
+            var lessonBGRT = lessonBGObj.GetComponent<RectTransform>();
+            lessonBGRT.offsetMin = Vector2.zero; lessonBGRT.offsetMax = Vector2.zero;
+
+            var lessonCard = CreatePanel(lessonBGRT, "LessonCard",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                Vector2.zero, new Vector2(1100, 440),
+                new Color(UIHelpers.BgSurface.r, UIHelpers.BgSurface.g, UIHelpers.BgSurface.b, 0.98f));
+            var lessonCardRT = lessonCard.GetComponent<RectTransform>();
+
+            _lessonText = CreateText(lessonCardRT, "LessonText", "",
+                new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                new Vector2(0, 30), new Vector2(980, 300), 32, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            _lessonText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _lessonText.verticalOverflow = VerticalWrapMode.Overflow;
+
+            var lessonPrompt = CreateText(lessonCardRT, "LessonPrompt", "Press any key to begin",
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0, 44), new Vector2(1000, 50), 26, TextAnchor.MiddleCenter, UIHelpers.AmberOrange);
+            lessonPrompt.fontStyle = FontStyle.Italic;
+
+            lessonBGObj.SetActive(false);
         }
 
         /// <summary>

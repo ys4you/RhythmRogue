@@ -37,6 +37,11 @@ namespace RhythmRogue.Core
         /// difficulty band and HP for battles in this area (see DifficultyCurve).</summary>
         [System.NonSerialized] public Area CurrentArea;
 
+        /// <summary>Optional area chosen at run start (e.g. the menu launching the onboarding
+        /// area). When set, MapScreen builds the map from this instead of its own serialized
+        /// default. Null for a normal run. Set by the launcher before StartNewRun.</summary>
+        [System.NonSerialized] public Area SelectedArea;
+
         /// <summary>Run-level forgiveness tier (chosen at run start). Defaults to Normal.</summary>
         [System.NonSerialized] public DifficultyTier Tier = DifficultyTier.Normal;
         [System.NonSerialized] public IRunSeed RunSeed;

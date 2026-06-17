@@ -87,21 +87,22 @@ namespace RhythmRogue.Data
 
             // Parse and validate notes
             List<NoteData> notes = ParseNotes(raw.notes);
+            List<NoteData> enemyNotes = ParseNotes(raw.enemyNotes, warnIfEmpty: false);
 
             GameLog.Info($"[ChartLoader] Loaded '{raw.songName}' — {notes.Count} notes, " +
-                      $"{raw.bpm} BPM, offset {raw.offset}s");
+                      $"{enemyNotes.Count} enemy notes, {raw.bpm} BPM, offset {raw.offset}s");
 
-            return new LoadedChart(raw, notes);
+            return new LoadedChart(raw, notes, enemyNotes);
         }
 
         /// <summary>
         /// Parse raw note entries into validated, sorted NoteData list.
         /// </summary>
-        private static List<NoteData> ParseNotes(ChartData.RawNoteData[] rawNotes)
+        private static List<NoteData> ParseNotes(ChartData.RawNoteData[] rawNotes, bool warnIfEmpty = true)
         {
             if (rawNotes == null || rawNotes.Length == 0)
             {
-                GameLog.Warn("[ChartLoader] Chart has no notes.");
+                if (warnIfEmpty) GameLog.Warn("[ChartLoader] Chart has no notes.");
                 return new List<NoteData>();
             }
 
@@ -227,7 +228,15 @@ namespace RhythmRogue.Data
         /// <summary>Total number of notes in the chart.</summary>
         public int NoteCount => Notes.Count;
 
-        public LoadedChart(ChartData raw, List<NoteData> sortedNotes)
+        /// <summary>
+        /// Optional enemy-side notes (auto-played on the enemy highway). Empty for most charts.
+        /// </summary>
+        public IReadOnlyList<NoteData> EnemyNotes { get; }
+
+        /// <summary>Number of enemy notes (0 if none).</summary>
+        public int EnemyNoteCount => EnemyNotes.Count;
+
+        public LoadedChart(ChartData raw, List<NoteData> sortedNotes, List<NoteData> enemyNotes = null)
         {
             SongName = raw.songName ?? "Untitled";
             BPM = raw.bpm;
@@ -235,6 +244,7 @@ namespace RhythmRogue.Data
             AudioFile = raw.audioFile ?? "";
             ChartAuthor = raw.chartAuthor ?? "Unknown";
             Notes = sortedNotes.AsReadOnly();
+            EnemyNotes = (enemyNotes ?? new List<NoteData>()).AsReadOnly();
         }
     }
 }

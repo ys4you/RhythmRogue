@@ -21,13 +21,21 @@ namespace RhythmRogue.UI
         [Header("References")]
         [SerializeField] private RunState _runState;
         [SerializeField] private InputActionAsset _rhythmActions;
+        [Tooltip("The onboarding area launched by the How to Play button: a short, gentle, single-" +
+                 "file path that teaches the basics. Leave unassigned and the button is hidden.")]
+        [SerializeField] private Area _onboardingArea;
+        [Tooltip("If on, a brand-new player (who has never seen the onboarding) is routed straight " +
+                 "into it on first launch. Skippable: they can pause and quit back here, and the flag " +
+                 "is set the moment they are routed in, so it only forces once. Needs onboardingArea " +
+                 "assigned. Turn off to disable the auto-route entirely.")]
+        [SerializeField] private bool _forceOnboardingOnFirstLaunch = true;
         [Header("Version")]
         [SerializeField] private string _versionText = "Prototype v0.1";
 
         private Canvas _canvas;
         private RectTransform _canvasRT;
         private InputField _seedInput;
-        private Button _newRunBtn, _seedGoBtn, _settingsBtn, _quitBtn;
+        private Button _newRunBtn, _seedGoBtn, _settingsBtn, _quitBtn, _howToPlayBtn;
         private SettingsPanel _settings;
         private UIFocusSetter _focusSetter;
         private UICancelHandler _cancelHandler;
@@ -45,6 +53,20 @@ namespace RhythmRogue.UI
         {
             if (_rhythmActions != null) KeybindManager.Initialize(_rhythmActions);
             DisplaySettings.ApplyAll();
+
+            // First-launch onboarding: route a brand-new player straight into the tutorial once.
+            // The flag is set here, at the moment of routing, so leaving early (pause -> quit) still
+            // counts as forced-once and they get a normal menu next time. How to Play stays the way
+            // to replay it. Skippable, never a lock. Keybinds + display are already applied above so
+            // the battle the player lands in behaves correctly.
+            if (_forceOnboardingOnFirstLaunch && _onboardingArea != null && !OnboardingState.IsComplete)
+            {
+                OnboardingState.MarkComplete();
+                GameLog.Info("[MainMenu] First launch detected; routing into onboarding.");
+                StartRun(null, _onboardingArea);
+                return;
+            }
+
             MusicManager.Instance.Play(MusicTrack.MenuDrone);
             CreateUI();
             SetupNavigation();
@@ -52,8 +74,18 @@ namespace RhythmRogue.UI
 
         private void SetupNavigation()
         {
-            UINavigationHelper.WireVerticalNoWrap(_newRunBtn, _seedGoBtn, _settingsBtn, _quitBtn);
-            UINavigationHelper.Wire(_seedInput, up: _newRunBtn, down: _settingsBtn, right: _seedGoBtn);
+            // Vertical chain adapts to whether the optional How to Play button exists.
+            if (_howToPlayBtn != null)
+            {
+                UINavigationHelper.WireVerticalNoWrap(_newRunBtn, _howToPlayBtn, _seedGoBtn, _settingsBtn, _quitBtn);
+                UINavigationHelper.Wire(_seedInput, up: _howToPlayBtn, down: _settingsBtn, right: _seedGoBtn);
+                UISelectableStyle.Apply(_howToPlayBtn);
+            }
+            else
+            {
+                UINavigationHelper.WireVerticalNoWrap(_newRunBtn, _seedGoBtn, _settingsBtn, _quitBtn);
+                UINavigationHelper.Wire(_seedInput, up: _newRunBtn, down: _settingsBtn, right: _seedGoBtn);
+            }
             UINavigationHelper.AddLink(_seedGoBtn, left: _seedInput);
             _seedInput.onEndEdit.AddListener(_ => { if (!_seedInput.isFocused) _focusSetter.FocusOn(_seedGoBtn.gameObject); });
             UISelectableStyle.Apply(_newRunBtn); UISelectableStyle.Apply(_seedGoBtn);
@@ -84,21 +116,24 @@ namespace RhythmRogue.UI
             _settings.OnCloseRequested += OnSettingsClosed;
         }
 
-        private void OnNewRun() => StartRun(null);
+        private void OnNewRun() => StartRun(null, null);
         private void OnSeededRun()
         {
             string seed = _seedInput != null ? _seedInput.text.Trim() : "";
-            StartRun(string.IsNullOrEmpty(seed) ? null : seed);
+            StartRun(string.IsNullOrEmpty(seed) ? null : seed, null);
         }
+        private void OnHowToPlay() => StartRun(null, _onboardingArea);
 
-        private void StartRun(string seed)
+        private void StartRun(string seed, Area area)
         {
             if (_runState == null) { GameLog.Error("[MainMenu] No RunState!"); return; }
             if (SceneTransitionManager.Instance != null && SceneTransitionManager.Instance.IsTransitioning) return;
             _runState.Tier = _selectedTier;
+            // null = use the map scene's default area; set = launch that area (e.g. onboarding).
+            _runState.SelectedArea = area;
             _runState.StartNewRun(seed);
             var ph = PlayerHealth.Instance; if (ph != null) ph.ResetForNewRun();
-            GameLog.Info($"[MainMenu] Starting run. Seed: {_runState.Seed}");
+            GameLog.Info($"[MainMenu] Starting run. Seed: {_runState.Seed}{(area != null ? $" | area: {area.areaName}" : "")}");
             var tm = SceneTransitionManager.Instance;
             if (tm != null) tm.GoToMap();
             else UnityEngine.SceneManagement.SceneManager.LoadScene(SceneTransitionManager.MAP_SCENE);
@@ -152,9 +187,12 @@ namespace RhythmRogue.UI
 
             float btnW = 400f, btnH = 80f, startY = -462f, gap = 98f;
             _newRunBtn = MakeMenuButton("New Run", startY, btnW, btnH, UIHelpers.RustOrange, OnNewRun);
-            CreateSeedEntry(startY - gap, btnW, btnH);
-            _settingsBtn = MakeMenuButton("Settings", startY - gap * 2, btnW, btnH, UIHelpers.BgLight, OnSettings);
-            _quitBtn = MakeMenuButton("Quit", startY - gap * 3, btnW, btnH, UIHelpers.Shadow, OnQuit);
+            int row = 1;
+            if (_onboardingArea != null)
+                _howToPlayBtn = MakeMenuButton("How to Play", startY - gap * row++, btnW, btnH, UIHelpers.AmberOrange, OnHowToPlay);
+            CreateSeedEntry(startY - gap * row++, btnW, btnH);
+            _settingsBtn = MakeMenuButton("Settings", startY - gap * row++, btnW, btnH, UIHelpers.BgLight, OnSettings);
+            _quitBtn = MakeMenuButton("Quit", startY - gap * row++, btnW, btnH, UIHelpers.Shadow, OnQuit);
 
             var version = MakeText(_canvasRT, "Version", new Vector2(1, 0), new Vector2(1, 0), new Vector2(1, 0), new Vector2(-20, 20), new Vector2(400, 40), 18, TextAnchor.MiddleRight, UIHelpers.Shadow);
             version.text = _versionText;

@@ -67,9 +67,18 @@ namespace RhythmRogue.Battle
 
                 AwardCurrency(wasBoss, wasElite, accuracy);
 
+                // Per-node reward relic (onboarding): completing a tagged node hands the player a
+                // relic. Read before CompleteSelectedNode, which clears SelectedNode.
+                GrantNodeRewardRelic();
+
+                bool practice = _runState.CurrentArea != null && _runState.CurrentArea.IsPracticeRun;
+
                 _runState.CompleteSelectedNode();
 
                 if (wasBoss) { _runState.EndRun(true); GoTo("SummaryScene"); }
+                // Onboarding (practice) skips the reward pick so the node reward above is the only
+                // relic source; go straight back to the map.
+                else if (practice) GoTo(SceneTransitionManager.MAP_SCENE);
                 else GoTo("RewardScene");
             }
             else
@@ -107,6 +116,20 @@ namespace RhythmRogue.Battle
             var tm = SceneTransitionManager.Instance;
             if (tm != null) tm.GoTo(scene);
             else UnityEngine.SceneManagement.SceneManager.LoadScene(scene);
+        }
+
+        /// <summary>
+        /// Grant the relic tagged on the just-cleared node, if any (onboarding: the shield node
+        /// hands the player their first relic). Routed through AcquireRelic so any on-pickup effect
+        /// fires, exactly as a reward-screen pick would. No-op when the node has no reward relic or
+        /// the player already holds it.
+        /// </summary>
+        private void GrantNodeRewardRelic()
+        {
+            RelicData relic = _runState.SelectedNode != null ? _runState.SelectedNode.RewardRelic : null;
+            if (relic == null || _runState.ActiveRelics.Contains(relic)) return;
+            _runState.AcquireRelic(relic, PlayerHealthAcquireContext.Default);
+            GameLog.Info($"[BattleResultHandler] Node reward relic granted: {relic.relicName}");
         }
     }
 }

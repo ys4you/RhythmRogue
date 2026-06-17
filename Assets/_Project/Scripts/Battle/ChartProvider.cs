@@ -65,6 +65,10 @@ namespace RhythmRogue.Battle
             float difficulty = GetEffectiveDifficulty(enemy, isElite, ctx);
             float bpmModifier = GetEffectiveBPMModifier(enemy, isElite);
 
+            // An explicitly supplied authored chart (e.g. the onboarding area's hand chart) wins
+            // for this battle regardless of the global mode, so one area can be hand-authored while
+            // the rest stay procedural.
+            if (selectedChart != null) return ResolveLegacy(selectedChart, enemy, bpmModifier);
             if (_useLegacyChart) return ResolveLegacy(selectedChart, enemy, bpmModifier);
             if (enemy.songBeatMap != null) return ResolveFromBeatMap(enemy, rng, difficulty, bpmModifier);
 

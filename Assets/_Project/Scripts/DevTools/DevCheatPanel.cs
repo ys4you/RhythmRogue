@@ -125,6 +125,7 @@ namespace RhythmRogue.DevTools
             DrawHealth();
             DrawTime();
             DrawRelics(rs);
+            DrawOnboarding();
 
             GUI.DragWindow(new Rect(0, 0, 100000, 20));
         }
@@ -202,6 +203,25 @@ namespace RhythmRogue.DevTools
             }
             GUILayout.EndScrollView();
             if (GUILayout.Button("Clear all relics")) rs.ActiveRelics.Clear();
+        }
+
+        private void DrawOnboarding()
+        {
+            GUILayout.Space(4);
+            GUILayout.Label("ONBOARDING", _header);
+            GUILayout.Label($"first-launch flag: {(OnboardingState.IsComplete ? "set (won't auto-show)" : "unset (will auto-show)")}");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Reset (force next launch)"))
+            {
+                OnboardingState.Reset();
+                GameLog.Info("[DevCheatPanel] Onboarding flag cleared; next launch will force the onboarding.");
+            }
+            if (GUILayout.Button("Mark seen"))
+            {
+                OnboardingState.MarkComplete();
+                GameLog.Info("[DevCheatPanel] Onboarding flag set.");
+            }
+            GUILayout.EndHorizontal();
         }
     }
 }

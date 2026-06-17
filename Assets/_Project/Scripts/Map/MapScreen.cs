@@ -41,7 +41,11 @@ namespace RhythmRogue.Map
                 return;
             }
 
-            if (_area == null)
+            // A run can request a specific area (e.g. the menu launching the onboarding area via
+            // RunState.SelectedArea); otherwise use this scene's default area.
+            Area area = _runState.SelectedArea != null ? _runState.SelectedArea : _area;
+
+            if (area == null)
             {
                 GameLog.Error("[MapScreen] No Area assigned. Cannot generate map.");
                 return;
@@ -49,7 +53,7 @@ namespace RhythmRogue.Map
 
             // Make the area available to battles this run: DifficultyCurve reads it (together with
             // node depth) to set each fight's difficulty band and HP.
-            _runState.CurrentArea = _area;
+            _runState.CurrentArea = area;
 
             if (!_runState.IsRunActive || _runState.MapData == null)
             {
@@ -65,7 +69,7 @@ namespace RhythmRogue.Map
                 if (ph != null) ph.ResetForNewRun();
 
                 ISeededRandom mapRng = _runState.RunSeed.GetRandom(RandomDomain.Map);
-                _runState.MapData = MapGenerator.Generate(mapRng, _runState.Seed, _area);
+                _runState.MapData = MapGenerator.Generate(mapRng, _runState.Seed, area);
             }
 
             _mapUI.SetRunState(_runState);
@@ -121,7 +125,9 @@ namespace RhythmRogue.Map
         private void StartBattle(MapNode node)
         {
             _runState.SelectedNode = node;
-            _runState.SelectedChart = _defaultChart;
+            // Onboarding nodes carry their own authored chart; normal nodes leave this null so the
+            // procedural pipeline runs.
+            _runState.SelectedChart = node.ChartAsset;
 
             GameLog.Info($"[MapScreen] Battle: {node.EnemyData?.enemyName ?? "Unknown"}");
 

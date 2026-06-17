@@ -54,6 +54,11 @@ namespace RhythmRogue.Core
             _audioSource.clip = clip;
         }
 
+        // The conductor is the battle's beat clock; it has no reason to outlive the battle scene.
+        // Scene-scoped (not DontDestroyOnLoad) so each battle gets a fresh instance instead of a
+        // persistent one that the next scene's placed conductor would collide with.
+        protected override bool Persistent => false;
+
         protected override void Awake()
         {
             base.Awake();

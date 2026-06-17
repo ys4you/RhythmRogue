@@ -56,6 +56,14 @@ namespace RhythmRogue.Util
         }
 
         /// <summary>
+        /// Whether this singleton survives scene loads. Default true: one instance persists for
+        /// the whole game (DontDestroyOnLoad). Override to false for a scene-scoped singleton
+        /// (e.g. a per-battle clock) so each scene gets its own fresh instance and no persistent
+        /// copy lingers for a reloaded scene's placed copy to collide with.
+        /// </summary>
+        protected virtual bool Persistent => true;
+
+        /// <summary>
         /// Called when the instance is created
         /// </summary>
         protected virtual void Awake()
@@ -63,7 +71,7 @@ namespace RhythmRogue.Util
             if (_instance == null)
             {
                 _instance = this as T;
-                DontDestroyOnLoad(gameObject);
+                if (Persistent) DontDestroyOnLoad(gameObject);
             }
             else if (_instance != this)
             {
@@ -85,11 +93,12 @@ namespace RhythmRogue.Util
         /// </summary>
         protected virtual void OnDestroy()
         {
+            // Clear the reference if WE were the live instance, so a scene-scoped singleton can be
+            // re-created cleanly on the next scene. The application-quitting guard is set only by
+            // OnApplicationQuit, never here: setting it on every destroy would wrongly disable the
+            // Instance getter the moment a non-persistent singleton's scene unloads.
             if (_instance == this)
-            {
                 _instance = null;
-                _applicationIsQuitting = true;
-            }
         }
     }
 }

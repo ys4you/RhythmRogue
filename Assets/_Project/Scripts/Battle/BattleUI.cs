@@ -342,6 +342,9 @@ namespace RhythmRogue.Battle
         /// <summary>True while the onboarding lesson overlay is on screen.</summary>
         public bool LessonVisible => _lessonBG != null && _lessonBG.gameObject.activeSelf;
 
+        /// <summary>The guard badge's RectTransform, so the onboarding can point a coach-mark at it.</summary>
+        public RectTransform GuardRect => _guardRect;
+
         /// <summary>Show the onboarding lesson overlay with the given text. No-op if text is empty.</summary>
         public void ShowLesson(string text)
         {

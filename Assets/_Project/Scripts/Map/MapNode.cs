@@ -64,6 +64,11 @@ namespace RhythmRogue.Map
         /// list. The onboarding uses this so the shield node hands the player their first relic.</summary>
         public RelicData RewardRelic { get; set; }
 
+        /// <summary>Optional coach-mark target shown while this node's lesson card is up (onboarding
+        /// paths only). None on normally generated nodes; set by the shaped generator from the
+        /// sequence so the shield/relic lessons can point at the matching HUD element.</summary>
+        public OnboardingHighlight Highlight { get; set; }
+
         public MapNode(int id, int layer, int column, NodeType type)
         {
             Id = id;

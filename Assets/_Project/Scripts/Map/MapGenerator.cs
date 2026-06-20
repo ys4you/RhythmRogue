@@ -129,7 +129,8 @@ namespace RhythmRogue.Map
                     EnemyData = sequence.enemy,
                     TeachingText = lesson != null ? lesson.lesson : null,
                     ChartAsset = lesson != null ? lesson.chart : null,
-                    RewardRelic = lesson != null ? lesson.rewardRelic : null
+                    RewardRelic = lesson != null ? lesson.rewardRelic : null,
+                    Highlight = lesson != null ? lesson.highlight : OnboardingHighlight.None
                 };
 
                 map.Layers.Add(new List<MapNode> { node });

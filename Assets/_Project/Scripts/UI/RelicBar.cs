@@ -40,6 +40,9 @@ namespace RhythmRogue.UI
         private const float IconSize = 56f;
         private const float IconGap = 10f;
 
+        /// <summary>The icon row's RectTransform, so the onboarding can point a coach-mark at the bar.</summary>
+        public RectTransform BarRect => _iconRow;
+
         /// <summary>Create a relic bar bound to the given run state. Call once per HUD scene.</summary>
         public static RelicBar Create(RunState runState)
         {

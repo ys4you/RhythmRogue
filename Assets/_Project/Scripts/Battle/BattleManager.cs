@@ -77,6 +77,8 @@ namespace RhythmRogue.Battle
         private bool _waitingForLesson;
         private bool _practice;
         private float _practiceEndBeat = float.MaxValue;
+        private RhythmRogue.UI.RelicBar _relicBar;
+        private LessonCallout _lessonCallout;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
@@ -154,7 +156,11 @@ namespace RhythmRogue.Battle
             // Relic bar on its own overlay canvas, so held relics stay visible during the fight
             // (and the onboarding's relic lesson has something to point at). Self-contained; shows
             // nothing when the player holds no relics.
-            if (_runState != null) RhythmRogue.UI.RelicBar.Create(_runState);
+            if (_runState != null) _relicBar = RhythmRogue.UI.RelicBar.Create(_runState);
+
+            // Onboarding lane focus (dim + spotlight the next note's lane) is held back for now: on
+            // its own, without the guided "freeze on the first note" step, it read as too much. Add
+            // LaneFocus to _highway here (practice-only) when that step lands to bring it back.
 
             _fsm.Start(BattlePhase.Intro);
         }
@@ -279,9 +285,22 @@ namespace RhythmRogue.Battle
                     // If this node carries a lesson (onboarding), show it now and wait for a key
                     // before counting down. The song hasn't started and no notes move during Intro,
                     // so the player reads it with the fight frozen behind.
-                    _waitingForLesson = _battleUI != null && !string.IsNullOrWhiteSpace(_lessonText);
+                    // A lesson that teaches a specific HUD element (shield, relics) uses a coach-mark
+                    // that dims the screen and spotlights that element; the rest use the plain card.
+                    _waitingForLesson = !string.IsNullOrWhiteSpace(_lessonText);
                     if (_waitingForLesson)
-                        _battleUI.ShowLesson(_lessonText);
+                    {
+                        RectTransform highlightTarget = ResolveHighlightTarget();
+                        if (highlightTarget != null)
+                        {
+                            if (_lessonCallout == null) _lessonCallout = LessonCallout.Create();
+                            _lessonCallout.Show(_lessonText, highlightTarget);
+                        }
+                        else if (_battleUI != null)
+                        {
+                            _battleUI.ShowLesson(_lessonText);
+                        }
+                    }
 
                     string eliteTag = _isElite ? " [ELITE]" : "";
                     GameLog.Info($"[BattleManager] INTRO{eliteTag} - {_currentEnemy.enemyName} appears!");
@@ -293,6 +312,7 @@ namespace RhythmRogue.Battle
                         if (!AnyAdvancePressedThisFrame()) return;
                         _waitingForLesson = false;
                         if (_battleUI != null) _battleUI.HideLesson();
+                        if (_lessonCallout != null) _lessonCallout.Hide();
                         _phaseTimer = _introDelay; // let the reveal beat + note runway play after dismissing
                         return;
                     }
@@ -399,6 +419,20 @@ namespace RhythmRogue.Battle
 #else
             return Input.anyKeyDown;
 #endif
+        }
+
+        // Map the current node's onboarding highlight to the HUD element a coach-mark should point
+        // at, or null for a plain lesson. The guard badge lives on the battle HUD; the relic bar is
+        // its own overlay created in Start.
+        private RectTransform ResolveHighlightTarget()
+        {
+            OnboardingHighlight h = _runState?.SelectedNode?.Highlight ?? OnboardingHighlight.None;
+            return h switch
+            {
+                OnboardingHighlight.Shield => _battleUI != null ? _battleUI.GuardRect : null,
+                OnboardingHighlight.Relics => _relicBar != null ? _relicBar.BarRect : null,
+                _ => null
+            };
         }
 
         private void PauseBattle()

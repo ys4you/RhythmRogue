@@ -3,6 +3,18 @@ using UnityEngine;
 namespace RhythmRogue.Data
 {
     /// <summary>
+    /// Which on-screen element a lesson should point at with a coach-mark. None shows the plain
+    /// teaching card; the others dim the screen and spotlight that HUD element while the card is on
+    /// screen, so the player is shown where to look, not just told.
+    /// </summary>
+    public enum OnboardingHighlight
+    {
+        None,
+        Shield,
+        Relics
+    }
+
+    /// <summary>
     /// A hand-authored, linear teaching path: the onboarding. Unlike a normal <see cref="Area"/>,
     /// which builds a branching procedural map from enemy pools, a sequence is a fixed straight
     /// line of lesson nodes. One enemy (so one song) is shared across every fight, each node has
@@ -52,6 +64,11 @@ namespace RhythmRogue.Data
             [Tooltip("Optional relic granted when this node is cleared. Most nodes leave this empty; " +
                      "the onboarding hands one out after the shield lesson so the next node explains it.")]
             public RelicData rewardRelic;
+
+            [Tooltip("Point this lesson at an on-screen element with a coach-mark (dim + spotlight + " +
+                     "ring) while the card is up. Set the shield lesson to Shield and the relic lesson " +
+                     "to Relics; leave the rest None.")]
+            public OnboardingHighlight highlight = OnboardingHighlight.None;
         }
     }
 }

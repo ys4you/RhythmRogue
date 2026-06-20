@@ -70,12 +70,18 @@ namespace RhythmRogue.Core
             return result;
         }
 
-        public static string GetBindingDisplayString(int lane, int bindingIndex)
+        public static string GetBindingDisplayString(int lane, int bindingIndex, bool shortNames = false)
         {
             if (!IsValidLane(lane)) return "???";
             var action = _laneActions[lane];
             if (bindingIndex < 0 || bindingIndex >= action.bindings.Count) return "???";
-            return action.GetBindingDisplayString(bindingIndex, InputBinding.DisplayStringOptions.DontUseShortDisplayNames);
+            // shortNames uses the control's short display name where it has one, so an arrow key reads
+            // as the glyph the player presses rather than the word "Left/Down/Up/Right" (which looks
+            // like a lane name). Settings keeps the long form by default for clarity.
+            var options = shortNames
+                ? default(InputBinding.DisplayStringOptions)
+                : InputBinding.DisplayStringOptions.DontUseShortDisplayNames;
+            return action.GetBindingDisplayString(bindingIndex, options);
         }
 
         public static string GetEffectivePath(int lane, int bindingIndex)

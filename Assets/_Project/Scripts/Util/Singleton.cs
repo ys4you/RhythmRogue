@@ -3,6 +3,23 @@ using UnityEngine;
 namespace RhythmRogue.Util
 {
     /// <summary>
+    /// Process-wide "is the application shutting down" flag for singletons. Kept OFF the generic
+    /// Singleton&lt;T&gt; so it can be reset by a RuntimeInitializeOnLoadMethod: that attribute
+    /// cannot live on an open generic type (Unity cannot invoke it and throws "containing type is
+    /// not fully instantiated" once per closed singleton at startup, which is what spammed the
+    /// player log). A single global flag is also more correct than one per T, since quitting is
+    /// process-wide. The per-T instance itself needs no reset: a destroyed instance compares
+    /// == null (Unity-null), so the getter recreates it on the next play session.
+    /// </summary>
+    internal static class SingletonState
+    {
+        public static bool ApplicationIsQuitting;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void Reset() => ApplicationIsQuitting = false;
+    }
+
+    /// <summary>
     /// Generic singleton base class for MonoBehaviours.
     /// Inherit from this to make any class a singleton.
     /// Example: public class MyManager : Singleton<MyManager>
@@ -11,14 +28,6 @@ namespace RhythmRogue.Util
     {
         private static T _instance;
         private static readonly object _lock = new object();
-        private static bool _applicationIsQuitting = false;
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics()
-        {
-            _instance = null;
-            _applicationIsQuitting = false;
-        }
 
         /// <summary>
         /// Access singleton instance
@@ -27,7 +36,7 @@ namespace RhythmRogue.Util
         {
             get
             {
-                if (_applicationIsQuitting)
+                if (SingletonState.ApplicationIsQuitting)
                 {
                     GameLog.Warn($"[Singleton] Instance of {typeof(T)} already destroyed. Returning null.");
                     return null;
@@ -85,7 +94,7 @@ namespace RhythmRogue.Util
         /// </summary>
         protected virtual void OnApplicationQuit()
         {
-            _applicationIsQuitting = true;
+            SingletonState.ApplicationIsQuitting = true;
         }
 
         /// <summary>

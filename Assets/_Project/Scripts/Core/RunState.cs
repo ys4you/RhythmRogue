@@ -39,7 +39,8 @@ namespace RhythmRogue.Core
 
         /// <summary>Optional area chosen at run start (e.g. the menu launching the onboarding
         /// area). When set, MapScreen builds the map from this instead of its own serialized
-        /// default. Null for a normal run. Set by the launcher before StartNewRun.</summary>
+        /// default. Null for a normal run. Set by the launcher before StartNewRun; cleared by
+        /// EndRun so the next run (e.g. New Run from the summary) returns to the default area.</summary>
         [System.NonSerialized] public Area SelectedArea;
 
         /// <summary>Run-level forgiveness tier (chosen at run start). Defaults to Normal.</summary>
@@ -120,6 +121,12 @@ namespace RhythmRogue.Core
         {
             WasVictory = victory;
             IsRunActive = false;
+            // Drop any area override now the run is over, so the next StartNewRun (New Run / Retry
+            // from the summary) uses the default area instead of silently relaunching the onboarding.
+            // Cleared here, at run end, rather than in StartNewRun: MapScreen re-runs StartNewRun on
+            // first entry, and clearing there would wipe the override mid-run (every later map
+            // re-entry would fall back to the default area and lose practice mode).
+            SelectedArea = null;
             GameLog.Info($"[RunState] Run ended: {(victory ? "VICTORY" : "DEFEAT")} Battles:{BattlesWon} Score:{TotalScore} Currency:{Currency}");
         }
 

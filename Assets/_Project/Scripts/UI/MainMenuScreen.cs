@@ -24,10 +24,11 @@ namespace RhythmRogue.UI
         [Tooltip("The onboarding area launched by the How to Play button: a short, gentle, single-" +
                  "file path that teaches the basics. Leave unassigned and the button is hidden.")]
         [SerializeField] private Area _onboardingArea;
-        [Tooltip("If on, a brand-new player (who has never seen the onboarding) is routed straight " +
-                 "into it on first launch. Skippable: they can pause and quit back here, and the flag " +
-                 "is set the moment they are routed in, so it only forces once. Needs onboardingArea " +
-                 "assigned. Turn off to disable the auto-route entirely.")]
+        [Tooltip("If on, a brand-new player (who has never seen the onboarding) is sent into it the " +
+                 "first time they click New Run, instead of straight into a normal run. Skippable: " +
+                 "they can pause and quit back to the menu, and the flag is set the moment they are " +
+                 "routed in, so it only forces once. Needs onboardingArea assigned. Turn off to " +
+                 "disable the gate entirely.")]
         [SerializeField] private bool _forceOnboardingOnFirstLaunch = true;
         [Header("Version")]
         [SerializeField] private string _versionText = "Prototype v0.1";
@@ -53,20 +54,6 @@ namespace RhythmRogue.UI
         {
             if (_rhythmActions != null) KeybindManager.Initialize(_rhythmActions);
             DisplaySettings.ApplyAll();
-
-            // First-launch onboarding: route a brand-new player straight into the tutorial once.
-            // The flag is set here, at the moment of routing, so leaving early (pause -> quit) still
-            // counts as forced-once and they get a normal menu next time. How to Play stays the way
-            // to replay it. Skippable, never a lock. Keybinds + display are already applied above so
-            // the battle the player lands in behaves correctly.
-            if (_forceOnboardingOnFirstLaunch && _onboardingArea != null && !OnboardingState.IsComplete)
-            {
-                OnboardingState.MarkComplete();
-                GameLog.Info("[MainMenu] First launch detected; routing into onboarding.");
-                StartRun(null, _onboardingArea);
-                return;
-            }
-
             MusicManager.Instance.Play(MusicTrack.MenuDrone);
             CreateUI();
             SetupNavigation();
@@ -116,13 +103,33 @@ namespace RhythmRogue.UI
             _settings.OnCloseRequested += OnSettingsClosed;
         }
 
-        private void OnNewRun() => StartRun(null, null);
+        // New Run doubles as the first-timer gate: a player who has never seen the onboarding is
+        // sent there once instead of straight into a normal run. The flag is set at the moment of
+        // routing, so leaving early (pause -> quit back to the menu) still counts and the next
+        // New Run is a normal run. Skippable, never a lock. How to Play remains the manual replay.
+        private void OnNewRun()
+        {
+            if (_forceOnboardingOnFirstLaunch && _onboardingArea != null && !OnboardingState.IsComplete)
+            {
+                OnboardingState.MarkComplete();
+                GameLog.Info("[MainMenu] First New Run: routing into onboarding.");
+                StartRun(null, _onboardingArea);
+                return;
+            }
+            StartRun(null, null);
+        }
         private void OnSeededRun()
         {
             string seed = _seedInput != null ? _seedInput.text.Trim() : "";
             StartRun(string.IsNullOrEmpty(seed) ? null : seed, null);
         }
-        private void OnHowToPlay() => StartRun(null, _onboardingArea);
+        // Manual replay of the onboarding. Also marks it seen, so a first-timer who comes here
+        // instead of New Run is not forced into it again on their next New Run.
+        private void OnHowToPlay()
+        {
+            OnboardingState.MarkComplete();
+            StartRun(null, _onboardingArea);
+        }
 
         private void StartRun(string seed, Area area)
         {
@@ -130,6 +137,7 @@ namespace RhythmRogue.UI
             if (SceneTransitionManager.Instance != null && SceneTransitionManager.Instance.IsTransitioning) return;
             _runState.Tier = _selectedTier;
             // null = use the map scene's default area; set = launch that area (e.g. onboarding).
+            // Cleared by EndRun when the previous run finished, so a normal New Run starts clean.
             _runState.SelectedArea = area;
             _runState.StartNewRun(seed);
             var ph = PlayerHealth.Instance; if (ph != null) ph.ResetForNewRun();

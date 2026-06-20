@@ -7,13 +7,14 @@
     "notes": [
         { "beat": 4.06,  "lane": 0, "type": "tap" },
         { "beat": 4.56,  "lane": 0, "type": "tap" },
-        { "beat": 5.29,  "lane": 0, "type": "tap" },
-        { "beat": 6.78,  "lane": 0, "type": "tap" },
-        { "beat": 8.01,  "lane": 1, "type": "tap" },
-        { "beat": 10.0,  "lane": 0, "type": "tap" },
-        { "beat": 11.99, "lane": 1, "type": "tap" },
+        { "beat": 5.29,  "lane": 1, "type": "tap" },
+        { "beat": 6.78,  "lane": 2, "type": "tap" },
+        { "beat": 8.01,  "lane": 3, "type": "tap" },
+
+        { "beat": 10.0,  "lane": 1, "type": "tap" },
+        { "beat": 11.99, "lane": 2, "type": "tap" },
         { "beat": 14.44, "lane": 0, "type": "tap" },
-        { "beat": 16.93, "lane": 1, "type": "tap" },
-        { "beat": 18.93, "lane": 0, "type": "tap" }
+        { "beat": 16.93, "lane": 3, "type": "tap" },
+        { "beat": 18.93, "lane": 2, "type": "tap" }
     ]
 }

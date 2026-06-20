@@ -75,7 +75,14 @@ namespace RhythmRogue.Battle
 
                 _runState.CompleteSelectedNode();
 
-                if (wasBoss) { _runState.EndRun(true); GoTo("SummaryScene"); }
+                if (wasBoss)
+                {
+                    _runState.EndRun(true);
+                    // The onboarding finale is a tutorial, not a scored run: skip the run-summary
+                    // ("you conquered the dungeon") and drop the player at the main menu, ready to
+                    // start a real run. Normal boss wins still show the summary.
+                    GoTo(practice ? SceneTransitionManager.MAIN_MENU_SCENE : "SummaryScene");
+                }
                 // Onboarding (practice) skips the reward pick so the node reward above is the only
                 // relic source; go straight back to the map.
                 else if (practice) GoTo(SceneTransitionManager.MAP_SCENE);

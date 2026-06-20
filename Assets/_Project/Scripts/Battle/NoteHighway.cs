@@ -36,7 +36,13 @@ namespace RhythmRogue.Battle
             ? (_missWindowMs / 1000f) / _conductor.SecPerBeat
             : 0f;
 
-        protected override void Awake() => base.Awake();
+        protected override void Awake()
+        {
+            base.Awake();
+            // Ensure the per-lane key labels exist without requiring scene wiring. The label logic
+            // lives in its own component (SRP); the highway only guarantees its presence.
+            if (GetComponent<LaneKeyLabels>() == null) gameObject.AddComponent<LaneKeyLabels>();
+        }
         protected override string GetReceptorPrefix() => "Receptor";
 
         private void Update()

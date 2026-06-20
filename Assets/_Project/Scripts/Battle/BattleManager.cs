@@ -79,6 +79,7 @@ namespace RhythmRogue.Battle
         private float _practiceEndBeat = float.MaxValue;
         private RhythmRogue.UI.RelicBar _relicBar;
         private LessonCallout _lessonCallout;
+        private bool _completeFired;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
@@ -523,6 +524,11 @@ namespace RhythmRogue.Battle
 
         private void OnBattleComplete()
         {
+            // Won/Lost run their end countdown in Update, so this is reached every frame once the
+            // timer hits zero (until the scene actually changes). Fire completion exactly once.
+            if (_completeFired) return;
+            _completeFired = true;
+
             if (_enemyHealth.Health != null) _enemyHealth.Health.OnDeath -= OnEnemyDied;
             _playerHealth.Health.OnDeath -= OnPlayerDied;
             GameLog.Info("[BattleManager] Battle complete - ready for scene transition.");

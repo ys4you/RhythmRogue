@@ -22,9 +22,8 @@ namespace RhythmRogue.Battle
     [RequireComponent(typeof(NoteHighway))]
     public class LaneKeyLabels : MonoBehaviour
     {
-        [Tooltip("Hide the labels. They help every early player, not just the onboarding, so they " +
-                 "are on by default. Bind this to a player setting later, or gate it to practice " +
-                 "mode, if you want to limit when it shows.")]
+        [Tooltip("Hide the labels. The battle shows these only in practice (onboarding) and hides " +
+                 "them in a normal run; this is the manual override for testing.")]
         [SerializeField] private bool _hidden;
         [Tooltip("World-unit gap from the receptor to the label, on the side away from incoming notes.")]
         [SerializeField] private float _gap = 0.7f;
@@ -92,6 +91,10 @@ namespace RhythmRogue.Battle
                     : "?";
             }
         }
+
+        /// <summary>Show or hide the labels. The battle gates these to practice (onboarding) only,
+        /// since a returning player does not need per-lane key reminders during a real run.</summary>
+        public void SetHidden(bool hidden) => _hidden = hidden;
 
         private void LateUpdate()
         {

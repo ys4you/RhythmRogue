@@ -164,6 +164,11 @@ namespace RhythmRogue.Battle
             // its own, without the guided "freeze on the first note" step, it read as too much. Add
             // LaneFocus to _highway here (practice-only) when that step lands to bring it back.
 
+            // Lane key labels are tutorial scaffolding: show them in practice (onboarding) only and
+            // hide them in a normal run, where a returning player does not need per-lane reminders.
+            if (_highway != null)
+                _highway.GetComponent<LaneKeyLabels>()?.SetHidden(!_practice);
+
             _fsm.Start(BattlePhase.Intro);
         }
 

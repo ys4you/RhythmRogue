@@ -86,6 +86,7 @@ namespace RhythmRogue.Battle
         public EnemyData CurrentEnemy => _currentEnemy;
         public bool IsElite => _isElite;
         public bool IsBoss => _isBoss;
+        public bool IsPractice => _practice;
         public event System.Action<bool> OnBattleCompleted;
 
         private void Awake()

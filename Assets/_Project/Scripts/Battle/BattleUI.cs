@@ -100,7 +100,14 @@ namespace RhythmRogue.Battle
             SetGuardVisual(_damagePipeline == null || _damagePipeline.GuardUp, animate: false);
 
             var enemyData = _battleManager?.CurrentEnemy ?? _fallbackEnemyData;
-            if (enemyData != null)
+            if (_battleManager != null && _battleManager.IsPractice)
+            {
+                // Onboarding: the enemy is a teaching dummy, so its name is noise and it sits in the
+                // same top-center spot as the relic bar. Hide the name and boss label there.
+                if (_enemyNameText != null) _enemyNameText.gameObject.SetActive(false);
+                if (_bossLabel != null) _bossLabel.gameObject.SetActive(false);
+            }
+            else if (enemyData != null)
             {
                 _enemyNameText.text = enemyData.enemyName;
                 if (enemyData.IsBoss) { _bossLabel.text = "BOSS"; _bossLabel.gameObject.SetActive(true); _enemyNameText.color = UIHelpers.RustOrange; }

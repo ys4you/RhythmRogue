@@ -80,6 +80,8 @@ namespace RhythmRogue.Battle
         private RhythmRogue.UI.RelicBar _relicBar;
         private LessonCallout _lessonCallout;
         private bool _completeFired;
+        private EnemyModifierRunner _modifiers;
+        private BattleContext _modifierContext;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
@@ -221,7 +223,14 @@ namespace RhythmRogue.Battle
             _playerHealth.Health.OnDeath += OnPlayerDied;
 
             if (_enemyRenderer != null && _currentEnemy.sprite != null)
+            {
                 _enemyRenderer.sprite = _currentEnemy.sprite;
+
+                // Make the enemy bob on the beat so the scene feels alive instead of a static sprite
+                // over a note highway. Auto-added so there is no scene wiring; purely visual.
+                if (_enemyRenderer.GetComponent<BeatBob>() == null)
+                    _enemyRenderer.gameObject.AddComponent<BeatBob>();
+            }
 
             if (_chart.IsLegacy)
             {
@@ -262,6 +271,18 @@ namespace RhythmRogue.Battle
             if (mods.HasAnyEffect)
                 GameLog.Info($"[BattleManager] Relic modifiers active: {mods}");
 
+            // Enemy modifiers (counter-attack, last stand, ...). Clone the enemy's authored list for
+            // this fight and start them. The runner drives their hooks at each point below; the
+            // context is the only surface they touch. Built only when the enemy actually has any,
+            // so a plain fight carries zero overhead.
+            _modifiers = new EnemyModifierRunner(_currentEnemy.modifiers);
+            if (_modifiers.HasAny)
+            {
+                _modifierContext = new BattleContext(
+                    _conductor, _enemyHealth, _enemyHighway, _playerHealth, _difficulty, GetModifierRng(), _isBoss);
+                _modifiers.BattleStart(_modifierContext);
+            }
+
             string eliteTag = _isElite ? " [ELITE]" : "";
             if (_chart.IsLegacy)
                 GameLog.Info($"[BattleManager] Initialized (legacy){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM");
@@ -276,6 +297,17 @@ namespace RhythmRogue.Battle
 
             GameLog.Warn("[BattleManager] No RunSeed available, using fallback seed 42.");
             return new SeededRandom(42);
+        }
+
+        // A deterministic random stream for enemy modifiers, kept separate from the chart stream so
+        // the two never draw from the same sequence (which would make either depend on the other).
+        // Same seed and node reproduce the same modifier behaviour. The sub-id is the node id mixed
+        // with a constant so it cannot collide with the chart stream's node-id sub-id.
+        private ISeededRandom GetModifierRng()
+        {
+            if (_runState?.RunSeed != null)
+                return _runState.RunSeed.GetRandom(RandomDomain.Charts, (_runState.SelectedNode?.Id ?? 0) ^ 0x4D4F44);
+            return new SeededRandom(1337);
         }
 
         private void SetupFSM()
@@ -343,6 +375,10 @@ namespace RhythmRogue.Battle
                 },
                 update: () =>
                 {
+                    // Drive enemy modifiers each frame while the song plays (counter-attack
+                    // scheduling, etc.). No-op when the enemy has none.
+                    if (_modifierContext != null) _modifiers.Update(_modifierContext);
+
                     // Practice mode auto-wins shortly after the last note so the fight always ends
                     // in victory without waiting out the rest of the song.
                     if (_practice && _conductor.IsPlaying &&
@@ -359,6 +395,7 @@ namespace RhythmRogue.Battle
                     _highway.ClearAllNotes();
                     _holdTracker.ClearAll();
                     if (_enemyHighway != null) _enemyHighway.Clear();
+                    if (_modifierContext != null) _modifiers.BattleEnd(_modifierContext);
                 }
             ));
 
@@ -471,6 +508,9 @@ namespace RhythmRogue.Battle
         private void OnEnemyDied()
         {
             if (_battleEnded) return;
+            // Give modifiers (e.g. a last stand) the chance to refuse this death and keep the enemy
+            // alive. If one consumes it, the fight continues instead of ending.
+            if (_modifierContext != null && _modifiers.NotifyEnemyWouldDie(_modifierContext)) return;
             LogKillTiming();
             EndBattle(true);
         }
@@ -544,6 +584,7 @@ namespace RhythmRogue.Battle
         {
             if (_enemyHealth != null && _enemyHealth.Health != null) _enemyHealth.Health.OnDeath -= OnEnemyDied;
             if (_playerHealth != null && _playerHealth.Health != null) _playerHealth.Health.OnDeath -= OnPlayerDied;
+            _modifiers?.Dispose();
         }
     }
 }

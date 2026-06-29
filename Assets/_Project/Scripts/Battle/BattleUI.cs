@@ -391,18 +391,30 @@ namespace RhythmRogue.Battle
             _bossLabel.fontStyle = FontStyle.Bold;
             _bossLabel.gameObject.SetActive(false);
 
+            // Enemy HP bar: the fight's main progress readout, so it is deliberately the largest,
+            // brightest bar on screen and the second thing the eye catches after the notes. A gold
+            // frame panel sits behind it (created first so it renders underneath) to make it pop,
+            // and it sits below the name so the two never overlap.
+            const float enemyBarW = 780f, enemyBarH = 48f, enemyBarY = -110f, framePad = 4f;
+            CreatePanel(canvasRT, "EnemyHP_Frame",
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0, enemyBarY + framePad), new Vector2(enemyBarW + framePad * 2f, enemyBarH + framePad * 2f),
+                UIHelpers.WarmGold);
+
             _enemyHPBarWidth = CreateHPBar(canvasRT, "EnemyHP",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -95), new Vector2(600, 30),
+                new Vector2(0, enemyBarY), new Vector2(enemyBarW, enemyBarH),
                 UIHelpers.RustOrange, out _enemyHPFill, out _enemyHPFillRT);
 
-            // Absolute HP number centered on the enemy bar, mirroring the player's "100/100"
-            // readout. With flat authored HP this is a real, legible value (not a percentage),
-            // so the player can see exactly how close the enemy is to dead.
+            // Absolute HP number centered on the bar (a real value, not a percent), bigger and bold
+            // with a dark outline so it stays legible against the fill. Mirrors the player readout.
             _enemyHPText = CreateText(canvasRT, "EnemyHPText", "",
                 new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
-                new Vector2(0, -95), new Vector2(600, 30), 20, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+                new Vector2(0, enemyBarY), new Vector2(enemyBarW, enemyBarH), 30, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
             _enemyHPText.fontStyle = FontStyle.Bold;
+            var enemyHPOutline = _enemyHPText.gameObject.AddComponent<Outline>();
+            enemyHPOutline.effectColor = new Color(UIHelpers.BgDeep.r, UIHelpers.BgDeep.g, UIHelpers.BgDeep.b, 0.9f);
+            enemyHPOutline.effectDistance = new Vector2(2f, -2f);
 
             // Player HP (bottom-left, inset from CRT bezel)
             _playerHPText = CreateText(canvasRT, "PlayerHPText", "100/100",

@@ -9,17 +9,16 @@ namespace RhythmRogue.Battle
     /// externally on the beat (see <see cref="BeatStep"/>); sing/miss clips advance at their own
     /// fps in Update and hold the last frame when they end.
     ///
-    /// Two setups: a full <see cref="CharacterVisualConfig"/> (the player), or a single sprite posed
-    /// by offsets (the enemy reusing its own sprite). Either way the frames drive the same
-    /// SpriteRenderer, and pose offsets are relative to the visual transform's starting position and
-    /// scale, so attaching straight onto an already-placed, already-scaled renderer works.
+    /// Clips come from an <see cref="ICharacterVisual"/> (the authored CharacterVisualConfig for the
+    /// player, or a RuntimeCharacterVisual posing one sprite for the enemy), so the same animator
+    /// drives any performer. Pose offsets are relative to the visual transform's starting position
+    /// and scale, so attaching straight onto an already-placed, already-scaled renderer works.
     /// </summary>
     public class CharacterAnimator : MonoBehaviour
     {
-        private CharacterVisualConfig _config;   // null in single-sprite mode
-        private Sprite _singleSprite;            // used when _config is null
+        private ICharacterVisual _source;
         private bool _flip;
-        private float _configScale;
+        private float _designScale;
 
         private SpriteRenderer _renderer;
         private Transform _visual;
@@ -31,34 +30,17 @@ namespace RhythmRogue.Battle
         private int _frameIndex;
         private float _frameTimer;
 
-        /// <summary>Full-config setup (authored clips, or the placeholder when a state is empty).</summary>
-        public void Initialize(CharacterVisualConfig config, SpriteRenderer spriteRenderer, Transform visual)
+        /// <summary>Wire the animator to a visual source. Call once from the factory.</summary>
+        public void Initialize(ICharacterVisual source, SpriteRenderer spriteRenderer, Transform visual)
         {
-            _config = config;
-            _singleSprite = null;
-            _flip = config != null && config.flip;
-            _configScale = config != null ? config.baseScale : 1f;
-            CaptureBase(spriteRenderer, visual);
-            SetState(CharacterState.Idle, force: true);
-        }
-
-        /// <summary>Single-sprite setup: pose one sprite by offsets, no config asset needed.</summary>
-        public void Initialize(Sprite baseSprite, float baseScale, bool flip, SpriteRenderer spriteRenderer, Transform visual)
-        {
-            _config = null;
-            _singleSprite = baseSprite;
-            _flip = flip;
-            _configScale = baseScale > 0f ? baseScale : 1f;
-            CaptureBase(spriteRenderer, visual);
-            SetState(CharacterState.Idle, force: true);
-        }
-
-        private void CaptureBase(SpriteRenderer spriteRenderer, Transform visual)
-        {
+            _source = source;
+            _flip = source != null && source.Flip;
+            _designScale = source != null ? source.BaseScale : 1f;
             _renderer = spriteRenderer;
             _visual = visual;
             _baseLocalPos = visual != null ? visual.localPosition : Vector3.zero;
             _baseVisualScale = visual != null ? visual.localScale : Vector3.one;
+            SetState(CharacterState.Idle, force: true);
         }
 
         /// <summary>
@@ -78,9 +60,8 @@ namespace RhythmRogue.Battle
 
         private CharacterClip ResolveClip(CharacterState state)
         {
-            if (_config != null) return _config.GetClip(state);
-            Sprite s = _singleSprite != null ? _singleSprite : PlaceholderCharacterArt.PlaceholderSprite;
-            return PlaceholderCharacterArt.PoseClip(s, state);
+            if (_source != null) return _source.GetClip(state);
+            return SpritePoser.GetClip(PlaceholderCharacterArt.PlaceholderSprite, state);
         }
 
         /// <summary>Advance the idle bop one step. Called on each Conductor beat by the performer.</summary>
@@ -128,7 +109,7 @@ namespace RhythmRogue.Battle
 
             float scale = f.scale > 0f ? f.scale : 1f;
             _visual.localPosition = _baseLocalPos + new Vector3(f.offset.x, f.offset.y, 0f);
-            _visual.localScale = _baseVisualScale * (_configScale * scale);
+            _visual.localScale = _baseVisualScale * (_designScale * scale);
             _renderer.flipX = _flip ^ f.flipX;
         }
     }

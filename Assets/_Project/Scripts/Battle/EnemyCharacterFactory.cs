@@ -1,18 +1,26 @@
 using UnityEngine;
 using RhythmRogue.Core;
+using RhythmRogue.Data;
 using RhythmRogue.Util;
 
 namespace RhythmRogue.Battle
 {
     /// <summary>
     /// Puts an existing enemy sprite renderer onto the shared character system in place: attaches a
-    /// CharacterAnimator that poses the enemy's own sprite (idle bob plus directional sing) and an
-    /// EnemyCharacter that drives it from the enemy note stream. No new GameObject and no new art,
-    /// so it slots onto the scene's enemy renderer exactly where BeatBob used to sit.
+    /// CharacterAnimator (driven by an ICharacterVisual) and an EnemyCharacter that sings from the
+    /// enemy note stream. The visual overlays the enemy's optional authored Character Visual on top
+    /// of its own sprite: drawn poses use the config, undrawn ones pose the sprite, so a partial or
+    /// empty config never blanks the enemy. No new GameObject: it slots onto the scene's enemy
+    /// renderer where BeatBob used to sit.
     /// </summary>
     public static class EnemyCharacterFactory
     {
-        public static EnemyCharacter Attach(SpriteRenderer enemyRenderer, Sprite sprite, Conductor conductor, EnemyHighway highway)
+        public static EnemyCharacter Attach(
+            SpriteRenderer enemyRenderer,
+            Sprite sprite,
+            CharacterVisualConfig visual,
+            Conductor conductor,
+            EnemyHighway highway)
         {
             if (enemyRenderer == null)
             {
@@ -21,13 +29,17 @@ namespace RhythmRogue.Battle
             }
 
             Sprite baseSprite = sprite != null ? sprite : enemyRenderer.sprite;
+
+            // Overlay any authored config onto the enemy's own sprite. The animator poses the
+            // renderer's own transform in place, so offsets are relative to the enemy's authored
+            // position and scale (no reparent, no second sprite).
+            ICharacterVisual source = new RuntimeCharacterVisual(baseSprite, visual);
+
             GameObject go = enemyRenderer.gameObject;
 
-            // The animator poses the renderer's own transform in place, so its offsets are relative
-            // to the enemy's authored position and scale (no reparenting, no double sprite).
             var animator = go.GetComponent<CharacterAnimator>();
             if (animator == null) animator = go.AddComponent<CharacterAnimator>();
-            animator.Initialize(baseSprite, 1f, false, enemyRenderer, enemyRenderer.transform);
+            animator.Initialize(source, enemyRenderer, enemyRenderer.transform);
 
             var enemy = go.GetComponent<EnemyCharacter>();
             if (enemy == null) enemy = go.AddComponent<EnemyCharacter>();

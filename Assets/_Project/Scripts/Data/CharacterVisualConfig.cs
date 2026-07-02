@@ -88,20 +88,36 @@ namespace RhythmRogue.Data
         public int SortingOrder => sortingOrder;
         public bool Flip => flip;
 
+        /// <summary>True if any state has authored frames. When false, a character should pose its
+        /// single sprite (bob + lean) instead of showing the white-square placeholder.</summary>
+        public bool HasAnyClips
+        {
+            get
+            {
+                if (clips == null) return false;
+                for (int i = 0; i < clips.Length; i++)
+                    if (clips[i] != null && clips[i].HasFrames) return true;
+                return false;
+            }
+        }
+
+        /// <summary>The authored clip for a state, or null if none is drawn (no placeholder
+        /// fallback). Lets a caller pose its own sprite for the states left undrawn.</summary>
+        public CharacterClip GetAuthoredClip(CharacterState state)
+        {
+            if (clips == null) return null;
+            for (int i = 0; i < clips.Length; i++)
+                if (clips[i] != null && clips[i].state == state && clips[i].HasFrames)
+                    return clips[i];
+            return null;
+        }
+
         /// <summary>
         /// The clip for a state: the authored one if present and non-empty, else a generated
         /// placeholder clip built from the shared placeholder sprite.
         /// </summary>
-        public CharacterClip GetClip(CharacterState state)
-        {
-            if (clips != null)
-            {
-                for (int i = 0; i < clips.Length; i++)
-                    if (clips[i] != null && clips[i].state == state && clips[i].HasFrames)
-                        return clips[i];
-            }
-            return PlaceholderCharacterArt.GetClip(state);
-        }
+        public CharacterClip GetClip(CharacterState state) =>
+            GetAuthoredClip(state) ?? PlaceholderCharacterArt.GetClip(state);
 
         /// <summary>
         /// Sprite used by the map marker: the first frame of the idle clip if authored, else the

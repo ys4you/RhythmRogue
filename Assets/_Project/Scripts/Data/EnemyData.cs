@@ -68,6 +68,12 @@ namespace RhythmRogue.Data
         [Header("Visuals")]
         public Sprite sprite;
 
+        [Tooltip("Optional directional character art (idle + per-lane sing poses). Leave null and the " +
+                 "enemy poses the single sprite above (bob + lean, no extra art). Assign a Character " +
+                 "Visual to give this enemy real directional frames; any pose you have not drawn yet " +
+                 "falls back to posing the sprite above, so a partial config is safe.")]
+        public CharacterVisualConfig visual;
+
         [Header("Modifiers")]
         public List<EnemyModifier> modifiers = new();
 

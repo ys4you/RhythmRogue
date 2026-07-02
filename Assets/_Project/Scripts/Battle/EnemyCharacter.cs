@@ -12,8 +12,9 @@ namespace RhythmRogue.Battle
     /// </summary>
     public class EnemyCharacter : PerformerCharacter
     {
-        // How long a sung pose holds after an enemy note lands before easing back to idle. Short,
-        // so dense passages stay expressive while sparse ones return to the bop between notes.
+        // Minimum time a sung pose holds after an enemy note lands before easing back to idle.
+        // Taps use this short floor so dense passages stay expressive; holds (sliders) override it
+        // with their own sustain length so the pose stays up for the whole note.
         private const float SingHoldSeconds = 0.18f;
 
         private EnemyHighway _highway;
@@ -32,10 +33,12 @@ namespace RhythmRogue.Battle
             }
         }
 
-        private void OnAutoHit(int lane)
+        private void OnAutoHit(int lane, float holdSeconds)
         {
             Animator?.SetState(LaneToState(lane));
-            _singHoldRemaining = SingHoldSeconds;
+            // Hold the pose for the length of a sustain (slider); taps pass 0 and fall back to
+            // the short ease. Fixes the pose snapping back to idle partway through a hold.
+            _singHoldRemaining = Mathf.Max(SingHoldSeconds, holdSeconds);
         }
 
         private void Update()

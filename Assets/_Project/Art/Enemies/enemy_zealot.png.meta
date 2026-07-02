@@ -5,6 +5,15 @@ TextureImporter:
   - first:
       213: 5005364897110879276
     second: enemy_zealot_0
+  - first:
+      213: -3506998171405433785
+    second: enemy_zealot_1
+  - first:
+      213: 8499256801049701312
+    second: enemy_zealot_2
+  - first:
+      213: 2639124878796275731
+    second: enemy_zealot_3
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -46,7 +55,7 @@ TextureImporter:
   nPOTScale: 0
   lightmap: 0
   compressionQuality: 50
-  spriteMode: 1
+  spriteMode: 2
   spriteExtrude: 1
   spriteMeshType: 1
   alignment: 0
@@ -103,9 +112,9 @@ TextureImporter:
       name: enemy_zealot_0
       rect:
         serializedVersion: 2
-        x: 1
+        x: 5
         y: 0
-        width: 30
+        width: 22
         height: 32
       alignment: 0
       pivot: {x: 0, y: 0}
@@ -121,11 +130,77 @@ TextureImporter:
       indices: 
       edges: []
       weights: []
+    - serializedVersion: 2
+      name: enemy_zealot_1
+      rect:
+        serializedVersion: 2
+        x: 33
+        y: 0
+        width: 30
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 7444f657eb3a45fc0800000000000000
+      internalID: -3506998171405433785
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: enemy_zealot_2
+      rect:
+        serializedVersion: 2
+        x: 64
+        y: 0
+        width: 31
+        height: 32
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 0cbe361970d63f570800000000000000
+      internalID: 8499256801049701312
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: enemy_zealot_3
+      rect:
+        serializedVersion: 2
+        x: 95
+        y: 0
+        width: 33
+        height: 30
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 3104c86381e00a420800000000000000
+      internalID: 2639124878796275731
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
     outline: []
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 5e97eb03825dee720800000000000000
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -136,6 +211,9 @@ TextureImporter:
       entries: []
     nameFileIdTable:
       enemy_zealot_0: 5005364897110879276
+      enemy_zealot_1: -3506998171405433785
+      enemy_zealot_2: 8499256801049701312
+      enemy_zealot_3: 2639124878796275731
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

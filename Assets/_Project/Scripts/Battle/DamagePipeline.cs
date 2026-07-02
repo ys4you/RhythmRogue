@@ -164,7 +164,7 @@ namespace RhythmRogue.Battle
         /// This is the enemy's only source of damage, and it is always telegraphed (the note
         /// scrolled in) and always escapable (hit your next note to raise the guard again).
         /// </summary>
-        private void HandleEnemyAutoHit(int lane)
+        private void HandleEnemyAutoHit(int lane, float holdSeconds)
         {
             if (_guardUp) return;
             if (_playerHealth == null || !_playerHealth.IsAlive || _config == null) return;

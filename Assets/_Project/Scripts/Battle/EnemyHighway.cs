@@ -16,7 +16,7 @@ namespace RhythmRogue.Battle
         [Header("Flash")]
         [SerializeField] private float _flashDuration = 0.08f;
 
-        public event Action<int> OnAutoHit;
+        public event Action<int, float> OnAutoHit;
 
         private List<StampedNote> _notes;
         private int _nextSpawnIndex;
@@ -86,7 +86,12 @@ namespace RhythmRogue.Battle
                 {
                     active.AutoHit = true;
                     FlashReceptor(active.Lane);
-                    OnAutoHit?.Invoke(active.Lane);
+                    // Pass the sustain length so the enemy holds its sing pose for the whole
+                    // slider; taps have EndBeat == Beat, so this is 0 and the pose uses the ease.
+                    float holdSeconds = active.IsHold
+                        ? Mathf.Max(0f, active.EndBeat - active.Beat) * _conductor.SecPerBeat
+                        : 0f;
+                    OnAutoHit?.Invoke(active.Lane, holdSeconds);
                     if (active.IsHold) active.HoldActive = true;
                     _activeNotes[i] = active;
                 }

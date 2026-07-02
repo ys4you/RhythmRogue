@@ -186,7 +186,7 @@ namespace RhythmRogue.Battle
         // ENEMY AUTO-HIT HANDLER
         // =================================================================
 
-        private void HandleEnemyAutoHit(int lane)
+        private void HandleEnemyAutoHit(int lane, float holdSeconds)
         {
             if (!_initialized || _enemyParticles == null) return;
             if (lane < 0 || lane >= 4 || _enemyHitCount <= 0) return;

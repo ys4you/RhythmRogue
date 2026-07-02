@@ -237,7 +237,7 @@ namespace RhythmRogue.Battle
                 // Put the enemy on the shared character system: it sings its own notes (leaning and
                 // popping on each enemy note via EnemyHighway.OnAutoHit) and idles on the beat, all by
                 // posing its existing sprite. Supersedes BeatBob, which no longer goes on the enemy.
-                EnemyCharacterFactory.Attach(_enemyRenderer, _currentEnemy.sprite, _conductor, _enemyHighway);
+                EnemyCharacterFactory.Attach(_enemyRenderer, _currentEnemy.sprite, _currentEnemy.visual, _conductor, _enemyHighway);
             }
 
             SpawnPlayerCharacter();

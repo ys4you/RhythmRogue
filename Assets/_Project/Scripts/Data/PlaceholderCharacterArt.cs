@@ -3,12 +3,12 @@ using UnityEngine;
 namespace RhythmRogue.Data
 {
     /// <summary>
-    /// Default placeholder for a character when no art is assigned: a plain white 32x32 sprite.
-    /// Deliberately featureless so it reads as an obvious stand-in rather than a real design. The
-    /// per-state pose clips reuse this one sprite via transform offsets, so the animation system
-    /// still runs; swap real clips into a <see cref="CharacterVisualConfig"/> to replace it.
+    /// Default placeholder art and single-sprite posing. Builds a plain white 32x32 sprite for
+    /// characters with no art assigned, and poses any single sprite into the per-state clips (idle
+    /// two-step plus directional sing leans) via transform offsets. The player uses the white
+    /// square; the enemy poses its own existing sprite. Same code path in both cases.
     ///
-    /// The sprite is generated once and cached for the session.
+    /// The white sprite is generated once and cached for the session.
     /// </summary>
     public static class PlaceholderCharacterArt
     {
@@ -27,13 +27,17 @@ namespace RhythmRogue.Data
             }
         }
 
+        /// <summary>Placeholder clip for a state, posing the white square.</summary>
+        public static CharacterClip GetClip(CharacterState state) => PoseClip(PlaceholderSprite, state);
+
         /// <summary>
-        /// A placeholder clip for a state: white-square frames posed by offset/scale. Idle is a
-        /// gentle two-frame bob that steps on the beat.
+        /// Pose any single sprite into a clip for a state: one frame offset/scaled to suggest the
+        /// direction, except Idle which is a gentle two-frame bob that steps on the beat. Lets a
+        /// character with only one sprite still bob and "sing" without directional art.
         /// </summary>
-        public static CharacterClip GetClip(CharacterState state)
+        public static CharacterClip PoseClip(Sprite baseSprite, CharacterState state)
         {
-            Sprite s = PlaceholderSprite;
+            Sprite s = baseSprite != null ? baseSprite : PlaceholderSprite;
             switch (state)
             {
                 case CharacterState.Idle:

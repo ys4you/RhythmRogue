@@ -234,10 +234,10 @@ namespace RhythmRogue.Battle
             {
                 _enemyRenderer.sprite = _currentEnemy.sprite;
 
-                // Make the enemy bob on the beat so the scene feels alive instead of a static sprite
-                // over a note highway. Auto-added so there is no scene wiring; purely visual.
-                if (_enemyRenderer.GetComponent<BeatBob>() == null)
-                    _enemyRenderer.gameObject.AddComponent<BeatBob>();
+                // Put the enemy on the shared character system: it sings its own notes (leaning and
+                // popping on each enemy note via EnemyHighway.OnAutoHit) and idles on the beat, all by
+                // posing its existing sprite. Supersedes BeatBob, which no longer goes on the enemy.
+                EnemyCharacterFactory.Attach(_enemyRenderer, _currentEnemy.sprite, _conductor, _enemyHighway);
             }
 
             SpawnPlayerCharacter();

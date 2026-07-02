@@ -56,11 +56,11 @@ namespace RhythmRogue.Data
     /// <summary>
     /// The single swap point for a rhythm-battle performer's look, shared by the battle scene
     /// and the map marker. Assign authored clips per state to reskin; any state left empty falls
-    /// back to a generated hooded-silhouette placeholder, so a fresh asset is usable with zero
+    /// back to a generated white-square placeholder, so a fresh asset is usable with zero
     /// art. Both the player and (next pass) the enemy use this same config type.
     /// </summary>
     [CreateAssetMenu(fileName = "NewCharacterVisual", menuName = "RhythmRogue/Data/Character Visual", order = 40)]
-    public class CharacterVisualConfig : ScriptableObject
+    public class CharacterVisualConfig : ScriptableObject, ICharacterVisual
     {
         [Header("Identity")]
         public string displayName = "Performer";
@@ -82,9 +82,15 @@ namespace RhythmRogue.Data
         [Tooltip("Flip the whole character horizontally, e.g. to face the opponent.")]
         public bool flip = false;
 
+        // ICharacterVisual: expose the serialized fields as properties so a CharacterAnimator can
+        // read any visual (this asset or a runtime one) through the same interface.
+        public float BaseScale => baseScale;
+        public int SortingOrder => sortingOrder;
+        public bool Flip => flip;
+
         /// <summary>
         /// The clip for a state: the authored one if present and non-empty, else a generated
-        /// placeholder clip built from the shared silhouette.
+        /// placeholder clip built from the shared placeholder sprite.
         /// </summary>
         public CharacterClip GetClip(CharacterState state)
         {

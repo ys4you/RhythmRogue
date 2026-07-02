@@ -984,7 +984,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _runState: {fileID: 11400000, guid: fd05c793c93cd014e9de44853e693de3, type: 2}
   _chartProvider: {fileID: 1177386018}
-  _defaultEnemy: {fileID: 11400000, guid: 964970cb64c97ef44a451160955dca57, type: 2}
+  _defaultEnemy: {fileID: 0}
   _highway: {fileID: 312867617}
   _enemyHighway: {fileID: 1671159282}
   _eliteConfig: {fileID: 11400000, guid: 22d906f96afec7f44a067d5acd75a092, type: 2}
@@ -999,6 +999,8 @@ MonoBehaviour:
   _damagePipeline: {fileID: 435255123}
   _enemyHealth: {fileID: 1009257967}
   _enemyRenderer: {fileID: 1009257969}
+  _playerVisual: {fileID: 11400000, guid: 283efaf1db773bd418355b608e7ca8d2, type: 2}
+  _playerAnchor: {fileID: 0}
   _battleUI: {fileID: 145289034}
   _pauseMenu: {fileID: 1869796271}
 --- !u!114 &1177386017

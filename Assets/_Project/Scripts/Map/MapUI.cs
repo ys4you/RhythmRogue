@@ -75,6 +75,11 @@ namespace RhythmRogue.Map
         [Tooltip("How many pixels the marker travels above/below its rest position at the peak of the bob.")]
         [SerializeField] private float _markerBobAmplitude = 6f;
 
+        [Header("Player Marker Visual")]
+        [Tooltip("Shared character visual. The marker uses this character's idle sprite so the figure " +
+                 "on the map matches the one in battle. If null, the marker stays a plain gold dot.")]
+        [SerializeField] private RhythmRogue.Data.CharacterVisualConfig _playerVisual;
+
         [Header("Node Icons (32x32 sprites, optional)")]
         [Tooltip("If null, auto-loads from Resources/MapIcons/node_<type>. Falls back to emoji text if not found.")]
         [SerializeField] private Sprite _iconEnemy;
@@ -663,9 +668,24 @@ namespace RhythmRogue.Map
             rt.anchorMin = new Vector2(0.5f, 0);
             rt.anchorMax = new Vector2(0.5f, 0);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.sizeDelta = new Vector2(30, 30);
             _playerMarker = markerGO.GetComponent<Image>();
-            _playerMarker.color = UIHelpers.WarmGold;
+
+            // Pull the marker's look from the shared character visual so the figure on the map is
+            // the same one that fights in battle (the single swap point). Falls back to the plain
+            // gold dot when no visual is assigned.
+            Sprite markerSprite = _playerVisual != null ? _playerVisual.MapSprite : null;
+            if (markerSprite != null)
+            {
+                _playerMarker.sprite = markerSprite;
+                _playerMarker.preserveAspect = true;
+                _playerMarker.color = UIHelpers.OffWhite;
+                rt.sizeDelta = new Vector2(34, 44);
+            }
+            else
+            {
+                _playerMarker.color = UIHelpers.WarmGold;
+                rt.sizeDelta = new Vector2(30, 30);
+            }
             UpdatePlayerMarker();
         }
 

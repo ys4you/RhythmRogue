@@ -59,6 +59,13 @@ namespace RhythmRogue.Battle
         [Header("Enemy Display")]
         [SerializeField] private SpriteRenderer _enemyRenderer;
 
+        [Header("Player Display")]
+        [Tooltip("The player's shared character visual (idle + sing poses). Also used by the map marker.")]
+        [SerializeField] private RhythmRogue.Data.CharacterVisualConfig _playerVisual;
+        [Tooltip("Where the player stands in the scene. If empty, a position mirrored from the enemy " +
+                 "across the camera is used, so the player still appears without setup.")]
+        [SerializeField] private Transform _playerAnchor;
+
         [Header("UI")]
         [SerializeField] private BattleUI _battleUI;
         [SerializeField] private PauseMenu _pauseMenu;
@@ -72,6 +79,7 @@ namespace RhythmRogue.Battle
         private bool _battleEnded;
         private bool _isElite;
         private bool _isBoss;
+        private PlayerCharacter _playerCharacter;
         private DifficultyContext _difficulty;
         private string _lessonText;
         private bool _waitingForLesson;
@@ -232,6 +240,8 @@ namespace RhythmRogue.Battle
                     _enemyRenderer.gameObject.AddComponent<BeatBob>();
             }
 
+            SpawnPlayerCharacter();
+
             if (_chart.IsLegacy)
             {
                 _highway.LoadChart(_chart.LegacyChart);
@@ -288,6 +298,29 @@ namespace RhythmRogue.Battle
                 GameLog.Info($"[BattleManager] Initialized (legacy){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM");
             else
                 GameLog.Info($"[BattleManager] Initialized ({_chart.Mode}){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM, {_chart.BattleChart.PlayerNoteCount}P + {_chart.BattleChart.EnemyNoteCount}E notes");
+        }
+
+        private void SpawnPlayerCharacter()
+        {
+            if (_playerVisual == null)
+            {
+                GameLog.Warn("[BattleManager] No player visual assigned; the player has no on-screen presence this battle.");
+                return;
+            }
+
+            Vector3 fallback = ComputePlayerFallbackPosition();
+            _playerCharacter = PlayerCharacterFactory.Create(_playerVisual, _playerAnchor, fallback, _inputHandler, _conductor);
+        }
+
+        // Fallback player position when no PlayerAnchor is placed: mirror the enemy across the
+        // battle camera's X so the player lands opposite the enemy (FNF-style facing), at the
+        // enemy's height. Assigning a PlayerAnchor in the scene overrides this entirely.
+        private Vector3 ComputePlayerFallbackPosition()
+        {
+            if (_enemyRenderer == null) return new Vector3(3f, -1f, 0f);
+            Vector3 e = _enemyRenderer.transform.position;
+            float camX = Camera.main != null ? Camera.main.transform.position.x : 0f;
+            return new Vector3(2f * camX - e.x, e.y, e.z);
         }
 
         private ISeededRandom GetChartRng()

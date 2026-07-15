@@ -165,6 +165,7 @@ MonoBehaviour:
   _bossPulseScale: 0.1
   _markerBobSpeed: 2.5
   _markerBobAmplitude: 6
+  _playerVisual: {fileID: 11400000, guid: 283efaf1db773bd418355b608e7ca8d2, type: 2}
   _iconEnemy: {fileID: 21300000, guid: 6497ba977ba00964d8952d401868c42c, type: 3}
   _iconRest: {fileID: 21300000, guid: 11293f519019ad442a845414e9458512, type: 3}
   _iconBoss: {fileID: 21300000, guid: 7845cd87b0212c148a612fff4e4fe56e, type: 3}

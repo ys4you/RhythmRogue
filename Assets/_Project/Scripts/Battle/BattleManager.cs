@@ -90,6 +90,7 @@ namespace RhythmRogue.Battle
         private bool _completeFired;
         private EnemyModifierRunner _modifiers;
         private BattleContext _modifierContext;
+        private BattleAnnouncer _announcer;
 
         public static BattleStats LastBattleStats { get; private set; }
         public BattlePhase CurrentPhase => _fsm != null && _fsm.IsRunning ? _fsm.CurrentStateKey : BattlePhase.Intro;
@@ -288,8 +289,19 @@ namespace RhythmRogue.Battle
             _modifiers = new EnemyModifierRunner(_currentEnemy.modifiers);
             if (_modifiers.HasAny)
             {
+                // Announcement overlay, built only when a modifier could actually need it. It is
+                // self-contained and dies with the scene.
+                _announcer = BattleAnnouncer.Create();
+
+                // If any modifier declares a chart escalation, assemble the denser chart NOW, while
+                // the fight is still in Intro. Assembling scans every marker in the beat map, so
+                // doing it on demand mid-song would hitch exactly when timing matters most. Built
+                // once, held ready, swapped instantly.
+                BattleChart escalatedChart = PrepareEscalatedChart(_modifiers.MaxChartEscalation);
+
                 _modifierContext = new BattleContext(
-                    _conductor, _enemyHealth, _enemyHighway, _playerHealth, _difficulty, GetModifierRng(), _isBoss);
+                    _conductor, _enemyHealth, _enemyHighway, _playerHealth, _difficulty, GetModifierRng(), _isBoss,
+                    _announcer, _highway, escalatedChart);
                 _modifiers.BattleStart(_modifierContext);
             }
 
@@ -298,6 +310,37 @@ namespace RhythmRogue.Battle
                 GameLog.Info($"[BattleManager] Initialized (legacy){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM");
             else
                 GameLog.Info($"[BattleManager] Initialized ({_chart.Mode}){eliteTag}: {_currentEnemy.enemyName} ({enemyHP} HP) at {_chart.EffectiveBPM} BPM, {_chart.BattleChart.PlayerNoteCount}P + {_chart.BattleChart.EnemyNoteCount}E notes");
+        }
+
+        /// <summary>
+        /// Build the denser chart a modifier may later swap to, or null when none asked. Only the
+        /// procedural beat-map path can escalate: an authored chart (onboarding) is hand-made and
+        /// has no second version, and the highway refuses to splice one.
+        /// </summary>
+        private BattleChart PrepareEscalatedChart(float escalation)
+        {
+            if (escalation <= 0f) return null;
+
+            if (_chart.IsLegacy)
+            {
+                GameLog.Warn("[BattleManager] A modifier asked to escalate the chart, but this fight " +
+                             "runs an authored chart. Escalation is skipped for this battle.");
+                return null;
+            }
+
+            ChartProvider.ChartResult escalated =
+                _chartProvider.ResolveEscalated(_currentEnemy, _isElite, GetChartRng(), _difficulty, escalation);
+
+            if (!escalated.Success || escalated.BattleChart == null)
+            {
+                GameLog.Warn("[BattleManager] Escalated chart could not be assembled; the fight will " +
+                             "keep its opening chart throughout.");
+                return null;
+            }
+
+            GameLog.Info($"[BattleManager] Escalated chart ready: " +
+                         $"{_chart.BattleChart.PlayerNoteCount} -> {escalated.BattleChart.PlayerNoteCount} player notes.");
+            return escalated.BattleChart;
         }
 
         private void SpawnPlayerCharacter()

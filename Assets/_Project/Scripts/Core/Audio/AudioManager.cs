@@ -124,6 +124,22 @@ namespace RhythmRogue.Core.Audio
         /// <summary>Play with full control over pitch and volume scale.</summary>
         public void PlayAdvanced(SfxId id, float pitch, float volumeScale) => PlayInternal(id, pitch, volumeScale);
 
+        /// <summary>
+        /// Play a clip that is NOT in the SfxLibrary. For sounds authored directly on a content
+        /// asset (an enemy modifier's sting, an event's one-off), so new content can bring its own
+        /// audio without also needing a new SfxId and a library entry. Anything reused across the
+        /// game should still go in the library and play through <see cref="Play(SfxId)"/>.
+        /// Silent no-op on a null clip or before the pool is built.
+        /// </summary>
+        public void PlayClip(AudioClip clip, float volumeScale = 1f, float pitch = 1f)
+        {
+            if (clip == null || _sourcePool == null) return;
+            var src = GetNextSource();
+            src.pitch = pitch;
+            src.volume = _masterVolume * _sfxVolume * Mathf.Clamp01(volumeScale);
+            src.PlayOneShot(clip);
+        }
+
         public void SetMasterVolume(float v) => _masterVolume = AudioSettings.ToLinearGain(v);
         public void SetSfxVolume(float v) => _sfxVolume = AudioSettings.ToLinearGain(v);
 

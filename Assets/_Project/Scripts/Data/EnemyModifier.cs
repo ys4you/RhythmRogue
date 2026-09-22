@@ -24,6 +24,19 @@ namespace RhythmRogue.Data
         [Tooltip("Description shown to the player.")]
         public string description;
 
+        /// <summary>
+        /// How much harder this modifier may make the chart later in the fight, added to the
+        /// fight's 0-1 chart difficulty. 0 (the default) means never, and the battle then does no
+        /// extra work at all.
+        ///
+        /// Declared up front rather than requested mid-song on purpose: assembling a chart scans
+        /// every marker in the beat map, so the battle builds the escalated chart during setup and
+        /// holds it ready. A modifier then triggers the swap instantly via
+        /// <see cref="IBattleContext.EscalateChart"/> with no frame hitch, which matters because
+        /// the swap lands in the middle of a song.
+        /// </summary>
+        public virtual float ChartEscalation => 0f;
+
         /// <summary>Once, after the chart is loaded and the fight is set up, just before the song
         /// starts. Initialise per-fight state and any up-front scheduling here.</summary>
         public virtual void OnBattleStart(IBattleContext context) { }

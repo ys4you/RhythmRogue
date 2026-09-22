@@ -49,6 +49,23 @@ namespace RhythmRogue.Battle
             OnHPChanged?.Invoke(_currentHP, _maxHP);
         }
 
+        /// <summary>
+        /// Bring a dead pool back at the given HP. This is a deliberate, controlled revival (a
+        /// last-stand modifier refusing a boss's first death), kept separate from <see cref="Heal"/>
+        /// on purpose: Heal refuses to touch a dead pool so a stray heal can never quietly undo a
+        /// death. Clears the death latch so TakeDamage works again. No-op when the pool is still
+        /// alive or hp is not positive, so calling it defensively is safe.
+        /// </summary>
+        public void Revive(int hp)
+        {
+            if (!_isDead || hp <= 0) return;
+            _isDead = false;
+            _currentHP = Mathf.Clamp(hp, 1, _maxHP);
+            // Reported as a heal from zero so HP bars and the event bus see the refill.
+            OnHealed?.Invoke(_currentHP, _currentHP);
+            OnHPChanged?.Invoke(_currentHP, _maxHP);
+        }
+
         public void SetMaxHP(int newMax, bool fillToMax = false)
         {
             _maxHP = Mathf.Max(1, newMax);

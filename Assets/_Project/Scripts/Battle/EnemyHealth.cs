@@ -28,6 +28,10 @@ namespace RhythmRogue.Battle
         public void TakeDamage(int amount) => Health?.TakeDamage(amount);
         public void Heal(int amount) => Health?.Heal(amount);
 
+        /// <summary>Revive the enemy at the given HP after a death was consumed by a modifier.
+        /// See <see cref="HealthComponent.Revive"/>; Heal deliberately will not do this.</summary>
+        public void Revive(int hp) => Health?.Revive(hp);
+
         public void InitForBattle(int maxHP = -1)
         {
             if (maxHP > 0) _maxHP = maxHP;

@@ -78,6 +78,14 @@ namespace RhythmRogue.Battle
         // so notes always appear the same distance off-screen (no pop-in at low speeds or high BPM).
         protected float SpawnAheadBeats => _spawnAheadUnits / Mathf.Max(0.01f, EffectiveBeatHeight);
 
+        /// <summary>
+        /// The spawn lead in beats, i.e. how far ahead of the playhead notes come into existence.
+        /// Anything at or beyond (current beat + this) has not spawned yet, so it can be changed
+        /// without a note visibly appearing or vanishing on screen. A mid-song chart swap uses this
+        /// to find a seam the player cannot see.
+        /// </summary>
+        public float SpawnLeadBeats => SpawnAheadBeats;
+
         // Default off-screen spawn distance in world units (matches the _spawnAheadUnits default).
         // Exposed so chart assembly can size the opening note-free lead-in to match it: the first
         // note must start at least this far out so it scrolls in cleanly instead of popping in.

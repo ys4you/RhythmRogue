@@ -76,6 +76,32 @@ namespace RhythmRogue.Battle
             return default;
         }
 
+        /// <summary>
+        /// Assemble an ALTERNATE, denser chart for the same song, for a mid-fight difficulty phase.
+        /// Same beat map, same BPM, same lead-in, so its beats line up with the chart already
+        /// playing and it can be spliced in without a seam.
+        ///
+        /// Deliberately does NOT touch the Conductor: no song assignment, no clip swap, nothing
+        /// that would disturb playback. Call it at battle setup and hold the result, never mid-song,
+        /// because assembling scans every marker in the beat map and would hitch the frame.
+        ///
+        /// The RNG is forked so the escalated chart cannot consume the base chart's stream; the
+        /// same seed still reproduces both. Returns default for an enemy with no beat map (the
+        /// authored-chart path cannot be escalated).
+        /// </summary>
+        public ChartResult ResolveEscalated(EnemyData enemy, bool isElite, ISeededRandom rng,
+                                            DifficultyContext ctx, float difficultyBoost)
+        {
+            if (enemy == null || enemy.songBeatMap == null || difficultyBoost <= 0f) return default;
+
+            float baseDifficulty = GetEffectiveDifficulty(enemy, isElite, ctx);
+            float difficulty = Mathf.Clamp01(baseDifficulty + difficultyBoost);
+            float bpmModifier = GetEffectiveBPMModifier(enemy, isElite);
+
+            GameLog.Info($"[ChartProvider] Assembling escalated chart: {baseDifficulty:F2} -> {difficulty:F2}.");
+            return ResolveFromBeatMap(enemy, rng.Fork("escalated"), difficulty, bpmModifier);
+        }
+
         private void AssignSong(EnemyData enemy, Conductor conductor)
         {
             AudioClip clip = enemy.EffectiveSong;

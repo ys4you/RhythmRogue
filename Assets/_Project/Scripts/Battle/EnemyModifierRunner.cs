@@ -31,6 +31,22 @@ namespace RhythmRogue.Battle
 
         public bool HasAny => _live.Count > 0;
 
+        /// <summary>
+        /// The largest chart escalation any live modifier might ask for. The battle assembles the
+        /// escalated chart once at setup using this, so the mid-song swap costs nothing. 0 when no
+        /// modifier escalates, in which case no second chart is built.
+        /// </summary>
+        public float MaxChartEscalation
+        {
+            get
+            {
+                float max = 0f;
+                for (int i = 0; i < _live.Count; i++)
+                    if (_live[i].ChartEscalation > max) max = _live[i].ChartEscalation;
+                return max;
+            }
+        }
+
         public void BattleStart(IBattleContext ctx)
         {
             for (int i = 0; i < _live.Count; i++) _live[i].OnBattleStart(ctx);

@@ -58,6 +58,12 @@ namespace RhythmRogue.Map
             if (area.onboarding != null && area.onboarding.nodes != null && area.onboarding.nodes.Length > 0)
                 return GenerateScripted(rng, seed, area, area.onboarding);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Dev shortcut, checked after onboarding so an explicitly launched tutorial still
+            // builds its scripted path.
+            if (DevBossOnly) return GenerateBossOnly(rng, seed, area);
+#endif
+
             var map = new MapData { Seed = seed };
             int nextId = 0;
 
@@ -145,6 +151,69 @@ namespace RhythmRogue.Map
             GameLog.Info($"[MapGenerator] Generated onboarding sequence for '{area.areaName}': {map.AllNodes.Count} nodes");
             return map;
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // ---------------------------------------------------------------------------------
+        // DEV ONLY. Excluded from release builds along with the boss-only generator below.
+        // ---------------------------------------------------------------------------------
+
+        private const string DevBossOnlyKey = "dev.map.bossOnly";
+        private static int _devBossOnlyCache = -1;
+
+        /// <summary>
+        /// DEV ONLY. When set, <see cref="Generate"/> returns a map containing nothing but the
+        /// area's boss, so a boss fight is two clicks from the main menu instead of a full run.
+        /// Toggle it from the dev cheat panel (F10).
+        ///
+        /// It does NOT change the fight: boss HP and boss chart difficulty come from the Area
+        /// (bossHP / bossDifficulty), not from node depth, so the encounter is identical to the
+        /// one at the end of a real map. The one thing it cannot reproduce is arriving damaged,
+        /// since a new run starts the player at full HP.
+        ///
+        /// Backed by PlayerPrefs so it survives a domain reload and stays on across play
+        /// sessions. Every generated boss-only map logs a warning, so it cannot be left on
+        /// silently. A scripted onboarding area ignores this entirely.
+        /// </summary>
+        public static bool DevBossOnly
+        {
+            get
+            {
+                if (_devBossOnlyCache < 0) _devBossOnlyCache = PlayerPrefs.GetInt(DevBossOnlyKey, 0);
+                return _devBossOnlyCache != 0;
+            }
+            set
+            {
+                _devBossOnlyCache = value ? 1 : 0;
+                PlayerPrefs.SetInt(DevBossOnlyKey, _devBossOnlyCache);
+                PlayerPrefs.Save();
+            }
+        }
+
+        /// <summary>
+        /// DEV ONLY. A map of exactly one node: the area's boss, accessible immediately. No
+        /// connections to draw and no layers to walk, so the player picks it straight away and
+        /// the win routes through the normal boss path (EndRun -> Summary).
+        /// </summary>
+        private static MapData GenerateBossOnly(ISeededRandom rng, string seed, Area area)
+        {
+            var map = new MapData { Seed = seed };
+
+            EnemyData boss = area.bosses != null ? area.bosses.Pick(rng.Fork("enemies")) : null;
+            if (boss == null)
+                GameLog.Error($"[MapGenerator] DevBossOnly: area '{area.areaName}' has no boss configured. " +
+                              "The node will fall back to the BattleScene's default enemy.");
+
+            var bossNode = new MapNode(0, 0, 0, NodeType.Boss) { EnemyData = boss, IsAccessible = true };
+            map.Layers.Add(new List<MapNode> { bossNode });
+            map.AllNodes.Add(bossNode);
+
+            AssignPositions(map, rng.Fork("jitter"));
+
+            GameLog.Warn($"[MapGenerator] DEV BOSS-ONLY MAP for '{area.areaName}' -> " +
+                         $"{boss?.enemyName ?? "no boss"}. Turn this off in the dev cheat panel (F10).");
+            return map;
+        }
+#endif
 
         /// <summary>
         /// Build one layer according to <paramref name="config"/> and append it to the map.
@@ -314,7 +383,9 @@ namespace RhythmRogue.Map
             for (int layerIdx = 0; layerIdx < totalLayers; layerIdx++)
             {
                 var layer = map.Layers[layerIdx];
-                float y = (float)layerIdx / (totalLayers - 1);
+                // Guard the single-layer case (the dev boss-only map): 0/0 would be NaN here and
+                // NaN survives Clamp01, which would push the node to an unrenderable position.
+                float y = totalLayers > 1 ? (float)layerIdx / (totalLayers - 1) : 0.5f;
 
                 for (int col = 0; col < layer.Count; col++)
                 {

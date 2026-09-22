@@ -20,9 +20,16 @@ namespace RhythmRogue.Battle
         private readonly DifficultyContext _difficulty;
         private readonly ISeededRandom _rng;
         private readonly bool _isBoss;
+        private readonly BattleAnnouncer _announcer;
+        private readonly NoteHighway _playerHighway;
+        private readonly BattleChart _escalatedChart;
+
+        private int _phase;
+        private bool _escalated;
 
         public BattleContext(Conductor conductor, EnemyHealth enemyHealth, EnemyHighway enemyHighway,
-            PlayerHealth playerHealth, DifficultyContext difficulty, ISeededRandom rng, bool isBoss)
+            PlayerHealth playerHealth, DifficultyContext difficulty, ISeededRandom rng, bool isBoss,
+            BattleAnnouncer announcer = null, NoteHighway playerHighway = null, BattleChart escalatedChart = null)
         {
             _conductor = conductor;
             _enemyHealth = enemyHealth;
@@ -31,6 +38,9 @@ namespace RhythmRogue.Battle
             _difficulty = difficulty;
             _rng = rng;
             _isBoss = isBoss;
+            _announcer = announcer;
+            _playerHighway = playerHighway;
+            _escalatedChart = escalatedChart;
         }
 
         public float SongBeat => _conductor != null ? _conductor.SongPositionInBeats : 0f;
@@ -42,9 +52,45 @@ namespace RhythmRogue.Battle
         public int EnemyCurrentHP => _enemyHealth != null ? _enemyHealth.CurrentHP : 0;
         public int EnemyMaxHP => _enemyHealth != null ? _enemyHealth.MaxHP : 0;
         public void HealEnemy(int amount) { if (_enemyHealth != null) _enemyHealth.Heal(amount); }
+        public void ReviveEnemy(int hp) { if (_enemyHealth != null) _enemyHealth.Revive(hp); }
 
         public int PlayerCurrentHP => _playerHealth != null ? _playerHealth.CurrentHP : 0;
         public int PlayerMaxHP => _playerHealth != null ? _playerHealth.MaxHP : 0;
+
+        public void Announce(string text)
+        {
+            if (_announcer == null) return;
+            _announcer.Announce(text);
+        }
+
+        public void PlaySound(UnityEngine.AudioClip clip, float volumeScale = 1f, float pitch = 1f)
+        {
+            if (clip == null) return;
+            var mgr = RhythmRogue.Core.Audio.AudioManager.Instance;
+            if (mgr != null) mgr.PlayClip(clip, volumeScale, pitch);
+        }
+
+        public int Phase => _phase;
+        public int AdvancePhase() => ++_phase;
+
+        public bool EscalateChart()
+        {
+            if (_escalated || _escalatedChart == null || _playerHighway == null) return false;
+
+            // Splice in past the spawn horizon plus a beat of margin, so every note already on
+            // screen finishes its approach and the player never sees a note vanish. One extra beat
+            // rather than exactly the horizon, because the horizon is recomputed per frame from the
+            // live scroll speed and landing exactly on it would be a race.
+            float seam = SongBeat + _playerHighway.SpawnLeadBeats + 1f;
+
+            int spliced = _playerHighway.SpliceNotesFrom(_escalatedChart.AllPlayerNotes, seam);
+            if (spliced <= 0) return false;
+
+            _escalated = true;
+            RhythmRogue.Util.GameLog.Info(
+                $"[BattleContext] Chart escalated at beat {SongBeat:F1}, taking effect from {seam:F1}.");
+            return true;
+        }
 
         public void SetEnemyNotes(IReadOnlyList<ModifierNote> notes)
         {

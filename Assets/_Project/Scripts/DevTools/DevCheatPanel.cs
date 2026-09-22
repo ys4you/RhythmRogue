@@ -123,6 +123,7 @@ namespace RhythmRogue.DevTools
 
             DrawCurrency(rs);
             DrawHealth();
+            DrawMap();
             DrawTime();
             DrawRelics(rs);
             DrawOnboarding();
@@ -169,6 +170,27 @@ namespace RhythmRogue.DevTools
                 if (ph != null && GUILayout.Button("Kill player (lose)")) ph.TakeDamage(ph.CurrentHP);
                 GUILayout.EndHorizontal();
             }
+        }
+
+        /// <summary>
+        /// Map shortcuts. Boss-only strips the map down to a single boss node so a boss fight is
+        /// reachable in two clicks. It only takes effect when a map is GENERATED, which happens on
+        /// a new run, so flipping it mid-run does nothing until the next New Run.
+        /// </summary>
+        private void DrawMap()
+        {
+            GUILayout.Space(4);
+            GUILayout.Label("MAP", _header);
+
+            bool current = RhythmRogue.Map.MapGenerator.DevBossOnly;
+            bool now = GUILayout.Toggle(current, " Boss-only map");
+            if (now != current)
+            {
+                RhythmRogue.Map.MapGenerator.DevBossOnly = now;
+                GameLog.Info($"[DevCheatPanel] Boss-only map {(now ? "ON" : "OFF")}. " +
+                             "Takes effect on the next New Run.");
+            }
+            GUILayout.Label(now ? "on: next New Run is boss only" : "off: normal map");
         }
 
         private void DrawTime()

@@ -93,6 +93,69 @@ namespace RhythmRogue.Battle
             GameLog.Info($"[NoteHighway] Assembled notes loaded: {_assembledNotes.Count} notes");
         }
 
+        /// <summary>
+        /// Replace the not-yet-spawned tail of the chart with a different set of notes, from
+        /// <paramref name="fromBeat"/> onward. Used for a mid-song difficulty phase: the fight
+        /// assembles a denser chart for the same song up front and splices it in here.
+        ///
+        /// Seamless by construction. Notes before <see cref="SpawnLeadBeats"/> have already spawned
+        /// and are never touched, so pass a <paramref name="fromBeat"/> beyond the spawn horizon and
+        /// nothing on screen moves, disappears, or pops in. The player's in-flight notes play out and
+        /// the new chart simply arrives behind them.
+        ///
+        /// Returns how many notes were spliced in, 0 if the new chart had nothing past the seam
+        /// (in which case nothing is changed), or -1 if this highway is on the legacy authored-chart
+        /// path, which does not support splicing.
+        /// </summary>
+        public int SpliceNotesFrom(IReadOnlyList<StampedNote> notes, float fromBeat)
+        {
+            if (!_useAssembledNotes || _assembledNotes == null)
+            {
+                GameLog.Warn("[NoteHighway] SpliceNotesFrom needs the assembled-note path; " +
+                             "an authored (legacy) chart cannot be spliced. Ignoring.");
+                return -1;
+            }
+            if (notes == null || notes.Count == 0) return 0;
+
+            // Count the incoming notes past the seam first. If there are none, leave the existing
+            // tail alone rather than silently deleting the rest of the fight.
+            int incoming = 0;
+            for (int i = 0; i < notes.Count; i++)
+                if (notes[i].Beat >= fromBeat) incoming++;
+
+            if (incoming == 0)
+            {
+                GameLog.Warn($"[NoteHighway] Splice at beat {fromBeat:F1} found no replacement notes; " +
+                             "keeping the current chart.");
+                return 0;
+            }
+
+            // Everything below _nextSpawnIndex has already spawned. Rebuild only the tail:
+            // keep the queued notes that land BEFORE the seam, then add the new ones after it.
+            var tail = new List<NoteData>(_assembledNotes.Count - _nextSpawnIndex + incoming);
+
+            for (int i = _nextSpawnIndex; i < _assembledNotes.Count; i++)
+                if (_assembledNotes[i].BeatPosition < fromBeat) tail.Add(_assembledNotes[i]);
+
+            for (int i = 0; i < notes.Count; i++)
+            {
+                StampedNote s = notes[i];
+                if (s.Beat < fromBeat) continue;
+                tail.Add(new NoteData(s.Beat, s.Lane, s.IsTap ? NoteType.Tap : NoteType.Hold, s.HoldBeats));
+            }
+
+            tail.Sort((a, b) => a.BeatPosition.CompareTo(b.BeatPosition));
+
+            // Swap the tail in place. _nextSpawnIndex stays valid because the spawned prefix is
+            // untouched and keeps its length.
+            _assembledNotes.RemoveRange(_nextSpawnIndex, _assembledNotes.Count - _nextSpawnIndex);
+            _assembledNotes.AddRange(tail);
+
+            GameLog.Info($"[NoteHighway] Spliced {incoming} notes from beat {fromBeat:F1}; " +
+                         $"{_assembledNotes.Count} total, {_assembledNotes.Count - _nextSpawnIndex} still queued.");
+            return incoming;
+        }
+
         public void ClearAllNotes()
         {
             foreach (NoteView note in _activeNotes) ReturnNoteView(note);

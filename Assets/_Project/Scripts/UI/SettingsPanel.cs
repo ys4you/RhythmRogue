@@ -59,6 +59,25 @@ namespace RhythmRogue.UI
         private Text _scrollDirValue;
         private InputField _scrollSpeedInput;
 
+        // Lane backdrop controls: per side, an on/off toggle plus a colour swatch that opens the picker.
+        private Button _playerBdToggle, _playerBdSwatchBtn;
+        private Text _playerBdToggleText;
+        private Image _playerBdSwatch;
+        private Button _enemyBdToggle, _enemyBdSwatchBtn;
+        private Text _enemyBdToggleText;
+        private Image _enemyBdSwatch;
+
+        // Colour picker popup, shared by both sides and bound to one side while open.
+        private GameObject _colorPopup;
+        private Slider _colR, _colG, _colB, _colA;
+        private Text _colRVal, _colGVal, _colBVal, _colAVal;
+        private Image _colorPreview;
+        private Button _colorBackBtn;
+        private BackdropSide _colorSide;
+        private Image _colorTargetSwatch;
+        private bool _colorSuppress;
+        private bool _colorCancelPushed;
+
         // Controls (rebind) widgets
         private Text[] _rebindButtonTexts, _secondaryTexts;
         private Button[] _rebindButtons, _secondaryButtons;
@@ -93,6 +112,8 @@ namespace RhythmRogue.UI
         {
             if (!_built) return;
             _root.gameObject.SetActive(true);
+            if (_colorPopup != null) _colorPopup.SetActive(false);
+            _colorCancelPushed = false;
             ShowAudioTab();
             if (_cancelHandler != null && !_cancelPushed)
             {
@@ -108,6 +129,7 @@ namespace RhythmRogue.UI
             if (KeybindManager.IsRebinding) KeybindManager.CancelRebind();
             // Audio offset now persists live through AudioSettings.CalibrationOffsetMs (set on the
             // slider's value-changed), so there is nothing to flush here.
+            if (_colorPopup != null) _colorPopup.SetActive(false);
             _root.gameObject.SetActive(false);
         }
 
@@ -174,6 +196,7 @@ namespace RhythmRogue.UI
             CreateGameplayPanel(cardRT);
             CreateControlsPanel(cardRT);
             CreateDisplayPanel(cardRT);
+            CreateColorPopup(_root);
 
             var closeBtnGO = MakePanel(cardRT, "CloseBtn", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(240, 55), UIHelpers.Shadow);
             _settingsCloseBtn = closeBtnGO.AddComponent<Button>(); _settingsCloseBtn.onClick.AddListener(CloseFromButton);
@@ -287,11 +310,18 @@ namespace RhythmRogue.UI
             UINavigationHelper.AddLink(_gameplayTabBtn, down: _scrollDirToggle);
             UINavigationHelper.AddLink(_controlsTabBtn, down: _scrollDirToggle);
             UINavigationHelper.AddLink(_displayTabBtn, down: _scrollDirToggle);
-            UINavigationHelper.WireVerticalNoWrap(_scrollDirToggle, _scrollSpeedInput);
+            UINavigationHelper.WireVerticalNoWrap(_scrollDirToggle, _scrollSpeedInput, _playerBdToggle, _enemyBdToggle);
             UINavigationHelper.AddLink(_scrollDirToggle, up: _gameplayTabBtn);
-            UINavigationHelper.AddLink(_scrollSpeedInput, down: _settingsCloseBtn);
-            UINavigationHelper.Wire(_settingsCloseBtn, up: _scrollSpeedInput);
-            UISelectableStyle.Apply(_scrollDirToggle); UISelectableStyle.Apply(_scrollSpeedInput); UISelectableStyle.Apply(_settingsCloseBtn);
+            UINavigationHelper.AddLink(_playerBdToggle, right: _playerBdSwatchBtn);
+            UINavigationHelper.AddLink(_playerBdSwatchBtn, left: _playerBdToggle);
+            UINavigationHelper.AddLink(_enemyBdToggle, right: _enemyBdSwatchBtn);
+            UINavigationHelper.AddLink(_enemyBdSwatchBtn, left: _enemyBdToggle);
+            UINavigationHelper.AddLink(_enemyBdToggle, down: _settingsCloseBtn);
+            UINavigationHelper.Wire(_settingsCloseBtn, up: _enemyBdToggle);
+            UISelectableStyle.Apply(_scrollDirToggle); UISelectableStyle.Apply(_scrollSpeedInput);
+            UISelectableStyle.Apply(_playerBdToggle); UISelectableStyle.Apply(_playerBdSwatchBtn);
+            UISelectableStyle.Apply(_enemyBdToggle); UISelectableStyle.Apply(_enemyBdSwatchBtn);
+            UISelectableStyle.Apply(_settingsCloseBtn);
             if (_focusSetter != null) _focusSetter.FocusOn(_gameplayTabBtn.gameObject);
         }
 
@@ -351,6 +381,14 @@ namespace RhythmRogue.UI
             // the same speed at any BPM. Out-of-range or junk input snaps back on commit.
             _scrollSpeedInput = CreateFloatInputRow(gpRT, "Scroll Speed", rowY - rowGap, $"{ScrollSpeedSetting.Min:0} to {ScrollSpeedSetting.Max:0} u/s", OnScrollSpeedCommitted);
 
+            // Lane backdrops: per side an on/off toggle and a colour swatch. The swatch opens the
+            // colour picker; both write BackdropSettings, which the in-battle HighwayBackdrop reads
+            // live so a change here shows up immediately, including mid-battle from the pause menu.
+            CreateBackdropRow(gpRT, "Player Lane Backdrop", rowY - rowGap * 2f, BackdropSide.Player,
+                out _playerBdToggle, out _playerBdToggleText, out _playerBdSwatchBtn, out _playerBdSwatch);
+            CreateBackdropRow(gpRT, "Enemy Lane Backdrop", rowY - rowGap * 3f, BackdropSide.Enemy,
+                out _enemyBdToggle, out _enemyBdToggleText, out _enemyBdSwatchBtn, out _enemyBdSwatch);
+
             _gameplayPanel.SetActive(false);
         }
 
@@ -358,6 +396,11 @@ namespace RhythmRogue.UI
         {
             if (_scrollDirValue != null) _scrollDirValue.text = ScrollDirectionSetting.DisplayString;
             if (_scrollSpeedInput != null) _scrollSpeedInput.text = ScrollSpeedSetting.UnitsPerSecond.ToString("0.0");
+
+            if (_playerBdToggleText != null) _playerBdToggleText.text = BackdropSettings.GetEnabled(BackdropSide.Player) ? "On" : "Off";
+            if (_playerBdSwatch != null) _playerBdSwatch.color = BackdropSettings.GetColor(BackdropSide.Player);
+            if (_enemyBdToggleText != null) _enemyBdToggleText.text = BackdropSettings.GetEnabled(BackdropSide.Enemy) ? "On" : "Off";
+            if (_enemyBdSwatch != null) _enemyBdSwatch.color = BackdropSettings.GetColor(BackdropSide.Enemy);
         }
 
         // Commit handler for the scroll-speed field. Normalizes a comma decimal to a dot so it
@@ -369,6 +412,135 @@ namespace RhythmRogue.UI
             if (float.TryParse(norm, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v))
                 ScrollSpeedSetting.UnitsPerSecond = v;
             RefreshGameplayValues();
+        }
+
+        // One backdrop row: a label, an On/Off toggle, and a colour swatch button. The toggle flips
+        // that side's backdrop; the swatch opens the colour picker bound to that side.
+        private void CreateBackdropRow(RectTransform parent, string label, float y, BackdropSide side,
+            out Button toggleBtn, out Text toggleText, out Button swatchBtn, out Image swatchImg)
+        {
+            MakeText(parent, $"{label}_Label", new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1), new Vector2(75, y), new Vector2(500, 50), 22, TextAnchor.MiddleLeft, UIHelpers.AmberOrange).text = label;
+
+            var tGO = MakePanel(parent, $"{label}_Toggle", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-230, y - 5f), new Vector2(150, 50), UIHelpers.BgLight);
+            toggleBtn = tGO.AddComponent<Button>();
+            toggleBtn.onClick.AddListener(() => { BackdropSettings.SetEnabled(side, !BackdropSettings.GetEnabled(side)); RefreshGameplayValues(); });
+            toggleText = MakeText(tGO.GetComponent<RectTransform>(), "Val", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(150, 50), 22, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            toggleText.text = "---";
+
+            var sGO = MakePanel(parent, $"{label}_Swatch", new Vector2(1, 1), new Vector2(1, 1), new Vector2(1, 1), new Vector2(-75, y - 5f), new Vector2(120, 50), Color.white);
+            swatchBtn = sGO.AddComponent<Button>();
+            swatchImg = sGO.GetComponent<Image>();
+            Image captured = swatchImg;
+            swatchBtn.onClick.AddListener(() => OpenColorPopup(side, captured));
+        }
+
+        // Builds the shared colour picker overlay once (hidden): four 0-255 sliders (R/G/B/A), a
+        // live preview swatch, and a Back button. Bound to a side when opened; writes live.
+        private void CreateColorPopup(RectTransform parent)
+        {
+            _colorPopup = MakePanel(parent, "ColorPopup", Vector2.zero, Vector2.one, new Vector2(0.5f, 0.5f), Vector2.zero, Vector2.zero,
+                new Color(UIHelpers.BgDeep.r, UIHelpers.BgDeep.g, UIHelpers.BgDeep.b, 0.9f));
+            var popupRT = _colorPopup.GetComponent<RectTransform>();
+            popupRT.offsetMin = Vector2.zero; popupRT.offsetMax = Vector2.zero;
+
+            var card = MakePanel(popupRT, "ColorCard", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1100, 540), UIHelpers.BgSurface);
+            var cardRT = card.GetComponent<RectTransform>();
+
+            var title = MakeText(cardRT, "ColorTitle", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -25), new Vector2(700, 50), 30, TextAnchor.MiddleCenter, UIHelpers.OffWhite);
+            title.fontStyle = FontStyle.Bold; title.text = "Backdrop Colour";
+
+            _colorPreview = MakePanel(cardRT, "Preview", new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -95), new Vector2(240, 60), Color.white).GetComponent<Image>();
+
+            float y = -190f, gap = 62f;
+            _colR = CreateSliderRow(cardRT, "R", y, 0f, 255f, 0f, out _colRVal); _colR.wholeNumbers = true;
+            _colG = CreateSliderRow(cardRT, "G", y - gap, 0f, 255f, 0f, out _colGVal); _colG.wholeNumbers = true;
+            _colB = CreateSliderRow(cardRT, "B", y - gap * 2f, 0f, 255f, 0f, out _colBVal); _colB.wholeNumbers = true;
+            _colA = CreateSliderRow(cardRT, "A", y - gap * 3f, 0f, 255f, 255f, out _colAVal); _colA.wholeNumbers = true;
+
+            _colR.onValueChanged.AddListener(_ => OnColorSliderChanged());
+            _colG.onValueChanged.AddListener(_ => OnColorSliderChanged());
+            _colB.onValueChanged.AddListener(_ => OnColorSliderChanged());
+            _colA.onValueChanged.AddListener(_ => OnColorSliderChanged());
+
+            var backGO = MakePanel(cardRT, "ColorBack", new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 25), new Vector2(240, 55), UIHelpers.Shadow);
+            _colorBackBtn = backGO.AddComponent<Button>(); _colorBackBtn.onClick.AddListener(CloseColorPopupFromButton);
+            MakeText(backGO.GetComponent<RectTransform>(), "T", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(240, 55), 24, TextAnchor.MiddleCenter, UIHelpers.OffWhite).text = "Back";
+
+            _colorPopup.transform.SetAsLastSibling();
+            _colorPopup.SetActive(false);
+        }
+
+        // Open the picker for a side, seeding the sliders from its current colour. The suppress flag
+        // keeps that seeding from writing back through the value-changed handlers.
+        private void OpenColorPopup(BackdropSide side, Image targetSwatch)
+        {
+            _colorSide = side;
+            _colorTargetSwatch = targetSwatch;
+            Color c = BackdropSettings.GetColor(side);
+
+            _colorSuppress = true;
+            _colR.value = Mathf.Round(c.r * 255f);
+            _colG.value = Mathf.Round(c.g * 255f);
+            _colB.value = Mathf.Round(c.b * 255f);
+            _colA.value = Mathf.Round(c.a * 255f);
+            _colorSuppress = false;
+
+            UpdateColorValueLabels();
+            _colorPreview.color = c;
+
+            _colorPopup.transform.SetAsLastSibling();
+            _colorPopup.SetActive(true);
+
+            if (_cancelHandler != null && !_colorCancelPushed) { _cancelHandler.Push(CloseColorPopupFromCancel); _colorCancelPushed = true; }
+
+            UINavigationHelper.WireVerticalNoWrap(_colR, _colG, _colB, _colA);
+            UINavigationHelper.AddLink(_colA, down: _colorBackBtn);
+            UINavigationHelper.Wire(_colorBackBtn, up: _colA);
+            UISelectableStyle.ApplySlider(_colR); UISelectableStyle.ApplySlider(_colG);
+            UISelectableStyle.ApplySlider(_colB); UISelectableStyle.ApplySlider(_colA);
+            UISelectableStyle.Apply(_colorBackBtn);
+            if (_focusSetter != null) _focusSetter.FocusOn(_colR.gameObject);
+        }
+
+        private void OnColorSliderChanged()
+        {
+            if (_colorSuppress) return;
+            Color c = new Color(_colR.value / 255f, _colG.value / 255f, _colB.value / 255f, _colA.value / 255f);
+            BackdropSettings.SetColor(_colorSide, c);
+            _colorPreview.color = c;
+            if (_colorTargetSwatch != null) _colorTargetSwatch.color = c;
+            UpdateColorValueLabels();
+        }
+
+        private void UpdateColorValueLabels()
+        {
+            if (_colRVal != null) _colRVal.text = Mathf.RoundToInt(_colR.value).ToString();
+            if (_colGVal != null) _colGVal.text = Mathf.RoundToInt(_colG.value).ToString();
+            if (_colBVal != null) _colBVal.text = Mathf.RoundToInt(_colB.value).ToString();
+            if (_colAVal != null) _colAVal.text = Mathf.RoundToInt(_colA.value).ToString();
+        }
+
+        // Back button: pop our cancel handler (Escape would have popped it already) then hide.
+        private void CloseColorPopupFromButton()
+        {
+            if (_colorCancelPushed && _cancelHandler != null) { _cancelHandler.Pop(); _colorCancelPushed = false; }
+            HideColorPopup();
+        }
+
+        private void CloseColorPopupFromCancel()
+        {
+            _colorCancelPushed = false;
+            HideColorPopup();
+        }
+
+        private void HideColorPopup()
+        {
+            if (_colorPopup != null) _colorPopup.SetActive(false);
+            if (_focusSetter != null)
+            {
+                if (_colorTargetSwatch != null) _focusSetter.FocusOn(_colorTargetSwatch.gameObject);
+                else if (_gameplayTabBtn != null) _focusSetter.FocusOn(_gameplayTabBtn.gameObject);
+            }
         }
 
         // ============================================================

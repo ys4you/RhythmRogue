@@ -112,9 +112,39 @@ namespace RhythmRogue.Data
         /// </summary>
         bool EscalateChart();
 
-        /// <summary>Give the enemy a set of notes to auto-play on its highway. The existing guard and
-        /// damage wiring already turns an unblocked enemy note into player damage, so this is all a
-        /// counter-attack modifier needs. Replaces any notes currently on the enemy highway.</summary>
+        /// <summary>Give the enemy a set of notes to auto-play on its highway. REPLACES everything
+        /// currently scheduled there, including the enemy notes the assembler generated for Both
+        /// and EnemyOnly sections, so this is for a modifier that wants to take the enemy side over
+        /// entirely. To layer notes on top of the existing chart, use <see cref="AddEnemyNotes"/>.</summary>
         void SetEnemyNotes(IReadOnlyList<ModifierNote> notes);
+
+        /// <summary>
+        /// Schedule extra enemy notes alongside whatever the enemy highway is already playing,
+        /// merged in beat order. The guard and damage wiring already turns an unblocked enemy note
+        /// into player damage, so this is all a counter-attack needs.
+        ///
+        /// Notes too close to now are dropped rather than made to pop in on screen, so schedule
+        /// ahead of time. Returns how many were actually scheduled.
+        /// </summary>
+        int AddEnemyNotes(IReadOnlyList<ModifierNote> notes);
+
+        /// <summary>
+        /// The song's structural sections (intro, verse, chorus, drop), in beats. Lets a modifier
+        /// hang its behaviour on the music rather than on a stopwatch, so a burst that lands on a
+        /// chorus is telegraphed by the song itself and the player learns where the danger is.
+        /// Empty when the fight runs an authored chart with no beat map.
+        /// </summary>
+        IReadOnlyList<SongSection> Sections { get; }
+
+        /// <summary>
+        /// Append the beat positions of the song's real musical onsets inside [fromBeat, toBeat)
+        /// to <paramref name="into"/>, keeping only markers at or above
+        /// <paramref name="minIntensity"/> and skipping Break markers. Returns how many were added.
+        ///
+        /// Use this instead of placing notes on a fixed grid: onsets are where the music actually
+        /// hits, so generated notes sit with the song instead of drifting against it. The list is
+        /// not cleared, so a caller can accumulate across several windows.
+        /// </summary>
+        int GetOnsets(float fromBeat, float toBeat, List<float> into, float minIntensity = 0f);
     }
 }

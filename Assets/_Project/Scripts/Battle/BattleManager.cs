@@ -301,7 +301,7 @@ namespace RhythmRogue.Battle
 
                 _modifierContext = new BattleContext(
                     _conductor, _enemyHealth, _enemyHighway, _playerHealth, _difficulty, GetModifierRng(), _isBoss,
-                    _announcer, _highway, escalatedChart);
+                    _announcer, _highway, escalatedChart, _currentEnemy.songBeatMap);
                 _modifiers.BattleStart(_modifierContext);
             }
 

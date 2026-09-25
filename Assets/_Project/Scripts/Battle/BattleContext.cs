@@ -23,13 +23,16 @@ namespace RhythmRogue.Battle
         private readonly BattleAnnouncer _announcer;
         private readonly NoteHighway _playerHighway;
         private readonly BattleChart _escalatedChart;
+        private readonly SongBeatMap _beatMap;
+        private readonly List<BeatMarker> _markerScratch = new(128);
 
         private int _phase;
         private bool _escalated;
 
         public BattleContext(Conductor conductor, EnemyHealth enemyHealth, EnemyHighway enemyHighway,
             PlayerHealth playerHealth, DifficultyContext difficulty, ISeededRandom rng, bool isBoss,
-            BattleAnnouncer announcer = null, NoteHighway playerHighway = null, BattleChart escalatedChart = null)
+            BattleAnnouncer announcer = null, NoteHighway playerHighway = null,
+            BattleChart escalatedChart = null, SongBeatMap beatMap = null)
         {
             _conductor = conductor;
             _enemyHealth = enemyHealth;
@@ -41,6 +44,7 @@ namespace RhythmRogue.Battle
             _announcer = announcer;
             _playerHighway = playerHighway;
             _escalatedChart = escalatedChart;
+            _beatMap = beatMap;
         }
 
         public float SongBeat => _conductor != null ? _conductor.SongPositionInBeats : 0f;
@@ -99,6 +103,45 @@ namespace RhythmRogue.Battle
             for (int i = 0; i < notes.Count; i++)
                 stamped.Add(new StampedNote(notes[i].Lane, notes[i].Beat, notes[i].HoldBeats));
             _enemyHighway.LoadNotes(stamped);
+        }
+
+        public int AddEnemyNotes(IReadOnlyList<ModifierNote> notes)
+        {
+            if (_enemyHighway == null || notes == null || notes.Count == 0) return 0;
+
+            var stamped = new List<StampedNote>(notes.Count);
+            for (int i = 0; i < notes.Count; i++)
+                stamped.Add(new StampedNote(notes[i].Lane, notes[i].Beat, notes[i].HoldBeats));
+
+            int added = _enemyHighway.AddNotes(stamped);
+            RhythmRogue.Util.GameLog.Info(
+                $"[BattleContext] Enemy counter-attack scheduled: {added}/{notes.Count} notes accepted.");
+            return added;
+        }
+
+        public IReadOnlyList<SongSection> Sections =>
+            _beatMap != null && _beatMap.sections != null
+                ? (IReadOnlyList<SongSection>)_beatMap.sections
+                : System.Array.Empty<SongSection>();
+
+        public int GetOnsets(float fromBeat, float toBeat, List<float> into, float minIntensity = 0f)
+        {
+            if (_beatMap == null || into == null || toBeat <= fromBeat) return 0;
+
+            // GetMarkersInRange clears the list it is given, which is why this uses its own scratch
+            // buffer and appends: callers accumulate across several windows.
+            _beatMap.GetMarkersInRange(fromBeat, toBeat, _markerScratch);
+
+            int added = 0;
+            for (int i = 0; i < _markerScratch.Count; i++)
+            {
+                BeatMarker m = _markerScratch[i];
+                if (m.type == MarkerType.Break) continue;
+                if (m.intensity < minIntensity) continue;
+                into.Add(m.beat);
+                added++;
+            }
+            return added;
         }
     }
 }

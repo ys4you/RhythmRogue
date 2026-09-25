@@ -45,6 +45,52 @@ namespace RhythmRogue.Battle
             _isActive = true;
         }
 
+        /// <summary>
+        /// Schedule extra notes on top of whatever this highway is already playing, merged in beat
+        /// order. Unlike <see cref="LoadNotes"/>, which replaces, this keeps the chart's own enemy
+        /// notes (the ones the assembler generates for Both and EnemyOnly sections) intact, so a
+        /// modifier can layer a counter-attack over them instead of erasing them.
+        ///
+        /// Notes at or before the spawn horizon are dropped rather than inserted, because anything
+        /// inside it would either pop in on screen or arrive already past the receptor. Returns how
+        /// many notes were actually scheduled.
+        /// </summary>
+        public int AddNotes(IReadOnlyList<StampedNote> extra)
+        {
+            if (extra == null || extra.Count == 0) return 0;
+
+            if (_notes == null)
+            {
+                LoadNotes(extra);
+                return extra.Count;
+            }
+
+            float horizon = _conductor != null
+                ? _conductor.SongPositionInBeats + SpawnAheadBeats
+                : float.NegativeInfinity;
+
+            // Rebuild only the unspawned tail. The prefix below _nextSpawnIndex has already been
+            // spawned, so leaving it untouched keeps that index valid after the swap.
+            var tail = new List<StampedNote>(_notes.Count - _nextSpawnIndex + extra.Count);
+            for (int i = _nextSpawnIndex; i < _notes.Count; i++) tail.Add(_notes[i]);
+
+            int added = 0;
+            for (int i = 0; i < extra.Count; i++)
+            {
+                if (extra[i].Beat <= horizon) continue;
+                tail.Add(extra[i]);
+                added++;
+            }
+
+            if (added == 0) return 0;
+
+            tail.Sort((a, b) => a.Beat.CompareTo(b.Beat));
+            _notes.RemoveRange(_nextSpawnIndex, _notes.Count - _nextSpawnIndex);
+            _notes.AddRange(tail);
+            _isActive = true;
+            return added;
+        }
+
         public void Clear()
         {
             for (int i = _activeNotes.Count - 1; i >= 0; i--) ReturnNoteView(_activeNotes[i].View);

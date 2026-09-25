@@ -59,6 +59,8 @@ namespace RhythmRogue.Map
                 return GenerateScripted(rng, seed, area, area.onboarding);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
+            DevCacheEnemyNames(area);
+
             // Dev shortcut, checked after onboarding so an explicitly launched tutorial still
             // builds its scripted path.
             if (DevBossOnly) return GenerateBossOnly(rng, seed, area);
@@ -104,6 +106,11 @@ namespace RhythmRogue.Map
             foreach (var node in map.Layers[0]) node.IsAccessible = true;
 
             GameLog.Info($"[MapGenerator] Generated map for '{area.areaName}': {map.AllNodes.Count} nodes, {map.LayerCount} layers");
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!string.IsNullOrEmpty(DevForcedEnemy))
+                GameLog.Warn($"[MapGenerator] DEV FORCED ENEMY: every battle node is '{DevForcedEnemy}'. " +
+                             "Turn this off in the dev cheat panel (F10).");
+#endif
             return map;
         }
 
@@ -159,6 +166,69 @@ namespace RhythmRogue.Map
 
         private const string DevBossOnlyKey = "dev.map.bossOnly";
         private static int _devBossOnlyCache = -1;
+
+        private const string DevForcedEnemyKey = "dev.map.forcedEnemy";
+        private static string _devForcedEnemyCache;
+        private static readonly List<string> DevEnemyNames = new();
+
+        /// <summary>
+        /// DEV ONLY. Names of the basic enemies in the last area a map was generated for, so a dev
+        /// UI can offer them without needing a reference to the Area itself.
+        /// </summary>
+        public static IReadOnlyList<string> DevBasicEnemyNames => DevEnemyNames;
+
+        /// <summary>
+        /// DEV ONLY. When set to an enemy's name, every Enemy and Elite node on a newly generated
+        /// map uses that enemy instead of rolling from the pool. Empty means normal selection.
+        ///
+        /// For testing one enemy's behaviour without rerolling runs until it appears. It bypasses
+        /// weights and the minDepthT gate on purpose, so an enemy meant for the back half can be
+        /// fought immediately. Applies at map GENERATION, so it takes effect on the next new run.
+        /// Backed by PlayerPrefs, and every forced map logs a warning so it cannot be left on
+        /// silently.
+        /// </summary>
+        public static string DevForcedEnemy
+        {
+            get
+            {
+                _devForcedEnemyCache ??= PlayerPrefs.GetString(DevForcedEnemyKey, string.Empty);
+                return _devForcedEnemyCache;
+            }
+            set
+            {
+                _devForcedEnemyCache = value ?? string.Empty;
+                PlayerPrefs.SetString(DevForcedEnemyKey, _devForcedEnemyCache);
+                PlayerPrefs.Save();
+            }
+        }
+
+        private static void DevCacheEnemyNames(Area area)
+        {
+            DevEnemyNames.Clear();
+            if (area.basicEnemies == null) return;
+            foreach (var entry in area.basicEnemies.Entries)
+                if (entry.enemy != null && !DevEnemyNames.Contains(entry.enemy.enemyName))
+                    DevEnemyNames.Add(entry.enemy.enemyName);
+        }
+
+        /// <summary>
+        /// DEV ONLY. Resolve the forced enemy for a battle node, or null when nothing is forced or
+        /// the name matches nothing in the area's basic pool.
+        /// </summary>
+        private static EnemyData DevResolveForcedEnemy(NodeType type, Area area)
+        {
+            if (type != NodeType.Enemy && type != NodeType.Elite) return null;
+
+            string forced = DevForcedEnemy;
+            if (string.IsNullOrEmpty(forced) || area.basicEnemies == null) return null;
+
+            foreach (var entry in area.basicEnemies.Entries)
+                if (entry.enemy != null && entry.enemy.enemyName == forced) return entry.enemy;
+
+            GameLog.Warn($"[MapGenerator] Forced enemy '{forced}' is not in '{area.areaName}' basic pool. " +
+                         "Falling back to normal selection.");
+            return null;
+        }
 
         /// <summary>
         /// DEV ONLY. When set, <see cref="Generate"/> returns a map containing nothing but the
@@ -246,14 +316,21 @@ namespace RhythmRogue.Map
         // Enemy nodes pull from the area pool by depth: harder-feeling enemies (higher minDepthT)
         // are kept out of the opening layers, so the opener can't roll a wall. Difficulty itself
         // is depth-driven at battle time; this just controls where each enemy's flavour appears.
-        private static EnemyData ResolveEnemyForNode(NodeType type, Area area, ISeededRandom rng, float depthT) => type switch
+        private static EnemyData ResolveEnemyForNode(NodeType type, Area area, ISeededRandom rng, float depthT)
         {
-            NodeType.Enemy => area.basicEnemies != null ? area.basicEnemies.PickEligible(rng, depthT) : null,
-            NodeType.Elite => (area.eliteEnemies != null && !area.eliteEnemies.IsEmpty)
-                                ? area.eliteEnemies.PickEligible(rng, depthT)
-                                : (area.basicEnemies != null ? area.basicEnemies.PickEligible(rng, depthT) : null),
-            _ => null
-        };
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            EnemyData forced = DevResolveForcedEnemy(type, area);
+            if (forced != null) return forced;
+#endif
+            return type switch
+            {
+                NodeType.Enemy => area.basicEnemies != null ? area.basicEnemies.PickEligible(rng, depthT) : null,
+                NodeType.Elite => (area.eliteEnemies != null && !area.eliteEnemies.IsEmpty)
+                                    ? area.eliteEnemies.PickEligible(rng, depthT)
+                                    : (area.basicEnemies != null ? area.basicEnemies.PickEligible(rng, depthT) : null),
+                _ => null
+            };
+        }
 
         private static NodeType PickNodeType(LayerConfig config, ISeededRandom rng)
         {

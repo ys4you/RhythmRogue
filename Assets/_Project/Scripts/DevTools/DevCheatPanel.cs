@@ -191,6 +191,29 @@ namespace RhythmRogue.DevTools
                              "Takes effect on the next New Run.");
             }
             GUILayout.Label(now ? "on: next New Run is boss only" : "off: normal map");
+
+            var names = RhythmRogue.Map.MapGenerator.DevBasicEnemyNames;
+            string forced = RhythmRogue.Map.MapGenerator.DevForcedEnemy;
+            string shown = string.IsNullOrEmpty(forced) ? "off (random)" : forced;
+
+            if (names == null || names.Count == 0)
+            {
+                GUILayout.Label("Force enemy: start a run first");
+            }
+            else if (GUILayout.Button($"Force enemy: {shown}"))
+            {
+                // Cycle: off -> first -> second -> ... -> off. Keeps the panel to one control
+                // instead of a button per enemy, which would grow with every enemy added.
+                int index = -1;
+                for (int i = 0; i < names.Count; i++)
+                    if (names[i] == forced) { index = i; break; }
+
+                index++;
+                string next = index >= names.Count ? string.Empty : names[index];
+                RhythmRogue.Map.MapGenerator.DevForcedEnemy = next;
+                GameLog.Info($"[DevCheatPanel] Forced enemy set to " +
+                             $"{(string.IsNullOrEmpty(next) ? "off" : next)}. Takes effect on the next New Run.");
+            }
         }
 
         private void DrawTime()

@@ -1,0 +1,17 @@
+# Obsidian: per-machine UI state. Changes constantly and conflicts between laptop and desktop.
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/workspaces.json
+.obsidian/graph.json
+.obsidian/cache/
+
+# Obsidian trash (deleted notes)
+.trash/
+
+# OS junk
+.DS_Store
+Thumbs.db
+__MACOSX/
+
+# Old template files parked for review. Delete this folder when done.
+_to_delete/
